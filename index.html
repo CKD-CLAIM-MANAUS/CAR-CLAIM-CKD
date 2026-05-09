@@ -5,15 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>CAR — Garantia de Peças · CFMOTO</title>
 
-<!-- Firebase SDKs (Firestore apenas — sem Storage) -->
+<!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-  // =====================================================
-  // 🔧 COLE AQUI AS SUAS CREDENCIAIS DO FIREBASE
-  // (só precisas do Firestore — sem Storage)
-  // =====================================================
   const firebaseConfig = {
     apiKey: "AIzaSyBkOtlCGjrfSkR2HgVP2OOv4UZpW6txm90",
     authDomain: "car-garantia.firebaseapp.com",
@@ -22,831 +19,591 @@
     messagingSenderId: "1038572043129",
     appId: "1:1038572043129:web:6769b31e0d3be9fd4c0da8"
   };
-  // =====================================================
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const auth = getAuth(app);
 
   window._db = db;
-  window._fb = { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy };
+  window._auth = auth;
+  window._fb = { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc };
+  window._fbAuth = { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile };
   window._fbReady = true;
   document.dispatchEvent(new Event('firebase-ready'));
 </script>
 
-<!-- Cloudinary config (fotos) -->
+<!-- Cloudinary -->
 <script>
-  // =====================================================
-  // ✅ CLOUDINARY — JÁ CONFIGURADO
-  // =====================================================
-  window._cloudinary = {
-    cloudName: 'dos2jsgzg',
-    uploadPreset: 'Garantia CAR'
-  };
-
+  window._cloudinary = { cloudName: 'dos2jsgzg', uploadPreset: 'Garantia CAR' };
   async function uploadToCloudinary(file) {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('upload_preset', window._cloudinary.uploadPreset);
     fd.append('folder', 'garantia-car');
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${window._cloudinary.cloudName}/image/upload`, {
-      method: 'POST', body: fd
-    });
-    if(!res.ok) throw new Error('Cloudinary upload failed');
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${window._cloudinary.cloudName}/image/upload`, { method: 'POST', body: fd });
+    if(!res.ok) throw new Error('Upload failed');
     const data = await res.json();
     return { url: data.secure_url, publicId: data.public_id };
   }
   window.uploadToCloudinary = uploadToCloudinary;
 </script>
 
+<!-- SheetJS -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <style>
-:root {
-  --blue: #1565C0;
-  --blue-dark: #0D47A1;
-  --blue-light: #E3F2FD;
-  --blue-mid: #1976D2;
-  --green: #2E7D32;
-  --green-light: #E8F5E9;
-  --amber: #E65100;
-  --amber-light: #FFF3E0;
-  --red: #C62828;
-  --red-light: #FFEBEE;
-  --gray: #455A64;
-  --gray-light: #ECEFF1;
-  --gray-border: #CFD8DC;
-  --white: #FFFFFF;
-  --bg: #F4F6F8;
-  --text: #1A237E;
-  --text-body: #263238;
-  --text-muted: #607D8B;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow: 0 1px 4px rgba(0,0,0,0.10);
-  --shadow-md: 0 2px 12px rgba(0,0,0,0.13);
-}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F4F6F8;color:#263238;min-height:100vh;font-size:15px}
 
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#0D47A1}
+.auth-card{background:#fff;border-radius:16px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px;justify-content:center}
+.auth-logo-icon{width:44px;height:44px;background:#1565C0;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px}
+.auth-logo-text{font-size:18px;font-weight:700;color:#1A237E}
+.auth-logo-sub{font-size:11px;color:#607D8B;margin-top:1px}
+.auth-tabs{display:flex;background:#F4F6F8;border-radius:8px;padding:3px;margin-bottom:20px}
+.auth-tab{flex:1;padding:8px;text-align:center;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;color:#607D8B;border:none;background:transparent;transition:all 0.15s}
+.auth-tab.active{background:#fff;color:#1565C0;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+.auth-field{margin-bottom:14px}
+.auth-field label{display:block;font-size:12px;font-weight:600;color:#455A64;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:5px}
+.auth-field input{width:100%;padding:11px 14px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;color:#263238;background:#fff;transition:border-color 0.15s;font-family:inherit}
+.auth-field input:focus{outline:none;border-color:#1565C0;box-shadow:0 0 0 3px rgba(21,101,192,0.12)}
+.auth-btn{width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:background 0.15s;font-family:inherit;margin-top:4px}
+.auth-btn:hover{background:#0D47A1}
+.auth-btn:disabled{opacity:0.6;cursor:not-allowed}
+.auth-err{background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+.auth-err.show{display:block}
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg);
-  color: var(--text-body);
-  min-height: 100vh;
-  font-size: 15px;
-}
+.app-wrap{display:none}
+.header{background:#1565C0;color:#fff;padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+.header-brand{display:flex;align-items:center;gap:10px}
+.header-logo{width:36px;height:36px;background:rgba(255,255,255,0.18);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.header-title{font-size:16px;font-weight:600}
+.header-sub{font-size:11px;opacity:0.7;margin-top:1px}
+.user-chip{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border-radius:20px;padding:5px 10px 5px 6px;cursor:pointer;font-size:13px}
+.user-avatar{width:26px;height:26px;background:rgba(255,255,255,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.admin-badge{background:#FFB300;color:#1A237E;border-radius:4px;font-size:9px;font-weight:800;padding:1px 5px;margin-left:3px}
 
-/* HEADER */
-.header {
-  background: var(--blue);
-  color: white;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 58px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-.header-brand { display: flex; align-items: center; gap: 10px; }
-.header-logo {
-  width: 36px; height: 36px;
-  background: rgba(255,255,255,0.18);
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px;
-}
-.header-title { font-size: 16px; font-weight: 600; letter-spacing: 0.01em; }
-.header-sub { font-size: 11px; opacity: 0.7; margin-top: 1px; }
-.user-chip {
-  display: flex; align-items: center; gap: 6px;
-  background: rgba(255,255,255,0.15);
-  border-radius: 20px;
-  padding: 5px 10px 5px 6px;
-  cursor: pointer;
-  font-size: 13px;
-}
-.user-avatar {
-  width: 26px; height: 26px;
-  background: rgba(255,255,255,0.3);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700;
-}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #CFD8DC;display:flex;z-index:100;box-shadow:0 -2px 8px rgba(0,0,0,0.08)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px 10px;font-size:10px;color:#607D8B;cursor:pointer;border:none;background:transparent;gap:3px;transition:color 0.15s}
+.nav-btn .nav-ico{font-size:22px}
+.nav-btn.active{color:#1565C0}
 
-/* NAV BOTTOM (mobile style) */
-.bottom-nav {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: white;
-  border-top: 1px solid var(--gray-border);
-  display: flex;
-  z-index: 100;
-  box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
-}
-.nav-btn {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 8px 4px 10px;
-  font-size: 10px; color: var(--text-muted);
-  cursor: pointer; border: none; background: transparent;
-  gap: 3px; transition: color 0.15s;
-}
-.nav-btn .nav-ico { font-size: 22px; }
-.nav-btn.active { color: var(--blue); }
-.nav-btn.active .nav-ico { transform: scale(1.1); }
+.main{padding:16px 14px 90px;max-width:680px;margin:0 auto}
 
-/* MAIN */
-.main { padding: 16px 14px 90px; max-width: 680px; margin: 0 auto; }
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.stat{background:#fff;border-radius:10px;padding:14px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+.stat-n{font-size:26px;font-weight:700}
+.stat-n.blue{color:#1565C0}
+.stat-n.amber{color:#E65100}
+.stat-n.green{color:#2E7D32}
+.stat-l{font-size:11px;color:#607D8B;margin-top:2px}
 
-/* STATS */
-.stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 16px; }
-.stat { background: white; border-radius: var(--radius); padding: 14px 10px; text-align: center; box-shadow: var(--shadow); }
-.stat-n { font-size: 26px; font-weight: 700; }
-.stat-n.blue { color: var(--blue); }
-.stat-n.amber { color: var(--amber); }
-.stat-n.green { color: var(--green); }
-.stat-l { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.search-box{background:#fff;border-radius:10px;display:flex;align-items:center;gap:8px;padding:10px 14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.1);border:1px solid #CFD8DC}
+.search-box input{flex:1;border:none;outline:none;font-size:14px;color:#263238;background:transparent}
+.filter-row{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px}
+.filter-row::-webkit-scrollbar{display:none}
+.fpill{white-space:nowrap;padding:6px 14px;border-radius:20px;border:1.5px solid #CFD8DC;background:#fff;font-size:12px;color:#607D8B;cursor:pointer;transition:all 0.15s}
+.fpill.active{background:#1565C0;color:#fff;border-color:#1565C0;font-weight:600}
 
-/* SEARCH */
-.search-box {
-  background: white; border-radius: var(--radius);
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px; margin-bottom: 10px;
-  box-shadow: var(--shadow); border: 1px solid var(--gray-border);
-}
-.search-box input { flex: 1; border: none; outline: none; font-size: 14px; color: var(--text-body); background: transparent; }
-.search-ico { font-size: 18px; opacity: 0.4; }
+.inc-list{display:flex;flex-direction:column;gap:10px}
+.inc-card{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.1);border-left:4px solid #CFD8DC;cursor:pointer;transition:box-shadow 0.15s}
+.inc-card.pending{border-left-color:#E65100}
+.inc-card.done{border-left-color:#2E7D32}
+.inc-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.inc-name{font-size:14px;font-weight:600;color:#263238}
+.inc-code{font-size:11px;color:#607D8B;margin-top:2px}
+.inc-meta{font-size:11px;color:#607D8B;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge.pending{background:#FFF3E0;color:#E65100}
+.badge.done{background:#E8F5E9;color:#2E7D32}
+.photo-count{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#1565C0;margin-top:6px}
 
-/* FILTERS */
-.filter-row { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; }
-.filter-row::-webkit-scrollbar { display: none; }
-.fpill {
-  white-space: nowrap; padding: 6px 14px; border-radius: 20px;
-  border: 1.5px solid var(--gray-border); background: white;
-  font-size: 12px; color: var(--text-muted); cursor: pointer;
-  transition: all 0.15s;
-}
-.fpill.active { background: var(--blue); color: white; border-color: var(--blue); font-weight: 600; }
+.form-wrap{display:flex;flex-direction:column;gap:14px}
+.form-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+.form-section-title{font-size:11px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;padding-bottom:8px;border-bottom:1.5px solid #E3F2FD}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.full{grid-column:1/-1}
+.fg label{font-size:11px;font-weight:600;color:#607D8B;text-transform:uppercase;letter-spacing:0.04em}
+.fg input,.fg select,.fg textarea{padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;color:#263238;background:#fff;font-family:inherit;width:100%;transition:border-color 0.15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:#1565C0;box-shadow:0 0 0 3px rgba(21,101,192,0.12)}
+.fg textarea{min-height:80px;resize:vertical}
 
-/* INCIDENT CARDS */
-.inc-list { display: flex; flex-direction: column; gap: 10px; }
-.inc-card {
-  background: white; border-radius: var(--radius);
-  padding: 14px 16px; box-shadow: var(--shadow);
-  border-left: 4px solid var(--gray-border);
-  cursor: pointer; transition: box-shadow 0.15s, transform 0.1s;
-  position: relative;
-}
-.inc-card:active { transform: scale(0.99); }
-.inc-card.pending { border-left-color: var(--amber); }
-.inc-card.done { border-left-color: var(--green); }
-.inc-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.inc-name { font-size: 14px; font-weight: 600; color: var(--text-body); }
-.inc-code { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.inc-meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px; }
-.inc-meta span { display: flex; align-items: center; gap: 3px; }
-.badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap;
-}
-.badge.pending { background: var(--amber-light); color: var(--amber); }
-.badge.done { background: var(--green-light); color: var(--green); }
-.badge.new { background: var(--blue-light); color: var(--blue); }
+.photo-drop{border:2px dashed #CFD8DC;border-radius:10px;padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.2s;background:#F4F6F8}
+.photo-drop:hover{border-color:#1565C0;background:#E3F2FD}
+.photo-drop input{display:none}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:12px}
+.photo-thumb{aspect-ratio:1;border-radius:8px;overflow:hidden;position:relative;border:1.5px solid #CFD8DC}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-del{position:absolute;top:4px;right:4px;background:rgba(198,40,40,0.85);color:#fff;border:none;border-radius:4px;width:22px;height:22px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 
-/* PHOTO COUNT BADGE */
-.photo-count { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--blue); margin-top: 6px; }
+.btn{padding:11px 20px;border-radius:8px;border:1.5px solid #CFD8DC;background:#fff;color:#263238;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all 0.15s;font-family:inherit}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:#1565C0;color:#fff;border-color:#1565C0}
+.btn-primary:hover{background:#0D47A1}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.btn-success{background:#2E7D32;color:#fff;border-color:#2E7D32}
+.btn-danger{background:#C62828;color:#fff;border-color:#C62828}
+.btn-excel{background:#1B5E20;color:#fff;border-color:#1B5E20;width:100%;justify-content:center;font-size:15px;padding:14px}
+.btn-excel:hover{background:#2E7D32}
+.form-actions{display:flex;gap:10px;justify-content:flex-end;padding:4px 0}
 
-/* EMPTY */
-.empty { text-align: center; padding: 50px 20px; color: var(--text-muted); }
-.empty-ico { font-size: 52px; opacity: 0.25; margin-bottom: 12px; }
+.detail-header{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.1);margin-bottom:12px;border-left:4px solid #1565C0}
+.detail-title{font-size:18px;font-weight:700;color:#263238}
+.detail-id{font-size:12px;color:#607D8B;margin-top:3px}
+.detail-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.1);margin-bottom:12px}
+.detail-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #ECEFF1;font-size:13px;gap:12px}
+.detail-row:last-child{border:none;padding-bottom:0}
+.detail-lbl{color:#607D8B;flex-shrink:0}
+.detail-val{font-weight:600;text-align:right;word-break:break-word}
+.detail-text-block{font-size:13px;color:#263238;white-space:pre-wrap;line-height:1.6;padding:4px 0}
+.detail-actions{display:flex;gap:8px;flex-wrap:wrap}
+.back-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#607D8B;cursor:pointer;margin-bottom:14px;padding:4px 0}
+.back-btn:hover{color:#1565C0}
 
-/* LOADING */
-.loading-bar {
-  display: flex; align-items: center; justify-content: center;
-  gap: 10px; padding: 40px; color: var(--text-muted); font-size: 14px;
-}
-.spinner {
-  width: 24px; height: 24px;
-  border: 3px solid var(--gray-border);
-  border-top-color: var(--blue);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
+.excel-card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.1);margin-bottom:14px}
+.excel-card h2{font-size:16px;font-weight:700;color:#263238;margin-bottom:6px}
+.excel-card p{font-size:13px;color:#607D8B;line-height:1.6;margin-bottom:14px}
+.excel-filter{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.excel-filter label{font-size:12px;font-weight:600;color:#455A64;text-transform:uppercase;letter-spacing:0.04em}
+.excel-filter select{padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;color:#263238;background:#fff;font-family:inherit;width:100%}
+.excel-stat{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+.excel-stat-item{background:#F4F6F8;border-radius:8px;padding:12px;text-align:center}
+.excel-stat-item .n{font-size:22px;font-weight:700;color:#1565C0}
+.excel-stat-item .n.amber{color:#E65100}
+.excel-stat-item .n.green{color:#2E7D32}
+.excel-stat-item .l{font-size:11px;color:#607D8B;margin-top:2px}
 
-/* ===== FORM ===== */
-.form-wrap { display: flex; flex-direction: column; gap: 14px; }
-.form-card { background: white; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
-.form-section-title {
-  font-size: 11px; font-weight: 700; color: var(--blue);
-  text-transform: uppercase; letter-spacing: 0.07em;
-  margin-bottom: 14px; padding-bottom: 8px;
-  border-bottom: 1.5px solid var(--blue-light);
-}
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.fg { display: flex; flex-direction: column; gap: 4px; }
-.fg.full { grid-column: 1/-1; }
-.fg label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.fg input, .fg select, .fg textarea {
-  padding: 10px 12px; border: 1.5px solid var(--gray-border);
-  border-radius: var(--radius-sm); font-size: 14px;
-  color: var(--text-body); background: white;
-  font-family: inherit; width: 100%;
-  transition: border-color 0.15s;
-}
-.fg input:focus, .fg select:focus, .fg textarea:focus {
-  outline: none; border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(21,101,192,0.12);
-}
-.fg textarea { min-height: 80px; resize: vertical; }
+.empty{text-align:center;padding:50px 20px;color:#607D8B}
+.empty-ico{font-size:52px;opacity:0.25;margin-bottom:12px}
+.loading-bar{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;color:#607D8B;font-size:14px}
+.spinner{width:24px;height:24px;border:3px solid #CFD8DC;border-top-color:#1565C0;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* PHOTO UPLOAD */
-.photo-drop {
-  border: 2px dashed var(--gray-border); border-radius: var(--radius);
-  padding: 24px 16px; text-align: center; cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  background: var(--bg);
-}
-.photo-drop:hover, .photo-drop.dragover { border-color: var(--blue); background: var(--blue-light); }
-.photo-drop input { display: none; }
-.photo-drop-ico { font-size: 36px; opacity: 0.35; margin-bottom: 6px; }
-.photo-drop-txt { font-size: 13px; color: var(--text-muted); }
-.photo-drop-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; opacity: 0.7; }
+.fs-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:300;align-items:center;justify-content:center;flex-direction:column}
+.fs-overlay.open{display:flex}
+.fs-overlay img{max-width:95vw;max-height:85vh;border-radius:8px}
+.fs-close{position:absolute;top:16px;right:16px;color:#fff;font-size:28px;cursor:pointer;background:none;border:none}
 
-.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px,1fr)); gap: 8px; margin-top: 12px; }
-.photo-thumb {
-  aspect-ratio: 1; border-radius: 8px; overflow: hidden;
-  position: relative; border: 1.5px solid var(--gray-border);
-}
-.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.photo-del {
-  position: absolute; top: 4px; right: 4px;
-  background: rgba(198,40,40,0.85); color: white;
-  border: none; border-radius: 4px; width: 22px; height: 22px;
-  font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-}
-.photo-uploading {
-  position: absolute; inset: 0; background: rgba(255,255,255,0.8);
-  display: flex; align-items: center; justify-content: center; font-size: 18px;
-}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A237E;color:#fff;padding:11px 20px;border-radius:24px;font-size:13px;font-weight:500;opacity:0;transition:all 0.3s;z-index:999;pointer-events:none;white-space:nowrap;box-shadow:0 2px 12px rgba(0,0,0,0.2)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* FORM ACTIONS */
-.form-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 4px 0; }
-.btn {
-  padding: 11px 20px; border-radius: var(--radius-sm); border: 1.5px solid var(--gray-border);
-  background: white; color: var(--text-body); font-size: 14px; font-weight: 600;
-  cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
-  transition: all 0.15s; font-family: inherit;
-}
-.btn:active { transform: scale(0.98); }
-.btn-primary { background: var(--blue); color: white; border-color: var(--blue); }
-.btn-primary:hover { background: var(--blue-dark); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-success { background: var(--green); color: white; border-color: var(--green); }
-.btn-danger { background: var(--red); color: white; border-color: var(--red); }
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:flex-end;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:16px 16px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;animation:slideUp 0.25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:4px;color:#263238}
+.modal-sub{font-size:13px;color:#607D8B;margin-bottom:16px}
+.modal-user-info{display:flex;align-items:center;gap:12px;padding:14px;background:#F4F6F8;border-radius:10px;margin-bottom:16px}
+.modal-av{width:44px;height:44px;background:#1565C0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0}
+.modal-name{font-size:15px;font-weight:600;color:#263238}
+.modal-email{font-size:12px;color:#607D8B;margin-top:2px}
 
-/* ===== DETAIL ===== */
-.detail-header {
-  background: white; border-radius: var(--radius);
-  padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px;
-  border-left: 4px solid var(--blue);
-}
-.detail-title { font-size: 18px; font-weight: 700; color: var(--text-body); }
-.detail-id { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-.detail-card { background: white; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px; }
-.detail-row {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  padding: 9px 0; border-bottom: 1px solid var(--gray-light);
-  font-size: 13px; gap: 12px;
-}
-.detail-row:last-child { border: none; padding-bottom: 0; }
-.detail-lbl { color: var(--text-muted); flex-shrink: 0; }
-.detail-val { font-weight: 600; text-align: right; word-break: break-word; }
-.detail-text-block {
-  font-size: 13px; color: var(--text-body); white-space: pre-wrap;
-  line-height: 1.6; padding: 4px 0;
-}
-
-/* DETAIL ACTIONS */
-.detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-/* BACK BTN */
-.back-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; color: var(--text-muted); cursor: pointer;
-  margin-bottom: 14px; padding: 4px 0;
-}
-.back-btn:hover { color: var(--blue); }
-
-/* TOAST */
-.toast {
-  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
-  background: #1A237E; color: white; padding: 11px 20px;
-  border-radius: 24px; font-size: 13px; font-weight: 500;
-  opacity: 0; transition: all 0.3s; z-index: 999; pointer-events: none;
-  white-space: nowrap; box-shadow: var(--shadow-md);
-}
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* USER MODAL */
-.modal-bg {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,0.45); z-index: 200;
-  align-items: flex-end; justify-content: center;
-}
-.modal-bg.open { display: flex; }
-.modal {
-  background: white; border-radius: 16px 16px 0 0;
-  padding: 20px 20px 36px; width: 100%; max-width: 480px;
-  animation: slideUp 0.25s ease;
-}
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: var(--text-body); }
-.user-option {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px; border-radius: var(--radius-sm); cursor: pointer;
-  transition: background 0.15s; font-size: 14px;
-}
-.user-option:hover { background: var(--bg); }
-.user-option.selected { background: var(--blue-light); color: var(--blue); font-weight: 600; }
-.user-av {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: var(--blue-light); color: var(--blue);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 13px; flex-shrink: 0;
-}
-
-/* FULLSCREEN PHOTO */
-.fs-overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,0.93); z-index: 300;
-  align-items: center; justify-content: center;
-  flex-direction: column; gap: 12px;
-}
-.fs-overlay.open { display: flex; }
-.fs-overlay img { max-width: 95vw; max-height: 80vh; border-radius: 8px; }
-.fs-close { position: absolute; top: 16px; right: 16px; color: white; font-size: 28px; cursor: pointer; background: none; border: none; }
-
-/* CONFIG SCREEN */
-.config-card {
-  background: white; border-radius: var(--radius); padding: 20px;
-  box-shadow: var(--shadow); margin-bottom: 12px;
-}
-.config-card h2 { font-size: 16px; font-weight: 700; color: var(--text-body); margin-bottom: 6px; }
-.config-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
-.step-num {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: var(--blue); color: white;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700; margin-right: 8px; flex-shrink: 0;
-}
-.step { display: flex; align-items: flex-start; gap: 0; margin-bottom: 14px; }
-.step-content { font-size: 13px; color: var(--text-body); line-height: 1.6; flex: 1; }
-.step-content a { color: var(--blue); text-decoration: none; font-weight: 600; }
-.code-block {
-  background: #1A237E; color: #E3F2FD; border-radius: 8px;
-  padding: 12px 14px; font-family: 'Courier New', monospace;
-  font-size: 12px; margin: 8px 0; overflow-x: auto; white-space: pre;
-}
-.alert-config {
-  background: var(--amber-light); border: 1.5px solid var(--amber);
-  border-radius: var(--radius); padding: 14px 16px;
-  font-size: 13px; color: var(--amber); margin-bottom: 14px;
-  display: flex; gap: 10px; align-items: flex-start; line-height: 1.6;
-}
-
-@media (max-width: 400px) {
-  .form-grid { grid-template-columns: 1fr; }
-  .fg.full { grid-column: 1; }
-}
+@media(max-width:400px){.form-grid{grid-template-columns:1fr}.fg.full{grid-column:1}}
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<div class="header">
-  <div class="header-brand">
-    <div class="header-logo">⚙️</div>
-    <div>
-      <div class="header-title">CAR · Garantia</div>
-      <div class="header-sub">CFMOTO da Amazônia</div>
-    </div>
-  </div>
-  <div class="user-chip" onclick="openUserModal()">
-    <div class="user-avatar" id="userAv">LH</div>
-    <span id="userLabel">Luis H.</span>
-  </div>
-</div>
-
-<!-- PAGES -->
-<div class="main">
-  <!-- LIST PAGE -->
-  <div id="pageList">
-    <div class="stats-row">
-      <div class="stat"><div class="stat-n blue" id="statTotal">—</div><div class="stat-l">Total</div></div>
-      <div class="stat"><div class="stat-n amber" id="statPending">—</div><div class="stat-l">Pendentes</div></div>
-      <div class="stat"><div class="stat-n green" id="statDone">—</div><div class="stat-l">Concluídos</div></div>
-    </div>
-    <div class="search-box">
-      <span class="search-ico">🔍</span>
-      <input type="text" id="searchInput" placeholder="Pesquisar peça, código, modelo..." oninput="renderList()">
-    </div>
-    <div class="filter-row">
-      <div class="fpill active" onclick="setFilter('all',this)">Todos</div>
-      <div class="fpill" onclick="setFilter('pending',this)">⏳ Pendentes</div>
-      <div class="fpill" onclick="setFilter('done',this)">✅ Concluídos</div>
-    </div>
-    <div id="incList" class="inc-list">
-      <div class="loading-bar"><div class="spinner"></div> Carregando...</div>
-    </div>
-  </div>
-
-  <!-- FORM PAGE -->
-  <div id="pageForm" style="display:none">
-    <div class="back-btn" onclick="showPage('list')">← Voltar</div>
-    <div class="form-wrap">
-      <div class="form-card">
-        <div class="form-section-title">📦 Identificação da Peça</div>
-        <div class="form-grid">
-          <div class="fg">
-            <label>Código da Peça *</label>
-            <input id="fPartNo" type="text" placeholder="9AWV-132000-8000">
-          </div>
-          <div class="fg">
-            <label>Nome da Peça *</label>
-            <input id="fPartName" type="text" placeholder="REAR SEAT ASSY">
-          </div>
-          <div class="fg">
-            <label>Modelo</label>
-            <input id="fModel" type="text" placeholder="CF1000AZ-2">
-          </div>
-          <div class="fg">
-            <label>Nº Pedido (Order No.)</label>
-            <input id="fOrderNo" type="text" placeholder="25BR-FMC38532C-1">
-          </div>
-          <div class="fg">
-            <label>Lote (Lot No.)</label>
-            <input id="fLotNo" type="text" placeholder="10194649">
-          </div>
-          <div class="fg">
-            <label>Qtd. Defeituosa</label>
-            <input id="fNgQty" type="number" min="1" placeholder="1">
-          </div>
-          <div class="fg full">
-            <label>Descrição do Defeito *</label>
-            <textarea id="fDefect" placeholder="Descreva o problema encontrado com a peça..."></textarea>
-          </div>
-          <div class="fg full">
-            <label>Como foi Detectado</label>
-            <textarea id="fDetected" placeholder="Desempacotamento, inspeção visual, teste em montagem..."></textarea>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-card">
-        <div class="form-section-title">🔧 Ação na Fábrica KD</div>
-        <div class="form-grid">
-          <div class="fg">
-            <label>Ação Tomada</label>
-            <select id="fAction">
-              <option value="">Selecionar...</option>
-              <option value="SEGREGATION">Segregação (Isolamento)</option>
-              <option value="REPAIR">Reparação</option>
-              <option value="USE AS IS">Usar como está</option>
-              <option value="REPLACEMENT">Substituição</option>
-            </select>
-          </div>
-          <div class="fg">
-            <label>Peça de Reposição</label>
-            <select id="fReplacement">
-              <option value="NEED">Necessária (NEED)</option>
-              <option value="NO NEED">Não necessária</option>
-            </select>
-          </div>
-          <div class="fg full">
-            <label>Observações / Contramedidas</label>
-            <textarea id="fNotes" placeholder="Contramedidas adotadas, observações adicionais..."></textarea>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-card">
-        <div class="form-section-title">📷 Fotos do Incidente</div>
-        <div class="photo-drop" id="photoDrop" onclick="document.getElementById('photoInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropPhotos(event)">
-          <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotos(this.files)">
-          <div class="photo-drop-ico">📸</div>
-          <div class="photo-drop-txt">Toque para adicionar fotos</div>
-          <div class="photo-drop-sub">Tire a foto agora ou escolha da galeria · Múltiplas permitidas</div>
-        </div>
-        <div class="photo-grid" id="photoGrid"></div>
-      </div>
-
-      <div class="form-actions">
-        <button class="btn" onclick="showPage('list')">Cancelar</button>
-        <button class="btn btn-primary" id="saveBtn" onclick="saveIncident()">💾 Guardar</button>
+<!-- AUTH -->
+<div class="auth-wrap" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">⚙️</div>
+      <div>
+        <div class="auth-logo-text">CAR · Garantia</div>
+        <div class="auth-logo-sub">CFMOTO da Amazônia</div>
       </div>
     </div>
-  </div>
-
-  <!-- DETAIL PAGE -->
-  <div id="pageDetail" style="display:none">
-    <div class="back-btn" onclick="showPage('list')">← Voltar à lista</div>
-    <div id="detailContent"></div>
-  </div>
-
-  <!-- CONFIG PAGE -->
-  <div id="pageConfig" style="display:none">
-    <div class="config-card" style="border-left:4px solid #2E7D32">
-      <h2>✅ Cloudinary configurado</h2>
-      <p style="margin-top:6px">Fotos guardadas em: <strong>dos2jsgzg</strong> · Preset: <strong>Garantia CAR</strong></p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Entrar</button>
+      <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Criar conta</button>
     </div>
-
-    <div class="config-card">
-      <h2>Passos restantes</h2>
-      <p>Só falta configurar o Firebase (banco de dados) e publicar online.</p>
+    <div class="auth-err" id="authErr"></div>
+    <div id="loginForm">
+      <div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="auth-field"><label>Senha</label><input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="auth-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
     </div>
-
-    <div class="config-card">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-content">
-          <strong>Ativar Firestore no Firebase</strong><br>
-          Acede a <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → projeto <em>Car-Garantia</em><br>
-          No menu: <strong>Build → Firestore Database → Create database</strong><br>
-          Escolhe <strong>"Start in test mode"</strong> → região <em>us-east1</em> → Enable.
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-content">
-          <strong>Copiar as credenciais do Firebase</strong><br>
-          Clica no ⚙️ → <strong>Configurações do projeto</strong> → role até "Seus apps"<br>
-          Clica em <strong>"Web" (&lt;/&gt;)</strong> → regista a app → copia o bloco <code>firebaseConfig</code>.
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-content">
-          <strong>Colar no ficheiro index.html</strong><br>
-          Abre o ficheiro num editor de texto (Bloco de Notas funciona).<br>
-          Encontra a secção <em>🔧 COLE AQUI AS SUAS CREDENCIAIS</em><br>
-          Substitui os <code>COLE_AQUI_...</code> pelos teus valores reais.
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-content">
-          <strong>Publicar no GitHub Pages</strong><br>
-          Cria conta em <a href="https://github.com" target="_blank">github.com</a><br>
-          Cria repositório <code>car-garantia</code> (Public) → faz upload do <code>index.html</code><br>
-          <strong>Settings → Pages → Branch: main → Save</strong><br>
-          O teu link: <code>https://SEU_USUARIO.github.io/car-garantia</code> 🎉
-        </div>
-      </div>
-    </div>
-
-    <div class="config-card">
-      <h2>💡 Precisas de ajuda?</h2>
-      <p>Manda uma mensagem no chat descrevendo onde ficaste preso — resolvo contigo em minutos!</p>
+    <div id="registerForm" style="display:none">
+      <div class="auth-field"><label>Nome completo</label><input type="text" id="regName" placeholder="Seu nome"></div>
+      <div class="auth-field"><label>Email</label><input type="email" id="regEmail" placeholder="seu@email.com"></div>
+      <div class="auth-field"><label>Senha</label><input type="password" id="regPass" placeholder="Mínimo 6 caracteres"></div>
+      <div class="auth-field"><label>Confirmar senha</label><input type="password" id="regPass2" placeholder="Repetir senha"></div>
+      <button class="auth-btn" id="registerBtn" onclick="doRegister()">Criar conta</button>
     </div>
   </div>
 </div>
 
-<!-- BOTTOM NAV -->
-<div class="bottom-nav">
-  <button class="nav-btn active" id="nav0" onclick="showPage('list')">
-    <span class="nav-ico">📋</span>Incidentes
-  </button>
-  <button class="nav-btn" id="nav1" onclick="showPage('form');clearForm()">
-    <span class="nav-ico">➕</span>Novo
-  </button>
-  <button class="nav-btn" id="nav2" onclick="showPage('config')">
-    <span class="nav-ico">⚙️</span>Config
-  </button>
+<!-- APP -->
+<div class="app-wrap" id="appScreen">
+  <div class="header">
+    <div class="header-brand">
+      <div class="header-logo">⚙️</div>
+      <div><div class="header-title">CAR · Garantia</div><div class="header-sub">CFMOTO da Amazônia</div></div>
+    </div>
+    <div class="user-chip" onclick="openUserModal()">
+      <div class="user-avatar" id="userAv">?</div>
+      <span id="userLabel">...</span>
+      <span class="admin-badge" id="adminBadge" style="display:none">ADMIN</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="pageList">
+      <div class="stats-row">
+        <div class="stat"><div class="stat-n blue" id="statTotal">—</div><div class="stat-l">Total</div></div>
+        <div class="stat"><div class="stat-n amber" id="statPending">—</div><div class="stat-l">Pendentes</div></div>
+        <div class="stat"><div class="stat-n green" id="statDone">—</div><div class="stat-l">Concluídos</div></div>
+      </div>
+      <div class="search-box">
+        <span style="font-size:18px;opacity:0.4">🔍</span>
+        <input type="text" id="searchInput" placeholder="Pesquisar peça, código, modelo..." oninput="renderList()">
+      </div>
+      <div class="filter-row">
+        <div class="fpill active" onclick="setFilter('all',this)">Todos</div>
+        <div class="fpill" onclick="setFilter('pending',this)">⏳ Pendentes</div>
+        <div class="fpill" onclick="setFilter('done',this)">✅ Concluídos</div>
+      </div>
+      <div id="incList" class="inc-list"><div class="loading-bar"><div class="spinner"></div> Carregando...</div></div>
+    </div>
+
+    <div id="pageForm" style="display:none">
+      <div class="back-btn" onclick="showPage('list')">← Voltar</div>
+      <div class="form-wrap">
+        <div class="form-card">
+          <div class="form-section-title">📦 Identificação da Peça</div>
+          <div class="form-grid">
+            <div class="fg"><label>Código da Peça *</label><input id="fPartNo" type="text" placeholder="9AWV-132000-8000"></div>
+            <div class="fg"><label>Nome da Peça *</label><input id="fPartName" type="text" placeholder="REAR SEAT ASSY"></div>
+            <div class="fg"><label>Modelo</label><input id="fModel" type="text" placeholder="CF1000AZ-2"></div>
+            <div class="fg"><label>Nº Pedido</label><input id="fOrderNo" type="text" placeholder="25BR-FMC38532C-1"></div>
+            <div class="fg"><label>Lote (Lot No.)</label><input id="fLotNo" type="text" placeholder="10194649"></div>
+            <div class="fg"><label>Qtd. Defeituosa</label><input id="fNgQty" type="number" min="1" placeholder="1"></div>
+            <div class="fg full"><label>Descrição do Defeito *</label><textarea id="fDefect" placeholder="Descreva o problema encontrado..."></textarea></div>
+            <div class="fg full"><label>Como foi Detectado</label><textarea id="fDetected" placeholder="Desempacotamento, inspeção visual..."></textarea></div>
+          </div>
+        </div>
+        <div class="form-card">
+          <div class="form-section-title">🔧 Ação na Fábrica KD</div>
+          <div class="form-grid">
+            <div class="fg"><label>Ação Tomada</label>
+              <select id="fAction">
+                <option value="">Selecionar...</option>
+                <option value="SEGREGATION">Segregação</option>
+                <option value="REPAIR">Reparação</option>
+                <option value="USE AS IS">Usar como está</option>
+                <option value="REPLACEMENT">Substituição</option>
+              </select>
+            </div>
+            <div class="fg"><label>Peça de Reposição</label>
+              <select id="fReplacement">
+                <option value="NEED">Necessária</option>
+                <option value="NO NEED">Não necessária</option>
+              </select>
+            </div>
+            <div class="fg full"><label>Observações</label><textarea id="fNotes" placeholder="Contramedidas, observações..."></textarea></div>
+          </div>
+        </div>
+        <div class="form-card">
+          <div class="form-section-title">📷 Fotos do Incidente</div>
+          <div class="photo-drop" onclick="document.getElementById('photoInput').click()">
+            <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotos(this.files)">
+            <div style="font-size:36px;opacity:0.35;margin-bottom:6px">📸</div>
+            <div style="font-size:13px;color:#607D8B">Toque para adicionar fotos</div>
+            <div style="font-size:11px;color:#607D8B;margin-top:4px;opacity:0.7">Múltiplas fotos permitidas</div>
+          </div>
+          <div class="photo-grid" id="photoGrid"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" onclick="showPage('list')">Cancelar</button>
+          <button class="btn btn-primary" id="saveBtn" onclick="saveIncident()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="pageDetail" style="display:none">
+      <div class="back-btn" onclick="showPage('list')">← Voltar</div>
+      <div id="detailContent"></div>
+    </div>
+
+    <div id="pageExcel" style="display:none">
+      <div class="excel-card">
+        <h2>📊 Relatório Excel</h2>
+        <p>Exporta os incidentes para um ficheiro Excel com todos os dados e links das fotos.</p>
+        <div class="excel-stat">
+          <div class="excel-stat-item"><div class="n" id="exSTotal">—</div><div class="l">Total</div></div>
+          <div class="excel-stat-item"><div class="n amber" id="exSPending">—</div><div class="l">Pendentes</div></div>
+          <div class="excel-stat-item"><div class="n green" id="exSDone">—</div><div class="l">Concluídos</div></div>
+        </div>
+        <div class="excel-filter">
+          <label>Filtrar por status</label>
+          <select id="excelFilter">
+            <option value="all">Todos os incidentes</option>
+            <option value="pending">Só pendentes</option>
+            <option value="done">Só concluídos</option>
+          </select>
+        </div>
+        <div class="excel-filter">
+          <label>Filtrar por período</label>
+          <select id="excelPeriod">
+            <option value="all">Todo o período</option>
+            <option value="7">Últimos 7 dias</option>
+            <option value="30">Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+          </select>
+        </div>
+        <button class="btn btn-excel" onclick="exportExcel()">📥 Exportar Excel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav0" onclick="showPage('list')"><span class="nav-ico">📋</span>Incidentes</button>
+    <button class="nav-btn" id="nav1" onclick="showPage('form');clearForm()"><span class="nav-ico">➕</span>Novo</button>
+    <button class="nav-btn" id="nav2" onclick="showPage('excel')"><span class="nav-ico">📊</span>Relatório</button>
+  </div>
 </div>
 
 <!-- USER MODAL -->
 <div class="modal-bg" id="userModal" onclick="closeUserModal(event)">
   <div class="modal">
-    <div class="modal-title">Selecionar Utilizador</div>
-    <div id="userList"></div>
+    <div class="modal-title">Minha conta</div>
+    <div class="modal-sub">Sessão iniciada</div>
+    <div class="modal-user-info">
+      <div class="modal-av" id="modalAv">?</div>
+      <div>
+        <div class="modal-name" id="modalName">—</div>
+        <div class="modal-email" id="modalEmail">—</div>
+        <div style="margin-top:5px" id="modalRole"></div>
+      </div>
+    </div>
+    <button class="btn btn-danger" style="width:100%;justify-content:center" onclick="doLogout()">🚪 Sair da conta</button>
   </div>
 </div>
 
-<!-- FULLSCREEN PHOTO -->
 <div class="fs-overlay" id="fsOverlay" onclick="closeFs()">
-  <button class="fs-close" onclick="closeFs()">✕</button>
-  <img id="fsImg" src="" alt="foto">
+  <button class="fs-close">✕</button>
+  <img id="fsImg" src="" alt="">
 </div>
-
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
-const USERS = [
-  { name: 'Luis Hernandez', short: 'LH' },
-  { name: 'Carlos Silva', short: 'CS' },
-  { name: 'Ana Santos', short: 'AS' },
-  { name: 'Pedro Costa', short: 'PC' },
-  { name: 'Maria Oliveira', short: 'MO' },
-];
+let incidents=[], currentFilter='all', currentPhotos=[], editingId=null, currentUser=null, isAdmin=false;
 
-let currentUser = USERS[0];
-let incidents = [];
-let currentFilter = 'all';
-let currentPhotos = []; // {url, storagePath, isNew, file, localPreview}
-let editingId = null;
-let currentPage = 'list';
+function waitFb(){return new Promise(res=>{if(window._fbReady)return res();document.addEventListener('firebase-ready',res,{once:true});})}
 
-// ---- USER ----
-function openUserModal() {
-  const list = document.getElementById('userList');
-  list.innerHTML = USERS.map((u,i) => `
-    <div class="user-option ${u.name===currentUser.name?'selected':''}" onclick="selectUser(${i})">
-      <div class="user-av">${u.short}</div>
-      ${u.name}
-    </div>
-  `).join('');
-  document.getElementById('userModal').classList.add('open');
+function switchAuthTab(tab){
+  document.getElementById('loginForm').style.display=tab==='login'?'block':'none';
+  document.getElementById('registerForm').style.display=tab==='register'?'block':'none';
+  document.getElementById('tabLogin').classList.toggle('active',tab==='login');
+  document.getElementById('tabRegister').classList.toggle('active',tab==='register');
+  hideErr();
 }
-function selectUser(i) {
-  currentUser = USERS[i];
-  document.getElementById('userAv').textContent = currentUser.short;
-  document.getElementById('userLabel').textContent = currentUser.name.split(' ')[0] + ' ' + currentUser.short[1] + '.';
-  closeUserModal();
-}
-function closeUserModal(e) {
-  if(!e || e.target === document.getElementById('userModal'))
-    document.getElementById('userModal').classList.remove('open');
-}
+function showErr(msg){const el=document.getElementById('authErr');el.textContent=msg;el.classList.add('show');}
+function hideErr(){document.getElementById('authErr').classList.remove('show');}
 
-// ---- PAGES ----
-function showPage(page) {
-  currentPage = page;
-  ['list','form','detail','config'].forEach(p => {
-    document.getElementById('page' + p.charAt(0).toUpperCase() + p.slice(1)).style.display = p===page?'block':'none';
-  });
-  ['nav0','nav1','nav2'].forEach((id,i) => {
-    document.getElementById(id).classList.toggle('active', 
-      (page==='list'&&i===0)||(page==='form'&&i===1)||(page==='config'&&i===2));
-  });
-  if(page==='list') loadIncidents();
-}
-
-// ---- FIREBASE ----
-function waitFb() {
-  return new Promise(res => {
-    if(window._fbReady) return res();
-    document.addEventListener('firebase-ready', res, {once:true});
-  });
-}
-
-async function loadIncidents() {
+async function doLogin(){
   await waitFb();
-  const el = document.getElementById('incList');
-  el.innerHTML = '<div class="loading-bar"><div class="spinner"></div> Carregando...</div>';
-  try {
-    const { collection, getDocs, query, orderBy } = window._fb;
-    const q = query(collection(window._db, 'incidents'), orderBy('createdAt','desc'));
-    const snap = await getDocs(q);
-    incidents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderList();
-  } catch(e) {
-    el.innerHTML = '<div class="empty"><div class="empty-ico">⚠️</div><div>Erro ao carregar. Verifique as credenciais do Firebase na aba Config.</div></div>';
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  if(!email||!pass){showErr('Preencha email e senha.');return;}
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=true;btn.textContent='Entrando...';
+  try{
+    await window._fbAuth.signInWithEmailAndPassword(window._auth,email,pass);
+  }catch(e){
+    showErr(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'?'Email ou senha incorretos.':'Erro ao entrar. Verifique os dados.');
+    btn.disabled=false;btn.textContent='Entrar';
   }
 }
 
-async function saveIncident() {
-  const partNo = document.getElementById('fPartNo').value.trim();
-  const partName = document.getElementById('fPartName').value.trim();
-  const defect = document.getElementById('fDefect').value.trim();
-  if(!partNo || !partName) { showToast('Preencha o código e nome da peça'); return; }
-  if(!defect) { showToast('Preencha a descrição do defeito'); return; }
-
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = true; btn.textContent = '⏳ Guardando...';
-
+async function doRegister(){
   await waitFb();
-  try {
-    // Upload new photos to Cloudinary
-    const photoUrls = [];
-    for(const p of currentPhotos) {
-      if(p.isNew && p.file) {
-        try {
-          const result = await window.uploadToCloudinary(p.file);
-          photoUrls.push({ url: result.url, publicId: result.publicId });
-        } catch(e) {
-          showToast('Erro ao fazer upload de uma foto. Tente novamente.');
-          btn.disabled = false; btn.textContent = '💾 Guardar';
-          return;
-        }
-      } else {
-        photoUrls.push({ url: p.url, publicId: p.publicId });
-      }
+  const name=document.getElementById('regName').value.trim();
+  const email=document.getElementById('regEmail').value.trim();
+  const pass=document.getElementById('regPass').value;
+  const pass2=document.getElementById('regPass2').value;
+  if(!name||!email||!pass){showErr('Preencha todos os campos.');return;}
+  if(pass.length<6){showErr('A senha deve ter pelo menos 6 caracteres.');return;}
+  if(pass!==pass2){showErr('As senhas não coincidem.');return;}
+  const btn=document.getElementById('registerBtn');
+  btn.disabled=true;btn.textContent='Criando conta...';
+  try{
+    const {collection,getDocs,doc,setDoc}=window._fb;
+    const usersSnap=await getDocs(collection(window._db,'users'));
+    const isFirst=usersSnap.empty;
+    const cred=await window._fbAuth.createUserWithEmailAndPassword(window._auth,email,pass);
+    await window._fbAuth.updateProfile(cred.user,{displayName:name});
+    await setDoc(doc(window._db,'users',cred.user.uid),{name,email,role:isFirst?'admin':'user',createdAt:Date.now()});
+  }catch(e){
+    let msg='Erro ao criar conta.';
+    if(e.code==='auth/email-already-in-use')msg='Este email já está registado.';
+    if(e.code==='auth/invalid-email')msg='Email inválido.';
+    showErr(msg);
+    btn.disabled=false;btn.textContent='Criar conta';
+  }
+}
+
+async function doLogout(){await window._fbAuth.signOut(window._auth);closeUserModal();}
+
+async function initAuth(){
+  await waitFb();
+  window._fbAuth.onAuthStateChanged(window._auth,async user=>{
+    if(user){
+      currentUser=user;
+      try{
+        const {doc,getDoc}=window._fb;
+        const snap=await getDoc(doc(window._db,'users',user.uid));
+        isAdmin=snap.exists()&&snap.data().role==='admin';
+      }catch(e){isAdmin=false;}
+      const name=user.displayName||user.email;
+      const initials=name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+      document.getElementById('userAv').textContent=initials;
+      document.getElementById('userLabel').textContent=name.split(' ')[0];
+      document.getElementById('adminBadge').style.display=isAdmin?'inline':'none';
+      document.getElementById('modalAv').textContent=initials;
+      document.getElementById('modalName').textContent=name;
+      document.getElementById('modalEmail').textContent=user.email;
+      document.getElementById('modalRole').innerHTML=isAdmin?
+        '<span class="admin-badge" style="font-size:11px;padding:2px 8px">👑 ADMIN</span>':
+        '<span style="font-size:12px;color:#607D8B">Utilizador</span>';
+      document.getElementById('authScreen').style.display='none';
+      document.getElementById('appScreen').style.display='block';
+      showPage('list');
+    }else{
+      currentUser=null;isAdmin=false;
+      document.getElementById('authScreen').style.display='flex';
+      document.getElementById('appScreen').style.display='none';
     }
+  });
+}
 
-    const data = {
-      partNo, partName,
-      model: document.getElementById('fModel').value.trim(),
-      orderNo: document.getElementById('fOrderNo').value.trim(),
-      lotNo: document.getElementById('fLotNo').value.trim(),
-      ngQty: document.getElementById('fNgQty').value.trim(),
+function openUserModal(){document.getElementById('userModal').classList.add('open');}
+function closeUserModal(e){if(!e||e.target===document.getElementById('userModal'))document.getElementById('userModal').classList.remove('open');}
+
+function showPage(page){
+  ['List','Form','Detail','Excel'].forEach(p=>{
+    document.getElementById('page'+p).style.display=p.toLowerCase()===page?'block':'none';
+  });
+  ['nav0','nav1','nav2'].forEach((id,i)=>{
+    document.getElementById(id).classList.toggle('active',(page==='list'&&i===0)||(page==='form'&&i===1)||(page==='excel'&&i===2));
+  });
+  if(page==='list')loadIncidents();
+  if(page==='excel')updateExcelStats();
+}
+
+async function loadIncidents(){
+  await waitFb();
+  const el=document.getElementById('incList');
+  el.innerHTML='<div class="loading-bar"><div class="spinner"></div> Carregando...</div>';
+  try{
+    const {collection,getDocs,query,orderBy}=window._fb;
+    const q=query(collection(window._db,'incidents'),orderBy('createdAt','desc'));
+    const snap=await getDocs(q);
+    incidents=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderList();
+  }catch(e){
+    el.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div>Erro ao carregar dados.</div></div>';
+  }
+}
+
+async function saveIncident(){
+  const partNo=document.getElementById('fPartNo').value.trim();
+  const partName=document.getElementById('fPartName').value.trim();
+  const defect=document.getElementById('fDefect').value.trim();
+  if(!partNo||!partName){showToast('Preencha o código e nome da peça');return;}
+  if(!defect){showToast('Preencha a descrição do defeito');return;}
+  const btn=document.getElementById('saveBtn');
+  btn.disabled=true;btn.textContent='⏳ Guardando...';
+  await waitFb();
+  try{
+    const photoUrls=[];
+    for(const p of currentPhotos){
+      if(p.isNew&&p.file){
+        const result=await window.uploadToCloudinary(p.file);
+        photoUrls.push({url:result.url,publicId:result.publicId});
+      }else{photoUrls.push({url:p.url,publicId:p.publicId});}
+    }
+    const data={
+      partNo,partName,
+      model:document.getElementById('fModel').value.trim(),
+      orderNo:document.getElementById('fOrderNo').value.trim(),
+      lotNo:document.getElementById('fLotNo').value.trim(),
+      ngQty:document.getElementById('fNgQty').value.trim(),
       defect,
-      detected: document.getElementById('fDetected').value.trim(),
-      action: document.getElementById('fAction').value,
-      replacement: document.getElementById('fReplacement').value,
-      notes: document.getElementById('fNotes').value.trim(),
-      photos: photoUrls,
-      user: currentUser.name,
-      updatedAt: Date.now(),
+      detected:document.getElementById('fDetected').value.trim(),
+      action:document.getElementById('fAction').value,
+      replacement:document.getElementById('fReplacement').value,
+      notes:document.getElementById('fNotes').value.trim(),
+      photos:photoUrls,
+      user:currentUser.displayName||currentUser.email,
+      userId:currentUser.uid,
+      updatedAt:Date.now(),
     };
-
-    const { collection, addDoc, doc, updateDoc } = window._fb;
-    if(editingId) {
-      await updateDoc(doc(window._db,'incidents',editingId), data);
-      showToast('✅ Actualizado com sucesso!');
-    } else {
-      data.status = 'pending';
-      data.createdAt = Date.now();
-      await addDoc(collection(window._db,'incidents'), data);
+    const {collection,addDoc,doc,updateDoc}=window._fb;
+    if(editingId){
+      await updateDoc(doc(window._db,'incidents',editingId),data);
+      showToast('✅ Actualizado!');
+    }else{
+      data.status='pending';data.createdAt=Date.now();
+      await addDoc(collection(window._db,'incidents'),data);
       showToast('✅ Incidente registado!');
     }
-    editingId = null;
-    showPage('list');
-  } catch(e) {
-    showToast('Erro ao guardar. Tente novamente.');
-    console.error(e);
-  }
-  btn.disabled = false; btn.textContent = '💾 Guardar';
+    editingId=null;showPage('list');
+  }catch(e){showToast('Erro ao guardar. Tente novamente.');}
+  btn.disabled=false;btn.textContent='💾 Guardar';
 }
 
-async function markDone(id) {
+async function markDone(id){
   await waitFb();
-  const { doc, updateDoc } = window._fb;
-  await updateDoc(doc(window._db,'incidents',id), { status:'done', completedAt: Date.now() });
+  const {doc,updateDoc}=window._fb;
+  await updateDoc(doc(window._db,'incidents',id),{status:'done',completedAt:Date.now()});
   showToast('✅ Marcado como concluído!');
-  loadIncidents();
-  showPage('list');
+  await loadIncidents();showDetail(id);
 }
 
-async function markPending(id) {
+async function markPending(id){
   await waitFb();
-  const { doc, updateDoc } = window._fb;
-  await updateDoc(doc(window._db,'incidents',id), { status:'pending' });
+  const {doc,updateDoc}=window._fb;
+  await updateDoc(doc(window._db,'incidents',id),{status:'pending'});
   showToast('Reaberto como pendente');
-  loadIncidents();
-  showPage('list');
+  await loadIncidents();showDetail(id);
 }
 
-async function deleteIncident(id) {
-  if(!confirm('Eliminar este incidente? Esta acção não pode ser desfeita.')) return;
+async function deleteIncident(id){
+  if(!isAdmin){showToast('⛔ Só o admin pode eliminar.');return;}
+  if(!confirm('Eliminar este incidente? Esta acção não pode ser desfeita.'))return;
   await waitFb();
-  const { doc, deleteDoc } = window._fb;
+  const {doc,deleteDoc}=window._fb;
   await deleteDoc(doc(window._db,'incidents',id));
-  showToast('🗑 Eliminado');
-  showPage('list');
+  showToast('🗑 Eliminado');showPage('list');
 }
 
-// ---- RENDER LIST ----
-function setFilter(f, el) {
-  currentFilter = f;
-  document.querySelectorAll('.fpill').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  renderList();
+function setFilter(f,el){
+  currentFilter=f;
+  document.querySelectorAll('.fpill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');renderList();
 }
 
-function renderList() {
-  const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
-  let list = incidents.filter(inc => {
-    const matchF = currentFilter==='all' || inc.status===currentFilter;
-    const matchS = !search ||
-      (inc.partNo||'').toLowerCase().includes(search) ||
-      (inc.partName||'').toLowerCase().includes(search) ||
-      (inc.model||'').toLowerCase().includes(search) ||
-      (inc.orderNo||'').toLowerCase().includes(search);
-    return matchF && matchS;
+function renderList(){
+  const search=(document.getElementById('searchInput')?.value||'').toLowerCase();
+  let list=incidents.filter(inc=>{
+    const mf=currentFilter==='all'||inc.status===currentFilter;
+    const ms=!search||(inc.partNo||'').toLowerCase().includes(search)||(inc.partName||'').toLowerCase().includes(search)||(inc.model||'').toLowerCase().includes(search)||(inc.orderNo||'').toLowerCase().includes(search);
+    return mf&&ms;
   });
-  const total = incidents.length;
-  const done = incidents.filter(i=>i.status==='done').length;
-  document.getElementById('statTotal').textContent = total;
-  document.getElementById('statPending').textContent = total - done;
-  document.getElementById('statDone').textContent = done;
-
-  const el = document.getElementById('incList');
-  if(!list.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-ico">📂</div><div>${total?'Nenhum resultado encontrado':'Sem incidentes registados.<br>Toque em <strong>+ Novo</strong> para começar.'}</div></div>`;
-    return;
-  }
-  el.innerHTML = list.map(inc => `
+  const total=incidents.length,done=incidents.filter(i=>i.status==='done').length;
+  document.getElementById('statTotal').textContent=total;
+  document.getElementById('statPending').textContent=total-done;
+  document.getElementById('statDone').textContent=done;
+  const el=document.getElementById('incList');
+  if(!list.length){el.innerHTML=`<div class="empty"><div class="empty-ico">📂</div><div>${total?'Nenhum resultado encontrado':'Sem incidentes.<br>Toque em <strong>+</strong> para começar.'}</div></div>`;return;}
+  el.innerHTML=list.map(inc=>`
     <div class="inc-card ${inc.status||'pending'}" onclick="showDetail('${inc.id}')">
       <div class="inc-card-top">
-        <div>
-          <div class="inc-name">${inc.partName||'—'}</div>
-          <div class="inc-code">${inc.partNo||''}</div>
-        </div>
-        <span class="badge ${inc.status==='done'?'done':'pending'}">
-          ${inc.status==='done'?'✓ Concluído':'⏳ Pendente'}
-        </span>
+        <div><div class="inc-name">${inc.partName||'—'}</div><div class="inc-code">${inc.partNo||''}</div></div>
+        <span class="badge ${inc.status==='done'?'done':'pending'}">${inc.status==='done'?'✓ Concluído':'⏳ Pendente'}</span>
       </div>
       <div class="inc-meta">
         <span>🚗 ${inc.model||'—'}</span>
@@ -858,151 +615,142 @@ function renderList() {
   `).join('');
 }
 
-function showDetail(id) {
-  const inc = incidents.find(i=>i.id===id);
-  if(!inc) return;
-  const photos = (inc.photos||[]).map(p=>
-    `<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="openFs('${p.url}')"></div>`
-  ).join('');
-
-  document.getElementById('detailContent').innerHTML = `
+function showDetail(id){
+  const inc=incidents.find(i=>i.id===id);if(!inc)return;
+  const photos=(inc.photos||[]).map(p=>`<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="openFs('${p.url}')"></div>`).join('');
+  const canEdit=isAdmin||inc.userId===currentUser?.uid;
+  document.getElementById('detailContent').innerHTML=`
     <div class="detail-header" style="border-left-color:${inc.status==='done'?'#2E7D32':'#E65100'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div>
-          <div class="detail-title">${inc.partName||'—'}</div>
-          <div class="detail-id">${inc.partNo||''} · ${fmtDate(inc.createdAt)}</div>
-        </div>
-        <span class="badge ${inc.status==='done'?'done':'pending'}" style="font-size:12px;padding:5px 12px">
-          ${inc.status==='done'?'✓ Concluído':'⏳ Pendente'}
-        </span>
+        <div><div class="detail-title">${inc.partName||'—'}</div><div class="detail-id">${inc.partNo||''} · ${fmtDate(inc.createdAt)}</div></div>
+        <span class="badge ${inc.status==='done'?'done':'pending'}">${inc.status==='done'?'✓ Concluído':'⏳ Pendente'}</span>
       </div>
     </div>
-
     <div class="detail-card">
       <div class="form-section-title" style="margin-bottom:8px">📦 Dados da Peça</div>
-      ${drow('Código',inc.partNo)} ${drow('Modelo',inc.model)}
-      ${drow('Nº Pedido',inc.orderNo)} ${drow('Lote',inc.lotNo)}
-      ${drow('Qtd. Defeituosa',inc.ngQty)} ${drow('Registado por',inc.user)}
+      ${drow('Código',inc.partNo)}${drow('Modelo',inc.model)}${drow('Nº Pedido',inc.orderNo)}${drow('Lote',inc.lotNo)}${drow('Qtd. Defeituosa',inc.ngQty)}${drow('Registado por',inc.user)}
     </div>
-
     <div class="detail-card">
       <div class="form-section-title" style="margin-bottom:8px">📝 Descrição</div>
       <div class="detail-text-block">${inc.defect||'—'}</div>
-      ${inc.detected?`<div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Como detectado</div><div class="detail-text-block">${inc.detected}</div>`:''}
+      ${inc.detected?`<div style="margin-top:12px;font-size:11px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Como detectado</div><div class="detail-text-block">${inc.detected}</div>`:''}
     </div>
-
-    ${inc.action?`<div class="detail-card">
-      <div class="form-section-title" style="margin-bottom:8px">🔧 Acção KD</div>
-      ${drow('Acção',inc.action)} ${drow('Reposição',inc.replacement)}
-      ${inc.notes?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Observações</div><div class="detail-text-block">${inc.notes}</div></div>`:''}
-    </div>`:''}
-
-    ${photos?`<div class="detail-card">
-      <div class="form-section-title" style="margin-bottom:8px">📷 Fotos (${inc.photos.length})</div>
-      <div class="photo-grid">${photos}</div>
-    </div>`:''}
-
+    ${inc.action?`<div class="detail-card"><div class="form-section-title" style="margin-bottom:8px">🔧 Acção KD</div>${drow('Acção',inc.action)}${drow('Reposição',inc.replacement)}${inc.notes?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Observações</div><div class="detail-text-block">${inc.notes}</div></div>`:''}</div>`:''}
+    ${photos?`<div class="detail-card"><div class="form-section-title" style="margin-bottom:8px">📷 Fotos (${inc.photos.length})</div><div class="photo-grid">${photos}</div></div>`:''}
     <div class="detail-card">
       <div class="detail-actions">
-        ${inc.status!=='done'?`<button class="btn btn-success" onclick="markDone('${inc.id}')">✓ Relatório Feito</button>`:''}
+        ${inc.status!=='done'?`<button class="btn btn-success" onclick="markDone('${inc.id}')">✓ Concluído</button>`:''}
         ${inc.status==='done'?`<button class="btn" onclick="markPending('${inc.id}')">↩ Reabrir</button>`:''}
-        <button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>
-        <button class="btn btn-danger" onclick="deleteIncident('${inc.id}')">🗑 Eliminar</button>
+        ${canEdit?`<button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>`:''}
+        ${isAdmin?`<button class="btn btn-danger" onclick="deleteIncident('${inc.id}')">🗑 Eliminar</button>`:''}
       </div>
     </div>
   `;
-  showPage('detail');
+  ['pageList','pageForm','pageExcel'].forEach(p=>document.getElementById(p).style.display='none');
+  document.getElementById('pageDetail').style.display='block';
 }
 
-function drow(lbl,val) {
-  return `<div class="detail-row"><span class="detail-lbl">${lbl}</span><span class="detail-val">${val||'—'}</span></div>`;
-}
+function drow(lbl,val){return `<div class="detail-row"><span class="detail-lbl">${lbl}</span><span class="detail-val">${val||'—'}</span></div>`;}
 
-function editIncident(id) {
-  const inc = incidents.find(i=>i.id===id);
-  if(!inc) return;
-  editingId = id;
-  document.getElementById('fPartNo').value = inc.partNo||'';
-  document.getElementById('fPartName').value = inc.partName||'';
-  document.getElementById('fModel').value = inc.model||'';
-  document.getElementById('fOrderNo').value = inc.orderNo||'';
-  document.getElementById('fLotNo').value = inc.lotNo||'';
-  document.getElementById('fNgQty').value = inc.ngQty||'';
-  document.getElementById('fDefect').value = inc.defect||'';
-  document.getElementById('fDetected').value = inc.detected||'';
-  document.getElementById('fAction').value = inc.action||'';
-  document.getElementById('fReplacement').value = inc.replacement||'NEED';
-  document.getElementById('fNotes').value = inc.notes||'';
-  currentPhotos = (inc.photos||[]).map(p=>({url:p.url,publicId:p.publicId,isNew:false}));
+function editIncident(id){
+  const inc=incidents.find(i=>i.id===id);if(!inc)return;
+  editingId=id;
+  document.getElementById('fPartNo').value=inc.partNo||'';
+  document.getElementById('fPartName').value=inc.partName||'';
+  document.getElementById('fModel').value=inc.model||'';
+  document.getElementById('fOrderNo').value=inc.orderNo||'';
+  document.getElementById('fLotNo').value=inc.lotNo||'';
+  document.getElementById('fNgQty').value=inc.ngQty||'';
+  document.getElementById('fDefect').value=inc.defect||'';
+  document.getElementById('fDetected').value=inc.detected||'';
+  document.getElementById('fAction').value=inc.action||'';
+  document.getElementById('fReplacement').value=inc.replacement||'NEED';
+  document.getElementById('fNotes').value=inc.notes||'';
+  currentPhotos=(inc.photos||[]).map(p=>({url:p.url,publicId:p.publicId,isNew:false}));
   renderPhotoGrid();
-  showPage('form');
+  ['pageList','pageDetail','pageExcel'].forEach(p=>document.getElementById(p).style.display='none');
+  document.getElementById('pageForm').style.display='block';
+  ['nav0','nav1','nav2'].forEach((id,i)=>document.getElementById(id).classList.toggle('active',i===1));
 }
 
-// ---- PHOTOS ----
-function clearForm() {
-  editingId = null;
-  ['fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected','fNotes'].forEach(id=>{
-    document.getElementById(id).value='';
-  });
-  document.getElementById('fAction').value='';
-  document.getElementById('fReplacement').value='NEED';
-  currentPhotos=[];
-  renderPhotoGrid();
+function clearForm(){
+  editingId=null;
+  ['fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected','fNotes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fAction').value='';document.getElementById('fReplacement').value='NEED';
+  currentPhotos=[];renderPhotoGrid();
 }
 
-function handlePhotos(files) {
-  Array.from(files).forEach(file => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      currentPhotos.push({ url: e.target.result, isNew: true, file, localPreview: e.target.result });
-      renderPhotoGrid();
-    };
+function handlePhotos(files){
+  Array.from(files).forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{currentPhotos.push({url:e.target.result,isNew:true,file,localPreview:e.target.result});renderPhotoGrid();};
     reader.readAsDataURL(file);
   });
 }
 
-function dragOver(e) { e.preventDefault(); document.getElementById('photoDrop').classList.add('dragover'); }
-function dragLeave(e) { document.getElementById('photoDrop').classList.remove('dragover'); }
-function dropPhotos(e) { e.preventDefault(); dragLeave(e); handlePhotos(e.dataTransfer.files); }
+function removePhoto(i,e){e.stopPropagation();currentPhotos.splice(i,1);renderPhotoGrid();}
 
-function removePhoto(i, e) {
-  e.stopPropagation();
-  currentPhotos.splice(i,1);
-  renderPhotoGrid();
-}
-
-function renderPhotoGrid() {
-  const grid = document.getElementById('photoGrid');
-  grid.innerHTML = currentPhotos.map((p,i)=>`
-    <div class="photo-thumb">
-      <img src="${p.localPreview||p.url}" alt="foto ${i+1}">
-      <button class="photo-del" onclick="removePhoto(${i},event)">✕</button>
-    </div>
+function renderPhotoGrid(){
+  document.getElementById('photoGrid').innerHTML=currentPhotos.map((p,i)=>`
+    <div class="photo-thumb"><img src="${p.localPreview||p.url}" alt="foto ${i+1}"><button class="photo-del" onclick="removePhoto(${i},event)">✕</button></div>
   `).join('');
 }
 
-// ---- FULLSCREEN ----
-function openFs(url) {
-  document.getElementById('fsImg').src = url;
-  document.getElementById('fsOverlay').classList.add('open');
-}
-function closeFs() { document.getElementById('fsOverlay').classList.remove('open'); }
-
-// ---- UTILS ----
-function fmtDate(ts) {
-  if(!ts) return '—';
-  return new Date(ts).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+function updateExcelStats(){
+  const total=incidents.length,done=incidents.filter(i=>i.status==='done').length;
+  document.getElementById('exSTotal').textContent=total;
+  document.getElementById('exSPending').textContent=total-done;
+  document.getElementById('exSDone').textContent=done;
 }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2800);
+function exportExcel(){
+  const filter=document.getElementById('excelFilter').value;
+  const period=document.getElementById('excelPeriod').value;
+  const now=Date.now();
+  let list=incidents.filter(inc=>{
+    const mf=filter==='all'||inc.status===filter;
+    const mp=period==='all'||(now-(inc.createdAt||0))<=parseInt(period)*24*60*60*1000;
+    return mf&&mp;
+  });
+  if(!list.length){showToast('Nenhum incidente para exportar.');return;}
+  const rows=list.map((inc,i)=>({
+    'Nº':i+1,'ID':inc.id,
+    'Status':inc.status==='done'?'Concluído':'Pendente',
+    'Código da Peça':inc.partNo||'','Nome da Peça':inc.partName||'',
+    'Modelo':inc.model||'','Nº Pedido':inc.orderNo||'','Lote':inc.lotNo||'',
+    'Qtd. Defeituosa':inc.ngQty||'','Descrição do Defeito':inc.defect||'',
+    'Como Detectado':inc.detected||'','Ação KD':inc.action||'',
+    'Reposição':inc.replacement||'','Observações':inc.notes||'',
+    'Registado por':inc.user||'','Data Registo':fmtDate(inc.createdAt),
+    'Data Conclusão':inc.completedAt?fmtDate(inc.completedAt):'',
+    'Nº Fotos':(inc.photos||[]).length,
+    'Links das Fotos':(inc.photos||[]).map(p=>p.url).join(' | '),
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:5},{wch:16},{wch:12},{wch:20},{wch:22},{wch:14},{wch:22},{wch:14},{wch:8},{wch:40},{wch:30},{wch:14},{wch:14},{wch:30},{wch:20},{wch:14},{wch:14},{wch:8},{wch:60}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Incidentes CAR');
+  const summary=[
+    ['RELATÓRIO CAR — GARANTIA DE PEÇAS'],['CFMOTO da Amazônia'],[''],
+    ['Data de exportação',new Date().toLocaleDateString('pt-BR')],
+    ['Total de incidentes',list.length],
+    ['Pendentes',list.filter(i=>i.status!=='done').length],
+    ['Concluídos',list.filter(i=>i.status==='done').length],
+  ];
+  const ws2=XLSX.utils.aoa_to_sheet(summary);
+  ws2['!cols']=[{wch:25},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Resumo');
+  const date=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,`CAR-Garantia-${date}.xlsx`);
+  showToast('📥 Excel exportado!');
 }
 
-// Init
-showPage('list');
+function openFs(url){document.getElementById('fsImg').src=url;document.getElementById('fsOverlay').classList.add('open');}
+function closeFs(){document.getElementById('fsOverlay').classList.remove('open');}
+function fmtDate(ts){if(!ts)return '—';return new Date(ts).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+initAuth();
 </script>
 </body>
 </html>
