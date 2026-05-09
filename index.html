@@ -130,9 +130,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:#1565C0;box-shadow:0 0 0 3px rgba(21,101,192,0.12)}
 .fg textarea{min-height:80px;resize:vertical}
 
-.photo-drop{border:2px dashed #CFD8DC;border-radius:10px;padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.2s;background:#F4F6F8}
-.photo-drop:hover{border-color:#1565C0;background:#E3F2FD}
-.photo-drop input{display:none}
+.photo-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.photo-btn-cam,.photo-btn-gal{position:relative;padding:16px 10px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-weight:700;transition:all 0.15s;overflow:hidden}
+.photo-btn-cam{background:#1565C0;color:#fff}
+.photo-btn-cam:hover{background:#0D47A1}
+.photo-btn-gal{background:#F4F6F8;color:#263238;border:1.5px solid #CFD8DC}
+.photo-btn-gal:hover{background:#ECEFF1}
+.photo-btn-cam input,.photo-btn-gal input{display:none}
+.quick-banner{background:#E3F2FD;border:1.5px solid #90CAF9;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#1565C0;line-height:1.5}
+.quick-banner strong{font-weight:700}
+.optional-tag{font-size:10px;color:#90A4AE;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-left:6px;background:#ECEFF1;border-radius:4px;padding:1px 6px}
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:12px}
 .photo-thumb{aspect-ratio:1;border-radius:8px;overflow:hidden;position:relative;border:1.5px solid #CFD8DC}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
@@ -271,17 +278,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div id="pageForm" style="display:none">
       <div class="back-btn" onclick="showPage('list')">← Voltar</div>
       <div class="form-wrap">
+        <div class="quick-banner">
+          ⚡ <strong>Registo rápido:</strong> Só o nome da peça e as fotos são obrigatórios. Podes completar o resto depois!
+        </div>
         <div class="form-card">
           <div class="form-section-title">📦 Identificação da Peça</div>
           <div class="form-grid">
-            <div class="fg"><label>Código da Peça *</label><input id="fPartNo" type="text" placeholder="9AWV-132000-8000"></div>
+            <div class="fg"><label>Código da Peça <span class="optional-tag">opcional</span></label><input id="fPartNo" type="text" placeholder="9AWV-132000-8000"></div>
             <div class="fg"><label>Nome da Peça *</label><input id="fPartName" type="text" placeholder="REAR SEAT ASSY"></div>
-            <div class="fg"><label>Modelo</label><input id="fModel" type="text" placeholder="CF1000AZ-2"></div>
-            <div class="fg"><label>Nº Pedido</label><input id="fOrderNo" type="text" placeholder="25BR-FMC38532C-1"></div>
-            <div class="fg"><label>Lote (Lot No.)</label><input id="fLotNo" type="text" placeholder="10194649"></div>
-            <div class="fg"><label>Qtd. Defeituosa</label><input id="fNgQty" type="number" min="1" placeholder="1"></div>
-            <div class="fg full"><label>Descrição do Defeito *</label><textarea id="fDefect" placeholder="Descreva o problema encontrado..."></textarea></div>
-            <div class="fg full"><label>Como foi Detectado</label><textarea id="fDetected" placeholder="Desempacotamento, inspeção visual..."></textarea></div>
+            <div class="fg"><label>Modelo <span class="optional-tag">opcional</span></label><input id="fModel" type="text" placeholder="CF1000AZ-2"></div>
+            <div class="fg"><label>Nº Pedido <span class="optional-tag">opcional</span></label><input id="fOrderNo" type="text" placeholder="25BR-FMC38532C-1"></div>
+            <div class="fg"><label>Lote (Lot No.) <span class="optional-tag">opcional</span></label><input id="fLotNo" type="text" placeholder="10194649"></div>
+            <div class="fg"><label>Qtd. Defeituosa <span class="optional-tag">opcional</span></label><input id="fNgQty" type="number" min="1" placeholder="1"></div>
+            <div class="fg full"><label>Descrição do Defeito <span class="optional-tag">opcional</span></label><textarea id="fDefect" placeholder="Descreva o problema encontrado..."></textarea></div>
+            <div class="fg full"><label>Como foi Detectado <span class="optional-tag">opcional</span></label><textarea id="fDetected" placeholder="Desempacotamento, inspeção visual..."></textarea></div>
           </div>
         </div>
         <div class="form-card">
@@ -306,14 +316,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           </div>
         </div>
         <div class="form-card">
-          <div class="form-section-title">📷 Fotos do Incidente</div>
-          <div class="photo-drop" onclick="document.getElementById('photoInput').click()">
-            <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotos(this.files)">
-            <div style="font-size:36px;opacity:0.35;margin-bottom:6px">📸</div>
-            <div style="font-size:13px;color:#607D8B">Toque para adicionar fotos</div>
-            <div style="font-size:11px;color:#607D8B;margin-top:4px;opacity:0.7">Múltiplas fotos permitidas</div>
+          <div class="form-section-title">📷 Fotos do Incidente *</div>
+          <div class="photo-btns">
+            <button type="button" class="photo-btn-cam" onclick="document.getElementById('cameraInput').click()">
+              <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handlePhotos(this.files)">
+              📷 Tirar foto
+            </button>
+            <button type="button" class="photo-btn-gal" onclick="document.getElementById('galleryInput').click()">
+              <input type="file" id="galleryInput" accept="image/*" multiple onchange="handlePhotos(this.files)">
+              🖼️ Da galeria
+            </button>
           </div>
           <div class="photo-grid" id="photoGrid"></div>
+          <div id="photoHint" style="font-size:12px;color:#E65100;margin-top:8px;display:none">Adicione pelo menos uma foto</div>
         </div>
         <div class="form-actions">
           <button class="btn" onclick="showPage('list')">Cancelar</button>
@@ -512,8 +527,12 @@ async function saveIncident(){
   const partNo=document.getElementById('fPartNo').value.trim();
   const partName=document.getElementById('fPartName').value.trim();
   const defect=document.getElementById('fDefect').value.trim();
-  if(!partNo||!partName){showToast('Preencha o código e nome da peça');return;}
-  if(!defect){showToast('Preencha a descrição do defeito');return;}
+  if(!partName){showToast('Preencha o nome da peça');return;}
+  if(currentPhotos.length===0){
+    document.getElementById('photoHint').style.display='block';
+    showToast('Adicione pelo menos uma foto');return;
+  }
+  document.getElementById('photoHint').style.display='none';
   const btn=document.getElementById('saveBtn');
   btn.disabled=true;btn.textContent='⏳ Guardando...';
   await waitFb();
@@ -678,6 +697,7 @@ function clearForm(){
   ['fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected','fNotes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fAction').value='';document.getElementById('fReplacement').value='NEED';
   currentPhotos=[];renderPhotoGrid();
+  const h=document.getElementById('photoHint');if(h)h.style.display='none';
 }
 
 function handlePhotos(files){
