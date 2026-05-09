@@ -700,11 +700,51 @@ function clearForm(){
   const h=document.getElementById('photoHint');if(h)h.style.display='none';
 }
 
-function handlePhotos(files){
-  Array.from(files).forEach(file=>{
+async function compressImage(file, maxSizeKB=900, maxW=1600){
+  return new Promise(res=>{
     const reader=new FileReader();
-    reader.onload=e=>{currentPhotos.push({url:e.target.result,isNew:true,file,localPreview:e.target.result});renderPhotoGrid();};
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+        const canvas=document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        const ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        let quality=0.82;
+        const tryEncode=()=>{
+          const dataUrl=canvas.toDataURL('image/jpeg',quality);
+          const kb=(dataUrl.length*3/4)/1024;
+          if(kb>maxSizeKB&&quality>0.35){quality-=0.1;tryEncode();return;}
+          // Convert dataUrl back to File-like blob for Cloudinary
+          const byteStr=atob(dataUrl.split(',')[1]);
+          const arr=new Uint8Array(byteStr.length);
+          for(let i=0;i<byteStr.length;i++)arr[i]=byteStr.charCodeAt(i);
+          const blob=new Blob([arr],{type:'image/jpeg'});
+          const compFile=new File([blob],file.name.replace(/\.[^.]+$/,'.jpg'),{type:'image/jpeg'});
+          res({dataUrl,compFile});
+        };
+        tryEncode();
+      };
+      img.src=e.target.result;
+    };
     reader.readAsDataURL(file);
+  });
+}
+
+function handlePhotos(files){
+  Array.from(files).forEach(async file=>{
+    try{
+      const {dataUrl,compFile}=await compressImage(file);
+      currentPhotos.push({url:dataUrl,isNew:true,file:compFile,localPreview:dataUrl});
+      renderPhotoGrid();
+    }catch(e){
+      // fallback sem compressão
+      const reader=new FileReader();
+      reader.onload=ev=>{currentPhotos.push({url:ev.target.result,isNew:true,file,localPreview:ev.target.result});renderPhotoGrid();};
+      reader.readAsDataURL(file);
+    }
   });
 }
 
