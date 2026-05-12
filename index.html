@@ -664,12 +664,27 @@ function showDetail(id){
         ${inc.status==='done'?`<button class="btn" onclick="markPending('${inc.id}')">↩ Reabrir</button>`:''}
         ${canEdit?`<button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>`:''}
         ${isAdmin?`<button class="btn btn-danger" onclick="deleteIncident('${inc.id}')">🗑 Eliminar</button>`:''}
-        <button class="btn btn-excel" style="padding:11px 16px;font-size:13px;width:auto" onclick="generateCAR('${inc.id}')">📄 Gerar CAR Excel</button>
+        <span id="carBtn_${inc.id}"></span>
       </div>
     </div>
   `;
   ['pageList','pageForm','pageExcel'].forEach(p=>document.getElementById(p).style.display='none');
   document.getElementById('pageDetail').style.display='block';
+  // Set CAR button based on completeness
+  var carBtnEl = document.getElementById('carBtn_'+id);
+  if(carBtnEl){
+    var missing=[];
+    if(!inc.partNo) missing.push('Codigo da peca');
+    if(!inc.model) missing.push('Modelo');
+    if(!inc.orderNo) missing.push('N. Pedido');
+    if(!inc.lotNo) missing.push('Lote');
+    if(!inc.ngQty) missing.push('Qtd. Defeituosa');
+    if(missing.length===0){
+      carBtnEl.innerHTML='<button class="btn btn-excel" style="padding:11px 16px;font-size:13px;width:auto" onclick="generateCAR(\'' + id + '\')">Gerar CAR Excel</button>';
+    } else {
+      carBtnEl.innerHTML='<div style="background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:8px;padding:10px 14px;font-size:12px;color:#E65100;line-height:1.6"><strong>Para gerar o CAR falta:</strong> ' + missing.join(', ') + '</div>';
+    }
+  }
 }
 
 function drow(lbl,val){return `<div class="detail-row"><span class="detail-lbl">${lbl}</span><span class="detail-val">${val||'—'}</span></div>`;}
@@ -835,317 +850,327 @@ async function generateCAR(id) {
     const carNum = await getNextCARNumber();
     const wb = new ExcelJS.Workbook();
 
-    // DATA sheet
+    // DATA sheet (English only)
     const dataWs = wb.addWorksheet('data');
-    const dataRows = [
-      ['','','','故障排除请求',''],
-      ['English','中文','','English','中文'],
-      ['No.','序号','','C A R  (Corrective Action Request)','质量信息反馈报告'],
-      ['Supplier','供应商','','REQUESTED SEC. from ','索赔请求来源公司：'],
-      ['Response from CFMOTO','CFMOTO 回复','','PART NO.:','零件号'],
-      ['Update Date','更新日期','','ORDER NO.:','订单号'],
-      ['AATW RESPONSE','台账回应','','MODEL:','车型：'],
-      ['Doc.No.','文件号','','NG QTY:','破损件数量：'],
-      ['Approve by','批准人','','DESCRIPTION OF DEFECT :','问题描述：'],
-      ['Issue Date','问题发生日期','','ISSUE NO.','问题文件号'],
-      ['Part No.','零件号','','ISSUE SEC.','问题来源'],
-      ['Part Name','零件名','','WRITTEN BY','提交人'],
-      ['Model','型号','','ISSUE DATE','问题发生时间'],
-      ['Lot No.','箱号','','PART NAME','零件名称'],
-      ['Defect Qty','问题件数量','','CI NO','合同号'],
-      ['Receive Qty','收到件数量','','LOT NO.','箱号'],
-      ['Problem','问题','','HOW IT WAS DETECTED : ','如何发现的问题：'],
-      ['Supplier Target reply','供应商对策回复','','ACTION in KD FACTORY :','KD车间处理办法'],
-      ['RPR 1st','RPR第一阶段提交','','SEGREGATION','隔离零件至仓库'],
-      ['RPR 2nd','RPR第二阶段提交','','REPAIR','修理零件'],
-      ['RPR 3rd','RPR第三阶段提交','','USE AS IS','仍旧使用'],
-      ['RPR Final','RPR最终阶段提交','','Hrs','小时'],
-      ['Delay Day','延期日期','','FOR MORE INFORMATION SEE THE PHOTOGRAPHS ON RIGHT HAND SIDE & THE DETAILS BELOW.','如果需要了解更多信息，请看右手边图片和以下详细说明'],
-      ['Date of CF QC Approval','质检批准日期','','REPLACEMENT PARTS :','替换零件'],
-      ["Reason Not Approved","不批准原因回复",'','NEED','需要'],
-      ['Status','状态日期','','NO NEED','不需要'],
-      ['Remark','备注','','pcs','件'],
-      ['Present status','当前状态','','PHOTO :','照片'],
-      ['Update Responsibility','更新责任人提交','','SEND','发送照片'],
-      ['Category PIC','分类 PIC','','NO','不发送'],
-      ['Section Manager','分区经理','','NG SAMPLE','索赔件样品'],
-      ['','','','SEND (ETD DATE:)','发送'],
+    [
+      ['','','','',''],
+      ['English','','','English',''],
+      ['No.','','','C A R  (Corrective Action Request)',''],
+      ['Supplier','','','REQUESTED SEC. from ',''],
+      ['Response from CFMOTO','','','PART NO.:',''],
+      ['Update Date','','','ORDER NO.:',''],
+      ['AATW RESPONSE','','','MODEL:',''],
+      ['Doc.No.','','','NG QTY:',''],
+      ['Approve by','','','DESCRIPTION OF DEFECT :',''],
+      ['Issue Date','','','ISSUE NO.',''],
+      ['Part No.','','','ISSUE SEC.',''],
+      ['Part Name','','','WRITTEN BY',''],
+      ['Model','','','ISSUE DATE',''],
+      ['Lot No.','','','PART NAME',''],
+      ['Defect Qty','','','CI NO',''],
+      ['Receive Qty','','','LOT NO.',''],
+      ['Problem','','','HOW IT WAS DETECTED : ',''],
+      ['Supplier Target','','','ACTION in KD FACTORY :',''],
+      ['RPR 1st','','','SEGREGATION',''],
+      ['RPR 2nd','','','REPAIR',''],
+      ['RPR 3rd','','','USE AS IS',''],
+      ['RPR Final','','','Hrs',''],
+      ['Delay','','','FOR MORE INFORMATION SEE THE PHOTOGRAPHS ON RIGHT HAND SIDE & THE DETAILS BELOW.',''],
+      ['CF QC','','','REPLACEMENT PARTS :',''],
+      ['Not Approved','','','NEED',''],
+      ['Status','','','NO NEED',''],
+      ['Remark','','','pcs',''],
+      ['Present','','','PHOTO :',''],
+      ['Update','','','SEND',''],
+      ['Category','','','NO',''],
+      ['Section','','','NG SAMPLE',''],
+      ['','','','SEND (ETD DATE:)',''],
       ['','','','   NO (WHEN REPEAT ONLY)',''],
-      ['','','','DETAIL INFORMATION OF DEFECT','零件损坏问题详细描述'],
-      ['','','','Is it new type of defect?','这是不是新发现的问题'],
-      ['','','','NEW','新发现'],
-      ['','','','REPEAT','重复发生'],
-      ['','','','NO REPORTED BUT REPEAT','未报告但是重复发生'],
-      ['','','','Where was the defect found first?','在何工序第一次发现问题'],
-      ['','','','RECEIVING','收货'],
-      ['','','','WAREHOUSE','车间'],
-      ['','','','LINE SIDE','线上'],
-      ['','','','FIRING','测试'],
-      ['','','','FINAL INSPECTION','最终检验'],
-      ['','','','OTHERS','其他'],
-      ['','','','When was the defect found first?','什么时候最先发现的问题'],
-      ['','','','UNPACKING','拆包装'],
-      ['','','','PROCESS','装配员'],
-      ['','','','INSPECTION','检验员'],
-      ['','','','OTHERS','其他'],
-      ['','','','Who found the defect first?','谁最先发现问题'],
-      ['','','','INSPECTOR','检验员'],
-      ['','','','WORKER/OPERATOR','工人/操作员'],
-      ['','','','LINE LEADER','线上班长'],
-      ['','','','OTHERS','其他'],
-      ['','','','How were the box conditions?','托运箱是否损坏？'],
-      ['','','','GOOD','好'],
-      ['','','','NG','坏'],
-      ['','','','How were the parts conditions?','零件的状态怎么样'],
-      ['','','','How is the result of segregation?','隔离后的结果状态'],
-      ['','','','DONE (NG    / TTL 20       )','已隔离'],
-      ['','','','IN PROGRESS','处理中'],
-      ['','','','NO SEGREGATION','未隔离'],
-      ['','','','RECEIVED DATE :','收到时间'],
-      ['','','','JUDGE for REPLACEMENT :','替换评估'],
-      ['','','','AMITTED','同意'],
-      ['','','','NOT AMITTED','不同意'],
-      ['','','','PCS','件'],
-      ['','','','COMMENT:','评论'],
-      ['','','','NO NEED ANSWER','不需要回答'],
-      ['','','','NEED ANSWER','需要回答'],
-      ['','','','(ANSWER DUE DATE )','（回答截止日期）'],
-      ['','','','ANSWER WITH CORRECTIVE ACTION REPORT SHEET','在故障排除请求报告里回答'],
-      ['','','','WRITE THE ANSWER BELOW','在下面写出回复'],
-      ['','','','WRITE THE COUNTER MEASURE ACTION IN ATTACHED REPORT','在所附的预防复发报告中写出应对策略'],
-      ['','','','APPLIED LOT NO. OF COUNTERMEASURE','应对策略 对应箱号'],
-      ['','','','ANS. RECEIVED DATE','收到回复日期'],
-      ['','','','APPROVED :','批准建议：'],
-      ['','','','WRITTEN BY :','批准人'],
-      ['','','','DATE：','日期'],
-      ['','','','PHOTO (Circle the issue point in the picture)','照片'],
-      ['','','','Main trouble part number :','主要问题零件号'],
-      ['','','',' NO','序号'],
-      ['','','','Part number','零件号'],
-      ['','','','Qty','数量'],
-      ['','','','Part name','零件名称'],
-      ['','','','Price(fob)','价格（FOB）'],
-      ['','','','Total','总数'],
-      ['','','','Reason','原因分析'],
-      ['','','','Solution','解决方案'],
-      ['','','','Approval Suggestion','索赔建议'],
-      ['','','','PHOTO 2 (Circle the issue point in the picture)','照片2'],
-      ['','','','Parts Number：','零件号'],
-      ['','','','Parts Name：','零件名称'],
-      ['','','','Important part description','重要点描述'],
-    ];
-    dataRows.forEach(r => dataWs.addRow(r));
+      ['','','','DETAIL INFORMATION OF DEFECT',''],
+      ['','','','Is it new type of defect?',''],
+      ['','','','NEW',''],['','','','REPEAT',''],
+      ['','','','NO REPORTED BUT REPEAT',''],
+      ['','','','Where was the defect found first?',''],
+      ['','','','RECEIVING',''],['','','','WAREHOUSE',''],
+      ['','','','LINE SIDE',''],['','','','FIRING',''],
+      ['','','','FINAL INSPECTION',''],['','','','OTHERS',''],
+      ['','','','When was the defect found first?',''],
+      ['','','','UNPACKING',''],['','','','PROCESS',''],
+      ['','','','INSPECTION',''],['','','','OTHERS',''],
+      ['','','','Who found the defect first?',''],
+      ['','','','INSPECTOR',''],['','','','WORKER/OPERATOR',''],
+      ['','','','LINE LEADER',''],['','','','OTHERS',''],
+      ['','','','How were the box conditions?',''],
+      ['','','','GOOD',''],['','','','NG',''],
+      ['','','','How were the parts conditions?',''],
+      ['','','','How is the result of segregation?',''],
+      ['','','','DONE',''],['','','','IN PROGRESS',''],
+      ['','','','NO SEGREGATION',''],
+      ['','','','RECEIVED DATE :',''],
+      ['','','','JUDGE for REPLACEMENT :',''],
+      ['','','','AMITTED',''],['','','','NOT AMITTED',''],
+      ['','','','PCS',''],['','','','COMMENT:',''],
+      ['','','','NO NEED ANSWER',''],
+      ['','','','NEED ANSWER',''],
+      ['','','','(ANSWER DUE DATE)',''],
+      ['','','','ANSWER WITH CORRECTIVE ACTION REPORT SHEET',''],
+      ['','','','WRITE THE ANSWER BELOW',''],
+      ['','','','WRITE THE COUNTER MEASURE ACTION IN ATTACHED REPORT',''],
+      ['','','','APPLIED LOT NO. OF COUNTERMEASURE',''],
+      ['','','','ANS. RECEIVED DATE',''],
+      ['','','','APPROVED :',''],['','','','WRITTEN BY :',''],
+      ['','','','DATE:',''],
+      ['','','','PHOTO (Circle the issue point in the picture)',''],
+      ['','','','Main trouble part number :',''],
+      ['','','',' NO',''],['','','','Part number',''],
+      ['','','','Qty',''],['','','','Part name',''],
+      ['','','','Price(fob)',''],['','','','Total',''],
+      ['','','','Reason',''],['','','','Solution',''],
+      ['','','','Approval Suggestion',''],
+      ['','','','PHOTO 2 (Circle the issue point in the picture)',''],
+      ['','','','Parts Number:',''],['','','','Parts Name:',''],
+      ['','','','Important part description',''],
+    ].forEach(function(r){ dataWs.addRow(r); });
 
     // CAR sheet
-    const ws = wb.addWorksheet('CAR');
+    var ws = wb.addWorksheet('CAR');
 
-    const yFill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFF00'}};
-    const bFill = {type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
-    const lbFill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFDAE3F3'}};
-    const bold = {bold:true};
-    const cAlign = {horizontal:'center',vertical:'middle',wrapText:true};
-    const lAlign = {horizontal:'left',vertical:'middle',wrapText:true};
-    const tAlign = {horizontal:'left',vertical:'top',wrapText:true};
+    // Exact column widths
+    var colW = {A:2,B:3,C:6.43,D:4.43,E:3.14,F:7.57,G:4.43,H:13,I:13,J:13,K:13,L:13,
+      M:2.29,N:3.71,O:1.43,P:2.86,Q:1.29,R:7.57,S:3.29,T:4.43,U:21.71,V:5.86,W:13,
+      X:7.29,Y:4.43,Z:13,AA:13,AB:13,AC:13,AD:8.57,AE:4.43,AF:13,AG:9,AH:13,AI:13,AJ:13,AK:13};
+    Object.keys(colW).forEach(function(col){ ws.getColumn(col).width = colW[col]; });
 
-    function c(addr, val, fill, font, align) {
-      const cell = ws.getCell(addr);
+    // Exact row heights
+    var rowH = {1:15,2:18.6,3:15.95,4:12.6,5:13.5,6:13.5,7:14.45,8:14.45,9:14.45,
+      10:14.45,11:14.45,12:14.45,13:86.1,14:14.45,15:14.45,16:14.45,17:16.5,18:16.5,
+      19:16.5,20:16.5,21:16.5,22:134.25,23:14.25,24:14.25,25:14.25,26:14.25,27:14.25,
+      28:14.25,29:14.25,30:14.25,31:14.25,32:14.25,33:12,34:12,35:24.75,37:12,38:12,
+      40:13.5,41:20.25,42:12,43:15,44:12.6,45:54.95,48:34.5,49:24.75,50:30,51:36,
+      52:28.5,53:12,54:12,55:12};
+    Object.keys(rowH).forEach(function(r){ ws.getRow(parseInt(r)).height = rowH[r]; });
+
+    var yFill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFF00'}};
+    var bFill = {type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}};
+    var lbFill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFDAE3F3'}};
+    var gFill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFD9D9D9'}};
+
+    var issueDate = inc.createdAt ? new Date(inc.createdAt).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+    var partName = (inc.partName||'').toUpperCase();
+    var partNo = (inc.partNo||'').toUpperCase();
+    var model = (inc.model||'').toUpperCase();
+    var orderNo = (inc.orderNo||'').toUpperCase();
+    var lotNo = (inc.lotNo||'').toUpperCase();
+    var ngQty = parseInt(inc.ngQty)||1;
+    var defect = (inc.defect||'').toUpperCase();
+    var detected = (inc.detected||'').toUpperCase();
+    var user = (inc.user||'LUIS HERNANDEZ').toUpperCase();
+    var replQty = inc.replacement === 'NO NEED' ? 0 : ngQty;
+    var shortDefect = partName + (defect ? ' (' + defect.substring(0,50) + ')' : ' (DEFECT)');
+    var fullDesc = (detected ? 'HOW DETECTED: ' + detected + '. ' : '') + defect + (defect?' ':'') + 'PHOTOS ARE ATTACHED FOR YOUR REFERENCE.';
+
+    function s(addr, val, opts) {
+      opts = opts || {};
+      var cell = ws.getCell(addr);
       cell.value = val;
-      if(fill) cell.fill = fill;
-      if(font) cell.font = font;
-      if(align) cell.alignment = align;
+      if(opts.fill) cell.fill = opts.fill;
+      if(opts.font) cell.font = opts.font;
+      if(opts.align) cell.alignment = opts.align;
     }
-    function m(r) { try{ws.mergeCells(r);}catch(e){} }
+    function m(r) { try{ ws.mergeCells(r); }catch(e){} }
 
-    const issueDate = inc.createdAt ? new Date(inc.createdAt).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
-    const partName = (inc.partName||'').toUpperCase();
-    const partNo = (inc.partNo||'').toUpperCase();
-    const model = (inc.model||'').toUpperCase();
-    const orderNo = (inc.orderNo||'').toUpperCase();
-    const lotNo = (inc.lotNo||'');
-    const ngQty = parseInt(inc.ngQty)||1;
-    const defect = (inc.defect||'').toUpperCase();
-    const detected = (inc.detected||'').toUpperCase();
-    const user = (inc.user||'LUIS HERNANDEZ').toUpperCase();
-    const replacement = inc.replacement === 'NO NEED' ? 0 : ngQty;
-    const shortDefect = partName + (defect ? ' (' + defect.substring(0,50) + ')' : ' (DEFECT)');
-    const fullDesc = (detected ? 'HOW DETECTED: ' + detected + '. ' : '') + defect + ' PHOTOS ARE ATTACHED FOR YOUR REFERENCE.';
+    var cM = {horizontal:'center',vertical:'middle',wrapText:true};
+    var lM = {horizontal:'left',vertical:'middle',wrapText:true};
+    var lT = {horizontal:'left',vertical:'top',wrapText:true};
 
-    // Row 1
-    c('A1','TO:     from    : ',null,bold,cAlign); m('A1:B1');
-    c('C1','CFMOTO',null,bold,cAlign); m('C1:D1');
-    c('F1','From：',null,bold);
-    c('G1','KD Factory',null,bold,cAlign); m('G1:L1');
-    c('U1','English');
+    // ROW 1
+    s('A1','TO:     from    : ',{font:{size:9},align:cM}); m('A1:B1');
+    s('C1','CFMOTO',{font:{size:9},align:cM}); m('C1:D1');
+    s('F1','From:',{font:{size:9}});
+    s('G1','KD Factory',{font:{size:9},align:cM}); m('G1:L1');
+    s('U1','English',{font:{size:9}});
 
-    // Row 2
-    c('A2','C A R  (Corrective Action Request)',bFill,{bold:true,color:{argb:'FFFFFFFF'},size:14},cAlign); m('A2:L2');
-    c('N2','ISSUE NO.',null,bold); m('N2:S2');
-    c('T2',':');
-    c('U2','IRU No. '+carNum,yFill,bold,lAlign); m('U2:X2');
-    c('Z2','PHOTO (Circle the issue point in the picture)',lbFill,{bold:true,size:12},cAlign); m('Z2:AK3');
+    // ROW 2
+    s('A2','C A R  (Corrective Action Request)',{fill:bFill,font:{size:14,bold:true,color:{argb:'FFFFFFFF'}},align:cM}); m('A2:L2');
+    s('N2','ISSUE NO.',{font:{size:9},align:lM}); m('N2:S2');
+    s('T2',':',{font:{size:9},align:{vertical:'middle'}});
+    s('U2','IRU No. '+carNum,{fill:yFill,font:{size:9},align:lM}); m('U2:X2');
+    s('Z2','PHOTO (Circle the issue point in the picture)',{fill:lbFill,font:{size:16,bold:true},align:cM}); m('Z2:AK3');
 
-    // Row 3
-    c('N3','ISSUE SEC.',null,bold); m('N3:S3');
-    c('T3',':');
-    c('U3','CFMOTO DA AMAZONIA',null,null,lAlign); m('U3:X3');
+    // ROW 3
+    s('N3','ISSUE SEC.',{font:{size:9},align:{vertical:'middle'}}); m('N3:S3');
+    s('T3',':',{font:{size:9},align:{vertical:'middle'}});
+    s('U3','CFMOTO DA AMAZONIA',{font:{size:9},align:lM}); m('U3:X3');
 
-    // Row 4
-    c('A4','REQUESTED SEC. from ',null,bold); m('A4:F4');
-    c('G4','CFMOTO - BRAZIL',null,null,lAlign); m('G4:L4');
-    c('N4','WRITTEN BY',null,bold); m('N4:S4');
-    c('T4',':');
-    c('U4',user,null,null,lAlign); m('U4:X4');
-    c('Z4','Parts Name:',null,bold,lAlign); m('Z4:AD5');
-    c('AE4',partName,yFill,bold,cAlign); m('AE4:AK5');
+    // ROW 4
+    s('A4','REQUESTED SEC. from',{font:{size:9},align:lM}); m('A4:F4');
+    s('G4','CFMOTO - BRAZIL',{font:{size:9},align:cM}); m('G4:L4');
+    s('N4','WRITTEN BY',{font:{size:9},align:{vertical:'middle'}}); m('N4:S4');
+    s('T4',':',{font:{size:9},align:{vertical:'middle'}});
+    s('U4',user,{font:{size:9},align:lM}); m('U4:X4');
+    s('Z4','Parts Name:',{font:{size:18},align:lM}); m('Z4:AD5');
+    s('AE4',partName,{fill:yFill,font:{size:16},align:cM}); m('AE4:AK5');
 
-    // Row 5
-    c('N5','ISSUE DATE',null,bold); m('N5:S5');
-    c('T5',':');
-    c('U5',issueDate,yFill,null,lAlign); m('U5:X5');
+    // ROW 5
+    s('A5','',{}); m('A5:L5');
+    s('N5','ISSUE DATE',{font:{size:9},align:{vertical:'middle'}}); m('N5:S5');
+    s('T5',':',{font:{size:9}});
+    s('U5',issueDate,{fill:yFill,font:{size:9},align:lM}); m('U5:X5');
 
-    // Row 6
-    c('A6','PART NO.:',null,bold); m('A6:F6');
-    c('G6',partNo,yFill,bold,lAlign); m('G6:L6');
-    c('N6','PART NAME',null,bold); m('N6:S6');
-    c('T6',':');
-    c('U6',partName,yFill,null,lAlign); m('U6:X6');
-    c('Z6','Parts Number:',null,bold,lAlign); m('Z6:AD7');
-    c('AE6',partNo,yFill,bold,cAlign); m('AE6:AK7');
+    // ROW 6
+    s('A6','PART NO.:',{font:{size:9},align:lM}); m('A6:F6');
+    s('G6',partNo,{fill:yFill,font:{size:9},align:cM}); m('G6:L6');
+    s('N6','PART NAME',{font:{size:9},align:{vertical:'middle'}}); m('N6:S6');
+    s('T6',':',{font:{size:9}});
+    s('U6',partName,{fill:yFill,font:{size:9},align:lM}); m('U6:X6');
+    s('Z6','Parts Number:',{font:{size:18},align:lM}); m('Z6:AD7');
+    s('AE6',partNo,{fill:yFill,font:{size:20},align:cM}); m('AE6:AK7');
 
-    // Row 7
-    c('A7','ORDER NO.:',null,bold); m('A7:F7');
-    c('G7',orderNo,yFill,null,lAlign); m('G7:L7');
-    c('N7','',null,bold); m('N7:S7');
-    c('T7',':');
-    c('U7',orderNo,yFill,null,lAlign); m('U7:X7');
+    // ROW 7
+    s('A7','ORDER NO.:',{font:{size:9},align:lM}); m('A7:F7');
+    s('G7',orderNo,{fill:yFill,font:{size:9},align:cM}); m('G7:L7');
+    s('N7','LOT NO.',{font:{size:9},align:{vertical:'middle'}}); m('N7:S7');
+    s('T7',':',{font:{size:9}});
+    s('U7',orderNo,{fill:yFill,font:{size:9},align:lM}); m('U7:X7');
 
-    // Row 8
-    c('A8','MODEL:',null,bold); m('A8:C8');
-    c('D8',model,yFill,null,lAlign); m('D8:F8');
-    c('G8','NG QTY:',null,bold); m('G8:J8');
-    c('K8',ngQty,yFill,null,cAlign); m('K8:L8');
-    c('N8','LOT NO.',null,bold); m('N8:S8');
-    c('T8',':');
-    c('U8',lotNo,yFill,null,lAlign); m('U8:X8');
+    // ROW 8
+    s('A8','MODEL:',{font:{size:9},align:lM}); m('A8:C8');
+    s('D8',model,{fill:yFill,font:{size:9},align:cM}); m('D8:F8');
+    s('G8','NG QTY:',{font:{size:8},align:lM}); m('G8:J8');
+    s('K8',ngQty,{fill:yFill,font:{size:9},align:cM}); m('K8:L8');
+    s('N8','LOT NO.',{font:{size:9},align:{vertical:'middle'}}); m('N8:S8');
+    s('T8',':',{font:{size:9}});
+    s('U8',lotNo,{fill:yFill,font:{size:9},align:lM}); m('U8:X8');
 
-    // Row 9
-    c('A9','DESCRIPTION OF DEFECT :',null,bold); m('A9:F9');
-    c('G9',shortDefect,yFill,null,lAlign); m('G9:R9');
-    c('S9','ACTION in KD FACTORY :',null,bold);
+    // ROW 9
+    s('A9','DESCRIPTION OF DEFECT :',{font:{size:9},align:lM}); m('A9:F9');
+    s('G9',shortDefect,{fill:yFill,font:{size:10},align:lM}); m('G9:R9');
+    s('S9','ACTION in KD FACTORY :',{font:{size:9},align:lM}); m('S9:U9');
 
-    // Row 10
-    c('A10','HOW IT WAS DETECTED :',null,bold); m('A10:F10');
+    // ROW 10
+    s('A10','HOW IT WAS DETECTED :',{font:{size:10,bold:true},align:lT}); m('A10:F10');
+    s('T10','SEGREGATION',{font:{size:9},align:lM}); m('T10:X10');
 
-    // Row 11-13 (description)
-    ws.getRow(11).height = 60;
-    c('A11',fullDesc,yFill,null,tAlign); m('A11:R13');
-    c('T11','SEGREGATION'); m('T11:U11');
-    c('W11','Hrs'); m('W11:X11');
-    c('T12','REPAIR'); c('W12','Hrs'); m('W12:X12');
-    c('T13','USE AS IS');
+    // ROW 11-13
+    s('A11',fullDesc,{fill:yFill,font:{size:8,bold:true},align:lT}); m('A11:R13');
+    s('T11','REPAIR',{font:{size:9},align:lM});
+    s('W11','Hrs',{font:{size:9},align:cM}); m('W11:X11');
+    s('T12','USE AS IS',{font:{size:9},align:{vertical:'middle'}});
+    s('W12','Hrs',{font:{size:9},align:cM}); m('W12:X12');
 
-    // Row 14-15
-    c('A14','FOR MORE INFORMATION SEE THE PHOTOGRAPHS ON RIGHT HAND SIDE & THE DETAILS BELOW.',null,{italic:true},lAlign); m('A14:R15');
-    c('S14','REPLACEMENT PARTS :',null,bold); m('S14:X14');
-    c('S15','REPLACEMENT PARTS :',null,bold); m('S15:X15');
+    // ROW 14-15
+    s('A14','FOR MORE INFORMATION SEE THE PHOTOGRAPHS ON RIGHT HAND SIDE & THE DETAILS BELOW.',{font:{size:10,bold:true,italic:true},align:lT}); m('A14:R15');
+    s('S14','REPLACEMENT PARTS :',{font:{size:9,bold:true},align:lM}); m('S14:X14');
+    s('S15','REPLACEMENT PARTS :',{font:{size:9,bold:true},align:lM}); m('S15:X15');
 
-    // Row 16-20
-    c('T16','NEED',null,bold); m('T16:U16');
-    c('V16',replacement,yFill,null,cAlign); m('V16:W16');
-    c('X16','pcs');
-    c('T17','NO NEED',null,bold); m('T17:X17');
-    c('S18','PHOTO :',null,bold); m('S18:T18');
-    c('T19','SEND',null,bold); m('T19:U19');
-    c('T20','NO',null,bold); m('T20:U20');
-    c('S21','NG SAMPLE',null,bold); m('S21:U21');
-    c('Z21','PHOTO 2 (Circle the issue point in the picture)',lbFill,{bold:true,size:11},cAlign); m('Z21:AK21');
+    // ROW 16-21
+    s('T16','NEED',{font:{size:9},align:{vertical:'middle'}});
+    s('V16',replQty,{fill:yFill,font:{size:9},align:cM}); m('V16:W16');
+    s('X16','pcs',{font:{size:9}});
+    s('T17','NO NEED',{font:{size:9},align:lM}); m('T17:X17');
+    s('S18','PHOTO :',{font:{size:9,bold:true},align:lM}); m('S18:T18');
+    s('T19','SEND',{font:{size:9},align:lM}); m('T19:U19');
+    s('T20','NO',{font:{size:9},align:lM}); m('T20:U20');
+    s('S21','NG SAMPLE',{font:{size:9},align:lM}); m('S21:U21');
+    s('A16','',{}); m('A16:R22');
+    s('Z21','PHOTO 2 (Circle the issue point in the picture)',{fill:lbFill,font:{size:10},align:cM}); m('Z21:AK21');
+    s('Z22','',{}); m('Z22:AK22');
 
-    // Detail info rows
-    c('A23','DETAIL INFORMATION OF DEFECT',lbFill,{bold:true,size:11}); m('A23:G23');
-    c('T23','   NO (WHEN REPEAT ONLY)'); m('T23:X23');
-    c('A24',1); c('B24','Is it new type of defect?',null,bold); m('B24:F24');
-    c('C25','NEW'); m('C25:E25');
-    c('F25','REPEAT'); m('F25:J25');
-    c('L25','NO REPORTED BUT REPEAT'); m('L25:T25');
-    c('A26',2); c('B26','Where was the defect found first?',null,bold); m('B26:H26');
-    c('B27','RECEIVING'); m('B27:D27');
-    c('F27','WAREHOUSE'); m('F27:G27');
-    c('I27','LINE SIDE'); m('I27:J27');
-    c('L27','FIRING'); m('L27:M27');
-    c('O27','FINAL INSPECTION'); m('O27:T27');
-    c('U27','OTHERS');
-    c('A28',3); c('B28','When was the defect found first?',null,bold); m('B28:H28');
-    c('B29','UNPACKING'); m('B29:D29');
-    c('G29','PROCESS'); m('G29:H29');
-    c('J29','INSPECTION'); m('J29:L29');
-    c('N29','OTHERS'); m('N29:R29');
-    c('A30',4); c('B30','Who found the defect first?',null,bold); m('B30:H30');
-    c('C31','INSPECTOR'); m('C31:E31');
-    c('G31','WORKER/OPERATOR'); m('G31:J31');
-    c('L31','LINE LEADER'); m('L31:P31');
-    c('A32',5); c('B32','How were the box conditions?',null,bold); m('B32:G32');
-    c('J32','GOOD'); m('J32:K32');
-    c('M32','NG'); m('M32:T32');
-    c('A33',6); c('B33','How were the parts conditions?',null,bold); m('B33:G33');
-    c('J33','GOOD'); m('J33:K33');
-    c('M33','NG'); m('M33:T33');
-    c('A34',7); c('B34','How is the result of segregation?',null,bold);
-    c('C35','DONE'); m('C35:G35');
-    c('J35','IN PROGRESS'); m('J35:L35');
-    c('P35','NO SEGREGATION'); m('P35:T35');
+    // ROWS 23-35
+    s('A23','DETAIL INFORMATION OF DEFECT',{fill:lbFill,font:{size:11,bold:true}}); m('A23:G23');
+    s('T23','   NO (WHEN REPEAT ONLY)',{font:{size:9}}); m('T23:X23');
+    s('A24',1,{font:{size:9}}); s('B24','Is it new type of defect?',{font:{size:9,bold:true}}); m('B24:F24');
+    s('C25','NEW',{font:{size:9}}); m('C25:E25');
+    s('F25','REPEAT',{font:{size:9}}); m('F25:J25');
+    s('L25','NO REPORTED BUT REPEAT',{font:{size:9}}); m('L25:T25');
+    s('A26',2,{font:{size:9}}); s('B26','Where was the defect found first?',{font:{size:9,bold:true}}); m('B26:H26');
+    s('B27','RECEIVING',{font:{size:9}}); m('B27:D27');
+    s('F27','WAREHOUSE',{font:{size:9}}); m('F27:G27');
+    s('I27','LINE SIDE',{font:{size:9}}); m('I27:J27');
+    s('L27','FIRING',{font:{size:9}}); m('L27:M27');
+    s('O27','FINAL INSPECTION',{font:{size:9}}); m('O27:T27');
+    s('U27','OTHERS',{font:{size:9}});
+    s('A28',3,{font:{size:9}}); s('B28','When was the defect found first?',{font:{size:9,bold:true}}); m('B28:H28');
+    s('B29','UNPACKING',{font:{size:9}}); m('B29:D29');
+    s('G29','PROCESS',{font:{size:9}}); m('G29:H29');
+    s('J29','INSPECTION',{font:{size:9}}); m('J29:L29');
+    s('N29','OTHERS',{font:{size:9}}); m('N29:R29');
+    s('A30',4,{font:{size:9}}); s('B30','Who found the defect first?',{font:{size:9,bold:true}}); m('B30:H30');
+    s('C31','INSPECTOR',{font:{size:9}}); m('C31:E31');
+    s('G31','WORKER/OPERATOR',{font:{size:9}}); m('G31:J31');
+    s('L31','LINE LEADER',{font:{size:9}}); m('L31:P31');
+    s('S31','OTHERS',{font:{size:9}}); m('S31:T31');
+    s('A32',5,{font:{size:9}}); s('B32','How were the box conditions?',{font:{size:9,bold:true}}); m('B32:G32');
+    s('J32','GOOD',{font:{size:9}}); m('J32:K32');
+    s('M32','NG',{font:{size:9}}); m('M32:T32');
+    s('A33',6,{font:{size:9}}); s('B33','How were the parts conditions?',{font:{size:9,bold:true}}); m('B33:G33');
+    s('J33','GOOD',{font:{size:9}}); m('J33:K33');
+    s('M33','NG',{font:{size:9}}); m('M33:T33');
+    s('A34',7,{font:{size:9}}); s('B34','How is the result of segregation?',{font:{size:9,bold:true}});
+    s('C35','DONE',{font:{size:9}}); m('C35:G35');
+    s('J35','IN PROGRESS',{font:{size:9}}); m('J35:L35');
+    s('P35','NO SEGREGATION',{font:{size:9}}); m('P35:T35');
 
-    // Received + judge
-    c('A37','RECEIVED DATE :',null,bold); m('A37:E37');
-    c('F37','JUDGE for REPLACEMENT :',null,bold); m('F37:L37');
-    c('M37','COMMENT:',null,bold); m('M37:X37');
-    c('Z37','Important part description',lbFill,bold,cAlign); m('Z37:AC39');
-    c('AD37','',lbFill); m('AD37:AK39');
-    c('G38','AMITTED'); m('G38:I38');
-    c('L38','PCS'); m('L38:X38');
-    c('G39','NOT AMITTED'); m('G39:L39');
+    // ROWS 37-39
+    s('A37','RECEIVED DATE :',{font:{size:9,bold:true}}); m('A37:E37');
+    m('A38:E39');
+    m('F37:L37');
+    s('M37','JUDGE for REPLACEMENT :',{font:{size:9,bold:true}}); m('M37:X37');
+    s('Z37','Important part description',{fill:lbFill,font:{size:9,bold:true},align:cM}); m('Z37:AC39');
+    s('AD37','',{fill:lbFill}); m('AD37:AK39');
+    s('G38','AMITTED',{font:{size:9}}); m('G38:I38');
+    s('J38','',{fill:gFill}); m('J38:K38');
+    s('L38','COMMENT:',{font:{size:9}}); m('L38:X38');
+    s('G39','NOT AMITTED',{font:{size:9}}); m('G39:L39');
+    m('M39:X39');
 
-    // Answer + Reason
-    c('C41','NO NEED ANSWER'); m('C41:F41');
-    c('H41','NEED ANSWER'); m('H41:K41');
-    c('L41','(ANSWER DUE DATE)'); m('L41:T41');
-    c('C42','ANSWER WITH CORRECTIVE ACTION REPORT SHEET'); m('C42:M42');
-    c('D43','WRITE THE ANSWER BELOW',null,bold); m('D43:M43');
-    c('V43','APPLIED LOT NO. OF COUNTERMEASURE'); m('V43:X44');
-    c('C44','WRITE THE COUNTER MEASURE ACTION IN ATTACHED REPORT',null,bold); m('C44:U44');
+    // ROWS 41-44
+    s('C41','NO NEED ANSWER',{font:{size:9}}); m('C41:F41');
+    s('H41','NEED ANSWER',{font:{size:9}}); m('H41:K41');
+    s('L41','(ANSWER DUE DATE)',{font:{size:9}}); m('L41:T41');
+    s('C42','ANSWER WITH CORRECTIVE ACTION REPORT SHEET',{font:{size:9}}); m('C42:M42');
+    s('D43','WRITE THE ANSWER BELOW',{font:{size:9,bold:true}}); m('D43:M43');
+    s('V43','APPLIED LOT NO. OF COUNTERMEASURE',{font:{size:9}}); m('V43:X44');
+    s('C44','WRITE THE COUNTER MEASURE ACTION IN ATTACHED REPORT',{font:{size:9,bold:true}}); m('C44:U44');
 
-    c('A45','Reason',null,bold); m('A45:C45'); m('D45:U45');
-    c('A46','Solution',null,bold); m('A46:C48'); m('D46:U48');
-    c('Z46','Main trouble part number :',null,bold); m('Z46:AF46'); m('AG46:AK46');
-    c('AA47','Part number',null,bold,cAlign); m('AA47:AE47');
-    c('AF47','Qty',null,bold,cAlign);
-    c('AG47','Part name',null,bold,cAlign); m('AG47:AH47');
-    c('AI47','Price(fob)',null,bold,cAlign); m('AI47:AJ47');
-    c('AK47','Total',null,bold,cAlign);
-    [48,49,50,51,52].forEach((r,i) => {
+    // ROWS 45-55
+    s('A45','Reason',{font:{size:9,bold:true}}); m('A45:C45');
+    m('D45:U45');
+    s('A46','Solution',{font:{size:9,bold:true}}); m('A46:C48');
+    m('D46:U48');
+    s('Z46','Main trouble part number :',{font:{size:9,bold:true}}); m('Z46:AF46');
+    m('AG46:AK46');
+    s('AA47','Part number',{font:{size:9,bold:true},align:cM}); m('AA47:AE47');
+    s('AF47','Qty',{font:{size:9,bold:true},align:cM});
+    s('AG47','Part name',{font:{size:9,bold:true},align:cM}); m('AG47:AH47');
+    s('AI47','Price(fob)',{font:{size:9,bold:true},align:cM}); m('AI47:AJ47');
+    s('AK47','Total',{font:{size:9,bold:true},align:cM});
+    [48,49,50,51,52].forEach(function(r,i) {
       ws.getCell('Z'+r).value = i+1;
       try{ws.mergeCells('AA'+r+':AE'+r);}catch(e){}
       try{ws.mergeCells('AG'+r+':AH'+r);}catch(e){}
       try{ws.mergeCells('AI'+r+':AJ'+r);}catch(e){}
     });
-
-    c('A49','Approval Suggestion',null,bold); m('A49:C51'); m('D49:U51');
-    c('V49','ANS. RECEIVED DATE',null,bold);
-    c('V50','             .             .             '); m('V50:X50');
-    c('V51','CF-MOTO QC');
+    s('A49','Approval Suggestion',{font:{size:9,bold:true}}); m('A49:C51');
+    m('D49:U51');
+    s('V49','ANS. RECEIVED DATE',{font:{size:9,bold:true}});
+    s('V50','             .             .             ',{font:{size:9}}); m('V50:X50');
+    s('V51','CF-MOTO QC',{font:{size:9}});
     m('A52:U52'); m('A53:U53');
-
-    c('B54','APPROVED :',null,bold); m('B54:D54'); m('E54:F54');
-    c('H54','WRITTEN BY :',null,bold); m('H54:I54'); m('J54:K54');
-    c('O54','DATE:',null,bold); m('O54:Q54');
+    s('B54','APPROVED :',{font:{size:9,bold:true}}); m('B54:D54');
+    m('E54:F54');
+    s('H54','WRITTEN BY :',{font:{size:9,bold:true}}); m('H54:I54');
+    m('J54:K54');
+    s('O54','DATE:',{font:{size:9,bold:true}}); m('O54:Q54');
 
     // Download
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    var buffer = await wb.xlsx.writeBuffer();
+    var blob = new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
     a.href = url;
-    const code = carNum.replace('/','_');
-    const part = (inc.partNo||'PART').replace(/[^a-zA-Z0-9-]/g,'_').substring(0,20);
+    var code = carNum.replace('/','_');
+    var part = (inc.partNo||'PART').replace(/[^a-zA-Z0-9-]/g,'_').substring(0,20);
     a.download = 'CAR_No_'+code+'_'+part+'.xlsx';
     a.click();
     URL.revokeObjectURL(url);
@@ -1155,6 +1180,7 @@ async function generateCAR(id) {
     showToast('Erro ao gerar CAR. Tente novamente.');
   }
 }
+
 initAuth();
 </script>
 </body>
