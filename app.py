@@ -1,11 +1,13 @@
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import openpyxl
+from openpyxl.drawing.image import Image as XLImage
 from datetime import datetime
-import os, io
+import os, io, tempfile
 import urllib.request
 import urllib.parse
 import json
+from PIL import Image as PILImage
 
 app = Flask(__name__)
 CORS(app)
@@ -13,11 +15,9 @@ CORS(app)
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'template.xlsx')
 
 def translate_to_english(text):
-    """Translate any text to English using Google Translate (free tier)."""
     if not text:
         return ''
     text = text.strip()
-    # Check if already mostly English
     pt_words = ['de', 'do', 'da', 'em', 'no', 'na', 'ao', 'foi', 'com', 'para',
                 'uma', 'um', 'que', 'por', 'nossa', 'nosso', 'este', 'esta',
                 'detectamos', 'modelo', 'durante', 'processo', 'item', 'danos']
@@ -39,12 +39,34 @@ def translate_to_english(text):
         print(f'Translation error: {e}')
         return text.upper()
 
+def download_and_resize_image(url, max_w, max_h):
+    """Download image from URL and resize to fit area."""
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            img_data = response.read()
+        img = PILImage.open(io.BytesIO(img_data))
+        # Convert to RGB if needed
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        # Resize to fit area maintaining aspect ratio
+        img.thumbnail((max_w, max_h), PILImage.LANCZOS)
+        # Save to temp file
+        tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+        img.save(tmp.name, 'JPEG', quality=85)
+        tmp.close()
+        return tmp.name
+    except Exception as e:
+        print(f'Image download error: {e}')
+        return None
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok'})
 
 @app.route('/generate-car', methods=['POST'])
 def generate_car():
+    tmp_files = []
     try:
         data = request.get_json()
 
@@ -61,8 +83,9 @@ def generate_car():
         replacement = data.get('replacement', 'NEED')
         repl_qty    = 0 if replacement == 'NO NEED' else ng_qty
         issue_date  = data.get('issueDate', datetime.now().strftime('%d/%m/%Y'))
+        photos      = data.get('photos', [])  # list of URLs
 
-        # Translate detected text to English
+        # Translate detected text
         detected_en = translate_to_english(detected)
 
         short_defect = part_name + (' (' + defect[:50] + ')' if defect else ' (DEFECT)')
@@ -91,6 +114,29 @@ def generate_car():
         ws['A11'] = full_desc
         ws['V16'] = repl_qty
 
+        # Insert photos into template
+        # Photo area 1: A16:R22 (~795x227 px)
+        # Photo area 2: Z22:AK22 (~971x133 px)
+        photo_areas = [
+            ('A16', 795, 227),
+            ('Z22', 971, 133),
+        ]
+
+        for i, photo_url in enumerate(photos[:2]):  # max 2 photos in template
+            if not photo_url:
+                continue
+            area_cell, max_w, max_h = photo_areas[i]
+            tmp_path = download_and_resize_image(photo_url, max_w, max_h)
+            if tmp_path:
+                tmp_files.append(tmp_path)
+                try:
+                    img = XLImage(tmp_path)
+                    img.anchor = area_cell
+                    ws.add_image(img)
+                except Exception as e:
+                    print(f'Image insert error: {e}')
+
+        # Save to memory buffer
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -108,6 +154,13 @@ def generate_car():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        # Cleanup temp files
+        for f in tmp_files:
+            try:
+                os.unlink(f)
+            except:
+                pass
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
