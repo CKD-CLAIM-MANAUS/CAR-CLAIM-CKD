@@ -137,6 +137,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .photo-btn-gal{background:#F4F6F8;color:#263238;border:1.5px solid #CFD8DC}
 .photo-btn-gal:hover{background:#ECEFF1}
 .photo-btn-cam input,.photo-btn-gal input{display:none}
+.photo-drop-zone{border:1.5px dashed #CFD8DC;border-radius:8px;padding:12px;text-align:center;margin-top:8px;transition:all 0.2s;background:#FAFAFA;cursor:pointer}
+.photo-drop-zone.drag-over{border-color:#1565C0;background:#E3F2FD}
 .quick-banner{background:#E3F2FD;border:1.5px solid #90CAF9;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#1565C0;line-height:1.5}
 .quick-banner strong{font-weight:700}
 .optional-tag{font-size:10px;color:#90A4AE;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-left:6px;background:#ECEFF1;border-radius:4px;padding:1px 6px}
@@ -306,6 +308,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
               <input type="file" id="galleryInput" accept="image/*" multiple onchange="handlePhotos(this.files)">
               🖼️ Da galeria
             </button>
+          </div>
+          <div class="photo-drop-zone" id="photoDropZone"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="handleDrop(event)">
+            <span style="font-size:12px;color:#90A4AE">Arraste fotos aqui ou cole com Ctrl+V</span>
           </div>
           <div class="photo-grid" id="photoGrid"></div>
           <div id="photoHint" style="font-size:12px;color:#E65100;margin-top:8px;display:none">Adicione pelo menos uma foto</div>
@@ -724,6 +732,29 @@ async function compressImage(file, maxSizeKB=900, maxW=1600){
   });
 }
 
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('photoDropZone').classList.remove('drag-over');
+  handlePhotos(e.dataTransfer.files);
+}
+
+// Paste handler (Ctrl+V)
+document.addEventListener('paste', function(e) {
+  var page = document.getElementById('pageForm');
+  if(!page || page.style.display === 'none') return;
+  var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  var imageFiles = [];
+  for(var i=0; i<items.length; i++) {
+    if(items[i].type.indexOf('image') !== -1) {
+      imageFiles.push(items[i].getAsFile());
+    }
+  }
+  if(imageFiles.length > 0) {
+    handlePhotos(imageFiles);
+    showToast('Foto colada com sucesso!');
+  }
+});
+
 function handlePhotos(files){
   Array.from(files).forEach(async file=>{
     try{
@@ -841,7 +872,8 @@ async function generateCAR(id) {
       detected: inc.detected || '',
       user: inc.user || '',
       replacement: inc.replacement || 'NEED',
-      issueDate
+      issueDate,
+      photos: (inc.photos || []).slice(0,2).map(p => p.url || p)
     };
 
     const res = await fetch(CAR_SERVER_URL + '/generate-car', {
