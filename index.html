@@ -840,12 +840,9 @@ async function getNextCARNumber() {
 }
 
 // ---- GENERATE CAR EXCEL ----
-// Template CAR - carregado do GitHub
-async function loadTemplateBytes() {
-  const res = await fetch('template.xlsx');
-  if(!res.ok) throw new Error('Nao foi possivel carregar o template.');
-  return await res.arrayBuffer();
-}
+// ---- CAR EXCEL via servidor Python ----
+// Actualiza este URL depois de criar o servidor no Render
+const CAR_SERVER_URL = 'COLE_AQUI_URL_DO_RENDER';
 
 async function generateCAR(id) {
   const inc = incidents.find(i=>i.id===id);
@@ -853,60 +850,34 @@ async function generateCAR(id) {
   showToast('Aguarde, a gerar CAR Excel...');
   try {
     const carNum = await getNextCARNumber();
+    const issueDate = inc.createdAt ?
+      new Date(inc.createdAt).toLocaleDateString('pt-BR') :
+      new Date().toLocaleDateString('pt-BR');
 
-    // Load template with SheetJS
-    const buffer = await loadTemplateBytes();
-    const wb = XLSX.read(buffer, {type:'array', cellStyles:true, cellDates:true});
-    const ws = wb.Sheets['CAR'];
+    const payload = {
+      carNum,
+      partName: inc.partName || '',
+      partNo: inc.partNo || '',
+      model: inc.model || '',
+      orderNo: inc.orderNo || '',
+      lotNo: inc.lotNo || '',
+      ngQty: inc.ngQty || 1,
+      defect: inc.defect || '',
+      detected: inc.detected || '',
+      user: inc.user || '',
+      replacement: inc.replacement || 'NEED',
+      issueDate
+    };
 
-    // Helper to set cell value preserving existing style
-    function setCell(addr, value) {
-      if(!ws[addr]) ws[addr] = {};
-      if(typeof value === 'number') {
-        ws[addr].t = 'n';
-        ws[addr].v = value;
-      } else {
-        ws[addr].t = 's';
-        ws[addr].v = String(value);
-      }
-      ws[addr].w = String(value); // formatted text
-    }
+    const res = await fetch(CAR_SERVER_URL + '/generate-car', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
 
-    // Prepare data
-    const issueDate = inc.createdAt ? new Date(inc.createdAt).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
-    const partName = (inc.partName||'').toUpperCase();
-    const partNo = (inc.partNo||'').toUpperCase();
-    const model = (inc.model||'').toUpperCase();
-    const orderNo = (inc.orderNo||'').toUpperCase();
-    const lotNo = (inc.lotNo||'').toUpperCase();
-    const ngQty = parseInt(inc.ngQty)||1;
-    const defect = (inc.defect||'').toUpperCase();
-    const detected = (inc.detected||'').toUpperCase();
-    const user = (inc.user||'LUIS HERNANDEZ').toUpperCase();
-    const replQty = inc.replacement === 'NO NEED' ? 0 : ngQty;
-    const shortDefect = partName + (defect ? ' (' + defect.substring(0,50) + ')' : ' (DEFECT)');
-    const fullDesc = (detected ? 'HOW DETECTED: ' + detected + '. ' : '') + defect + (defect?' ':'') + 'PHOTOS ARE ATTACHED FOR YOUR REFERENCE.';
+    if(!res.ok) throw new Error('Erro no servidor: ' + res.status);
 
-    // Fill yellow cells only
-    setCell('U2', 'IRU No. ' + carNum);
-    setCell('U4', user);
-    setCell('AE4', partName);
-    setCell('U5', issueDate);
-    setCell('G6', partNo);
-    setCell('U6', partName);
-    setCell('AE6', partNo);
-    setCell('G7', orderNo);
-    setCell('U7', orderNo);
-    setCell('D8', model);
-    setCell('K8', ngQty);
-    setCell('U8', lotNo);
-    setCell('G9', shortDefect);
-    setCell('A11', fullDesc);
-    setCell('V16', replQty);
-
-    // Write and download
-    const out = XLSX.write(wb, {type:'array', bookType:'xlsx', cellStyles:true});
-    const blob = new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
