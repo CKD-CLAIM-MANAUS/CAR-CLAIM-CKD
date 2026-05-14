@@ -7,7 +7,7 @@ import os, io, tempfile
 import urllib.request
 import urllib.parse
 import json
-from PIL import Image as PILImage
+import struct, zlib
 
 app = Flask(__name__)
 CORS(app)
@@ -39,25 +39,32 @@ def translate_to_english(text):
         print(f'Translation error: {e}')
         return text.upper()
 
-def download_and_resize_image(url, max_w, max_h):
-    """Download image from URL and resize to fit area."""
+def download_image(url):
+    """Download image from URL and return as bytes."""
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
-            img_data = response.read()
-        img = PILImage.open(io.BytesIO(img_data))
-        # Convert to RGB if needed
-        if img.mode in ('RGBA', 'P'):
-            img = img.convert('RGB')
-        # Resize to fit area maintaining aspect ratio
-        img.thumbnail((max_w, max_h), PILImage.LANCZOS)
-        # Save to temp file
-        tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-        img.save(tmp.name, 'JPEG', quality=85)
+            return response.read()
+    except Exception as e:
+        print(f'Image download error: {e}')
+        return None
+
+def save_image_to_temp(img_data, index):
+    """Save image bytes to a temp file, return path."""
+    try:
+        # Detect format from magic bytes
+        if img_data[:8] == b'\x89PNG\r\n\x1a\n':
+            ext = '.png'
+        elif img_data[:2] == b'\xff\xd8':
+            ext = '.jpg'
+        else:
+            ext = '.jpg'
+        tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+        tmp.write(img_data)
         tmp.close()
         return tmp.name
     except Exception as e:
-        print(f'Image download error: {e}')
+        print(f'Save temp error: {e}')
         return None
 
 @app.route('/health', methods=['GET'])
@@ -83,7 +90,7 @@ def generate_car():
         replacement = data.get('replacement', 'NEED')
         repl_qty    = 0 if replacement == 'NO NEED' else ng_qty
         issue_date  = data.get('issueDate', datetime.now().strftime('%d/%m/%Y'))
-        photos      = data.get('photos', [])  # list of URLs
+        photos      = data.get('photos', [])
 
         # Translate detected text
         detected_en = translate_to_english(detected)
@@ -114,29 +121,31 @@ def generate_car():
         ws['A11'] = full_desc
         ws['V16'] = repl_qty
 
-        # Insert photos into template
-        # Photo area 1: A16:R22 (~795x227 px)
-        # Photo area 2: Z22:AK22 (~971x133 px)
-        photo_areas = [
-            ('A16', 795, 227),
-            ('Z22', 971, 133),
-        ]
-
-        for i, photo_url in enumerate(photos[:2]):  # max 2 photos in template
+        # Insert photos — no Pillow needed, just download and embed directly
+        photo_anchors = ['A16', 'Z22']
+        for i, photo_url in enumerate(photos[:2]):
             if not photo_url:
                 continue
-            area_cell, max_w, max_h = photo_areas[i]
-            tmp_path = download_and_resize_image(photo_url, max_w, max_h)
-            if tmp_path:
-                tmp_files.append(tmp_path)
-                try:
-                    img = XLImage(tmp_path)
-                    img.anchor = area_cell
-                    ws.add_image(img)
-                except Exception as e:
-                    print(f'Image insert error: {e}')
+            img_data = download_image(photo_url)
+            if img_data:
+                tmp_path = save_image_to_temp(img_data, i)
+                if tmp_path:
+                    tmp_files.append(tmp_path)
+                    try:
+                        xl_img = XLImage(tmp_path)
+                        # Set size to fit area
+                        if i == 0:
+                            xl_img.width = 570   # A16:R22 area
+                            xl_img.height = 170
+                        else:
+                            xl_img.width = 700   # Z22:AK22 area
+                            xl_img.height = 100
+                        xl_img.anchor = photo_anchors[i]
+                        ws.add_image(xl_img)
+                    except Exception as e:
+                        print(f'Image insert error: {e}')
 
-        # Save to memory buffer
+        # Save to buffer
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -155,7 +164,6 @@ def generate_car():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
-        # Cleanup temp files
         for f in tmp_files:
             try:
                 os.unlink(f)
