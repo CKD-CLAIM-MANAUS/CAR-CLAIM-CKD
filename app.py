@@ -2,81 +2,42 @@ from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import openpyxl
 from datetime import datetime
-import shutil, os, io
+import os, io
+import urllib.request
+import urllib.parse
+import json
 
 app = Flask(__name__)
-CORS(app)  # Allow requests from GitHub Pages
+CORS(app)
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'template.xlsx')
 
-
-# Translation dictionary for common detection phrases (PT -> EN)
-TRANSLATIONS = {
-    # Unpacking/receiving
-    'desempacotamento': 'UNPACKING',
-    'desembalar': 'UNPACKING',
-    'abertura de caixa': 'UNPACKING',
-    'abertura da caixa': 'UNPACKING',
-    'ao abrir a caixa': 'DURING UNPACKING',
-    'na abertura': 'DURING UNPACKING',
-    # Visual inspection
-    'inspeção visual': 'VISUAL INSPECTION',
-    'inspecao visual': 'VISUAL INSPECTION',
-    'inspeção': 'INSPECTION',
-    'inspecao': 'INSPECTION',
-    # Assembly/line
-    'montagem': 'ASSEMBLY',
-    'linha de montagem': 'ASSEMBLY LINE',
-    'na montagem': 'DURING ASSEMBLY',
-    'durante a montagem': 'DURING ASSEMBLY',
-    'linha': 'PRODUCTION LINE',
-    # Receiving
-    'recebimento': 'RECEIVING',
-    'recepcao': 'RECEIVING',
-    'recepção': 'RECEIVING',
-    'ao receber': 'UPON RECEIVING',
-    'na recepcao': 'AT RECEIVING',
-    # Missing/damage
-    'faltando': 'MISSING',
-    'ausente': 'MISSING',
-    'danificado': 'DAMAGED',
-    'quebrado': 'BROKEN',
-    'arranhado': 'SCRATCHED',
-    'amassado': 'DENTED',
-    'torto': 'BENT',
-    'incorreto': 'INCORRECT',
-    'errado': 'WRONG',
-    # Detection by who
-    'equipe de desempacotamento': 'UNPACKING TEAM',
-    'time de desempacotamento': 'UNPACKING TEAM',
-    'operador': 'OPERATOR',
-    'inspetor': 'INSPECTOR',
-    'tecnico': 'TECHNICIAN',
-    'técnico': 'TECHNICIAN',
-    # Others
-    'teste': 'TESTING',
-    'verificacao': 'VERIFICATION',
-    'verificação': 'VERIFICATION',
-    'conferencia': 'CHECK',
-    'contagem': 'COUNTING',
-    'ao contar': 'DURING COUNTING',
-}
-
 def translate_to_english(text):
-    """Translate Portuguese detection text to English."""
+    """Translate any text to English using Google Translate (free tier)."""
     if not text:
         return ''
-    result = text.upper()
-    # Check if already in English (no common Portuguese words)
-    pt_indicators = ['ão', 'ção', 'ão', 'ção', 'em', 'ao', 'da', 'do', 'de', 'no', 'na', 'foi', 'foi', 'uma', 'um', 'que', 'com', 'para', 'por', 'nossa', 'nosso']
+    text = text.strip()
+    # Check if already mostly English
+    pt_words = ['de', 'do', 'da', 'em', 'no', 'na', 'ao', 'foi', 'com', 'para',
+                'uma', 'um', 'que', 'por', 'nossa', 'nosso', 'este', 'esta',
+                'detectamos', 'modelo', 'durante', 'processo', 'item', 'danos']
     text_lower = text.lower()
-    is_portuguese = any(ind in text_lower for ind in pt_indicators)
+    is_portuguese = sum(1 for w in pt_words if f' {w} ' in f' {text_lower} ') >= 2
     if not is_portuguese:
-        return result  # Already English
-    # Apply translations
-    for pt, en in sorted(TRANSLATIONS.items(), key=lambda x: -len(x[0])):
-        result = result.replace(pt.upper(), en)
-    return result
+        return text.upper()
+    try:
+        params = urllib.parse.urlencode({
+            'client': 'gtx', 'sl': 'pt', 'tl': 'en', 'dt': 't', 'q': text
+        })
+        url = f'https://translate.googleapis.com/translate_a/single?{params}'
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            translated = ''.join([item[0] for item in result[0] if item[0]])
+            return translated.upper()
+    except Exception as e:
+        print(f'Translation error: {e}')
+        return text.upper()
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -95,14 +56,16 @@ def generate_car():
         lot_no      = (data.get('lotNo', '') or '').upper()
         ng_qty      = int(data.get('ngQty', 1) or 1)
         defect      = (data.get('defect', '') or '').upper()
-        detected    = (data.get('detected', '') or '').upper()
+        detected    = data.get('detected', '') or ''
         user        = (data.get('user', 'LUIS HERNANDEZ') or '').upper()
         replacement = data.get('replacement', 'NEED')
         repl_qty    = 0 if replacement == 'NO NEED' else ng_qty
         issue_date  = data.get('issueDate', datetime.now().strftime('%d/%m/%Y'))
 
-        short_defect = part_name + (' (' + defect[:50] + ')' if defect else ' (DEFECT)')
+        # Translate detected text to English
         detected_en = translate_to_english(detected)
+
+        short_defect = part_name + (' (' + defect[:50] + ')' if defect else ' (DEFECT)')
         full_desc = ('HOW DETECTED: ' + detected_en + '. ' if detected_en else '') + \
                     (defect + ' ' if defect else '') + \
                     'PHOTOS ARE ATTACHED FOR YOUR REFERENCE.'
@@ -128,12 +91,10 @@ def generate_car():
         ws['A11'] = full_desc
         ws['V16'] = repl_qty
 
-        # Save to memory buffer
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
 
-        # Build filename
         part_code = (data.get('partNo', 'PART') or 'PART').replace(' ', '_')[:20]
         car_code = car_num.replace('/', '_')
         filename = f'CAR_No_{car_code}_{part_code}.xlsx'
