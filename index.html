@@ -294,27 +294,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <div class="fg full"><label>Como foi Detectado <span class="optional-tag">opcional</span></label><textarea id="fDetected" placeholder="Desempacotamento, inspeção visual..."></textarea></div>
           </div>
         </div>
-        <div class="form-card">
-          <div class="form-section-title">🔧 Ação na Fábrica KD</div>
-          <div class="form-grid">
-            <div class="fg"><label>Ação Tomada</label>
-              <select id="fAction">
-                <option value="">Selecionar...</option>
-                <option value="SEGREGATION">Segregação</option>
-                <option value="REPAIR">Reparação</option>
-                <option value="USE AS IS">Usar como está</option>
-                <option value="REPLACEMENT">Substituição</option>
-              </select>
-            </div>
-            <div class="fg"><label>Peça de Reposição</label>
-              <select id="fReplacement">
-                <option value="NEED">Necessária</option>
-                <option value="NO NEED">Não necessária</option>
-              </select>
-            </div>
-            <div class="fg full"><label>Observações</label><textarea id="fNotes" placeholder="Contramedidas, observações..."></textarea></div>
-          </div>
-        </div>
+
         <div class="form-card">
           <div class="form-section-title">📷 Fotos do Incidente *</div>
           <div class="photo-btns">
@@ -552,9 +532,7 @@ async function saveIncident(){
       ngQty:document.getElementById('fNgQty').value.trim(),
       defect,
       detected:document.getElementById('fDetected').value.trim(),
-      action:document.getElementById('fAction').value,
-      replacement:document.getElementById('fReplacement').value,
-      notes:document.getElementById('fNotes').value.trim(),
+
       photos:photoUrls,
       user:currentUser.displayName||currentUser.email,
       userId:currentUser.uid,
@@ -637,7 +615,7 @@ function renderList(){
 function showDetail(id){
   const inc=incidents.find(i=>i.id===id);if(!inc)return;
   const photos=(inc.photos||[]).map(p=>`<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="openFs('${p.url}')"></div>`).join('');
-  const canEdit=isAdmin||inc.userId===currentUser?.uid;
+
   document.getElementById('detailContent').innerHTML=`
     <div class="detail-header" style="border-left-color:${inc.status==='done'?'#2E7D32':'#E65100'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
@@ -654,13 +632,13 @@ function showDetail(id){
       <div class="detail-text-block">${inc.defect||'—'}</div>
       ${inc.detected?`<div style="margin-top:12px;font-size:11px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Como detectado</div><div class="detail-text-block">${inc.detected}</div>`:''}
     </div>
-    ${inc.action?`<div class="detail-card"><div class="form-section-title" style="margin-bottom:8px">🔧 Acção KD</div>${drow('Acção',inc.action)}${drow('Reposição',inc.replacement)}${inc.notes?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Observações</div><div class="detail-text-block">${inc.notes}</div></div>`:''}</div>`:''}
+
     ${photos?`<div class="detail-card"><div class="form-section-title" style="margin-bottom:8px">📷 Fotos (${inc.photos.length})</div><div class="photo-grid">${photos}</div></div>`:''}
     <div class="detail-card">
       <div class="detail-actions">
         ${inc.status!=='done'?`<button class="btn btn-success" onclick="markDone('${inc.id}')">✓ Concluído</button>`:''}
         ${inc.status==='done'?`<button class="btn" onclick="markPending('${inc.id}')">↩ Reabrir</button>`:''}
-        ${canEdit?`<button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>`:''}
+        <button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>
         ${isAdmin?`<button class="btn btn-danger" onclick="deleteIncident('${inc.id}')">🗑 Eliminar</button>`:''}
         <span id="carBtn_${inc.id}"></span>
       </div>
@@ -698,9 +676,7 @@ function editIncident(id){
   document.getElementById('fNgQty').value=inc.ngQty||'';
   document.getElementById('fDefect').value=inc.defect||'';
   document.getElementById('fDetected').value=inc.detected||'';
-  document.getElementById('fAction').value=inc.action||'';
-  document.getElementById('fReplacement').value=inc.replacement||'NEED';
-  document.getElementById('fNotes').value=inc.notes||'';
+
   currentPhotos=(inc.photos||[]).map(p=>({url:p.url,publicId:p.publicId,isNew:false}));
   renderPhotoGrid();
   ['pageList','pageDetail','pageExcel'].forEach(p=>document.getElementById(p).style.display='none');
@@ -710,8 +686,7 @@ function editIncident(id){
 
 function clearForm(){
   editingId=null;
-  ['fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected','fNotes'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('fAction').value='';document.getElementById('fReplacement').value='NEED';
+  ['fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected'].forEach(id=>{ var el=document.getElementById(id); if(el) el.value=''; });
   currentPhotos=[];renderPhotoGrid();
   const h=document.getElementById('photoHint');if(h)h.style.display='none';
 }
