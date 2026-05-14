@@ -9,6 +9,75 @@ CORS(app)  # Allow requests from GitHub Pages
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'template.xlsx')
 
+
+# Translation dictionary for common detection phrases (PT -> EN)
+TRANSLATIONS = {
+    # Unpacking/receiving
+    'desempacotamento': 'UNPACKING',
+    'desembalar': 'UNPACKING',
+    'abertura de caixa': 'UNPACKING',
+    'abertura da caixa': 'UNPACKING',
+    'ao abrir a caixa': 'DURING UNPACKING',
+    'na abertura': 'DURING UNPACKING',
+    # Visual inspection
+    'inspeção visual': 'VISUAL INSPECTION',
+    'inspecao visual': 'VISUAL INSPECTION',
+    'inspeção': 'INSPECTION',
+    'inspecao': 'INSPECTION',
+    # Assembly/line
+    'montagem': 'ASSEMBLY',
+    'linha de montagem': 'ASSEMBLY LINE',
+    'na montagem': 'DURING ASSEMBLY',
+    'durante a montagem': 'DURING ASSEMBLY',
+    'linha': 'PRODUCTION LINE',
+    # Receiving
+    'recebimento': 'RECEIVING',
+    'recepcao': 'RECEIVING',
+    'recepção': 'RECEIVING',
+    'ao receber': 'UPON RECEIVING',
+    'na recepcao': 'AT RECEIVING',
+    # Missing/damage
+    'faltando': 'MISSING',
+    'ausente': 'MISSING',
+    'danificado': 'DAMAGED',
+    'quebrado': 'BROKEN',
+    'arranhado': 'SCRATCHED',
+    'amassado': 'DENTED',
+    'torto': 'BENT',
+    'incorreto': 'INCORRECT',
+    'errado': 'WRONG',
+    # Detection by who
+    'equipe de desempacotamento': 'UNPACKING TEAM',
+    'time de desempacotamento': 'UNPACKING TEAM',
+    'operador': 'OPERATOR',
+    'inspetor': 'INSPECTOR',
+    'tecnico': 'TECHNICIAN',
+    'técnico': 'TECHNICIAN',
+    # Others
+    'teste': 'TESTING',
+    'verificacao': 'VERIFICATION',
+    'verificação': 'VERIFICATION',
+    'conferencia': 'CHECK',
+    'contagem': 'COUNTING',
+    'ao contar': 'DURING COUNTING',
+}
+
+def translate_to_english(text):
+    """Translate Portuguese detection text to English."""
+    if not text:
+        return ''
+    result = text.upper()
+    # Check if already in English (no common Portuguese words)
+    pt_indicators = ['ão', 'ção', 'ão', 'ção', 'em', 'ao', 'da', 'do', 'de', 'no', 'na', 'foi', 'foi', 'uma', 'um', 'que', 'com', 'para', 'por', 'nossa', 'nosso']
+    text_lower = text.lower()
+    is_portuguese = any(ind in text_lower for ind in pt_indicators)
+    if not is_portuguese:
+        return result  # Already English
+    # Apply translations
+    for pt, en in sorted(TRANSLATIONS.items(), key=lambda x: -len(x[0])):
+        result = result.replace(pt.upper(), en)
+    return result
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok'})
@@ -33,7 +102,8 @@ def generate_car():
         issue_date  = data.get('issueDate', datetime.now().strftime('%d/%m/%Y'))
 
         short_defect = part_name + (' (' + defect[:50] + ')' if defect else ' (DEFECT)')
-        full_desc = ('HOW DETECTED: ' + detected + '. ' if detected else '') + \
+        detected_en = translate_to_english(detected)
+        full_desc = ('HOW DETECTED: ' + detected_en + '. ' if detected_en else '') + \
                     (defect + ' ' if defect else '') + \
                     'PHOTOS ARE ATTACHED FOR YOUR REFERENCE.'
 
