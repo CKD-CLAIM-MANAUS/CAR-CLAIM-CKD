@@ -7,7 +7,7 @@ import os, io, tempfile
 import urllib.request
 import urllib.parse
 import json
-import struct, zlib
+from PIL import Image as PILImage
 
 app = Flask(__name__)
 CORS(app)
@@ -39,32 +39,23 @@ def translate_to_english(text):
         print(f'Translation error: {e}')
         return text.upper()
 
-def download_image(url):
-    """Download image from URL and return as bytes."""
+def download_and_resize(url, max_w, max_h):
+    """Download image, resize with Pillow, return temp file path."""
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
-            return response.read()
-    except Exception as e:
-        print(f'Image download error: {e}')
-        return None
-
-def save_image_to_temp(img_data, index):
-    """Save image bytes to a temp file, return path."""
-    try:
-        # Detect format from magic bytes
-        if img_data[:8] == b'\x89PNG\r\n\x1a\n':
-            ext = '.png'
-        elif img_data[:2] == b'\xff\xd8':
-            ext = '.jpg'
-        else:
-            ext = '.jpg'
-        tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
-        tmp.write(img_data)
+            img_data = response.read()
+        img = PILImage.open(io.BytesIO(img_data))
+        if img.mode in ('RGBA', 'P', 'LA'):
+            img = img.convert('RGB')
+        img.thumbnail((max_w, max_h), PILImage.LANCZOS)
+        tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+        img.save(tmp.name, 'JPEG', quality=85)
         tmp.close()
+        print(f"Image resized to {img.size}, saved to {tmp.name}")
         return tmp.name
     except Exception as e:
-        print(f'Save temp error: {e}')
+        print(f'Image error: {e}')
         return None
 
 @app.route('/health', methods=['GET'])
@@ -92,19 +83,15 @@ def generate_car():
         issue_date  = data.get('issueDate', datetime.now().strftime('%d/%m/%Y'))
         photos      = data.get('photos', [])
 
-        # Translate detected text
         detected_en = translate_to_english(detected)
-
         short_defect = part_name + (' (' + defect[:50] + ')' if defect else ' (DEFECT)')
         full_desc = ('HOW DETECTED: ' + detected_en + '. ' if detected_en else '') + \
                     (defect + ' ' if defect else '') + \
                     'PHOTOS ARE ATTACHED FOR YOUR REFERENCE.'
 
-        # Load template
         wb = openpyxl.load_workbook(TEMPLATE_PATH)
         ws = wb['CAR']
 
-        # Fill yellow cells
         ws['U2'] = 'IRU No. ' + car_num
         ws['U4'] = user
         ws['U5'] = issue_date
@@ -121,31 +108,29 @@ def generate_car():
         ws['A11'] = full_desc
         ws['V16'] = repl_qty
 
-        # Insert photos — no Pillow needed, just download and embed directly
-        photo_anchors = ['A16', 'Z22']
+        # Insert photos
+        photo_areas = [
+            ('A16', 570, 170),   # PHOTO 1 area
+            ('Z22', 700, 100),   # PHOTO 2 area
+        ]
+
         for i, photo_url in enumerate(photos[:2]):
             if not photo_url:
                 continue
-            img_data = download_image(photo_url)
-            if img_data:
-                tmp_path = save_image_to_temp(img_data, i)
-                if tmp_path:
-                    tmp_files.append(tmp_path)
-                    try:
-                        xl_img = XLImage(tmp_path)
-                        # Set size to fit area
-                        if i == 0:
-                            xl_img.width = 570   # A16:R22 area
-                            xl_img.height = 170
-                        else:
-                            xl_img.width = 700   # Z22:AK22 area
-                            xl_img.height = 100
-                        xl_img.anchor = photo_anchors[i]
-                        ws.add_image(xl_img)
-                    except Exception as e:
-                        print(f'Image insert error: {e}')
+            anchor, max_w, max_h = photo_areas[i]
+            tmp_path = download_and_resize(photo_url, max_w, max_h)
+            if tmp_path:
+                tmp_files.append(tmp_path)
+                try:
+                    xl_img = XLImage(tmp_path)
+                    xl_img.width = max_w
+                    xl_img.height = max_h
+                    xl_img.anchor = anchor
+                    ws.add_image(xl_img)
+                    print(f"Photo {i+1} inserted at {anchor}")
+                except Exception as e:
+                    print(f'Insert error photo {i+1}: {e}')
 
-        # Save to buffer
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -162,6 +147,7 @@ def generate_car():
         )
 
     except Exception as e:
+        print(f'Generate error: {e}')
         return jsonify({'error': str(e)}), 500
     finally:
         for f in tmp_files:
