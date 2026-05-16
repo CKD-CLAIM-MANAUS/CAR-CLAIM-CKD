@@ -873,7 +873,7 @@ async function generateCAR(id) {
       user: inc.user || '',
       replacement: inc.replacement || 'NEED',
       issueDate,
-      photos: (inc.photos || []).slice(0,2).map(p => p.url || p)
+      photos: (inc.photos || []).map(p => p.url || p)
     };
 
     const res = await fetch(CAR_SERVER_URL + '/generate-car', {
