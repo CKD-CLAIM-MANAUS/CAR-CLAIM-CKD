@@ -40,7 +40,7 @@ def translate_to_english(text):
         return text.upper()
 
 def cloudinary_resize_url(url, width, height):
-    transform = f'w_{width},h_{height},c_fit,f_jpg,q_85'
+    transform = f'w_{width},h_{height},c_fit,f_jpg,q_95'
     return re.sub(r'(/upload/)', f'/upload/{transform}/', url, count=1)
 
 def download_and_process(url, width, height):
@@ -114,8 +114,8 @@ def generate_car():
         ws['V16'] = repl_qty
 
         photo_config = [
-            ('A16', 570, 170),
-            ('Z22', 700, 100),
+            ('A16', 760, 220),
+            ('Z22', 900, 130),
         ]
 
         for i, photo_url in enumerate(photos[:2]):
