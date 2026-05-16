@@ -927,6 +927,78 @@ async function generateCAR(id) {
   }
 }
 
+
+// ---- QR CODE SCANNER ----
+let qrStream = null;
+let qrAnimFrame = null;
+
+async function openQR() {
+  const overlay = document.getElementById('qrOverlay');
+  overlay.classList.add('open');
+  try {
+    qrStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} }
+    });
+    const video = document.getElementById('qrVideo');
+    video.srcObject = qrStream;
+    video.addEventListener('loadedmetadata', () => {
+      video.play();
+      qrAnimFrame = requestAnimationFrame(scanQR);
+    });
+  } catch(e) {
+    showToast('Erro ao aceder a camera: ' + e.message);
+    closeQR();
+  }
+}
+
+function scanQR() {
+  const video = document.getElementById('qrVideo');
+  const canvas = document.getElementById('qrCanvas');
+  if(!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    qrAnimFrame = requestAnimationFrame(scanQR);
+    return;
+  }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const code = jsQR(imageData.data, imageData.width, imageData.height, {
+    inversionAttempts: 'dontInvert'
+  });
+  if(code) {
+    handleQRResult(code.data);
+    return;
+  }
+  qrAnimFrame = requestAnimationFrame(scanQR);
+}
+
+function handleQRResult(data) {
+  console.log('QR data:', data);
+  closeQR();
+  const parts = data.split('&');
+  if(parts.length >= 4) {
+    const partNo = parts[1].trim();
+    const lotNo = parts[3].trim();
+    clearForm();
+    document.getElementById('fPartNo').value = partNo;
+    document.getElementById('fLotNo').value = lotNo;
+    showPage('form');
+    ['nav0','nav1','nav2'].forEach((id,i) => {
+      document.getElementById(id).classList.toggle('active', i===1);
+    });
+    showToast('QR lido! Complete os restantes campos.');
+  } else {
+    showToast('Formato QR nao reconhecido: ' + data);
+  }
+}
+
+function closeQR() {
+  document.getElementById('qrOverlay').classList.remove('open');
+  if(qrAnimFrame){ cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
+  if(qrStream){ qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+}
+
 initAuth();
 </script>
 </body>
