@@ -7,6 +7,7 @@ import os, io, tempfile
 import urllib.request
 import urllib.parse
 import json
+from PIL import Image as PILImage
 
 app = Flask(__name__)
 CORS(app)
