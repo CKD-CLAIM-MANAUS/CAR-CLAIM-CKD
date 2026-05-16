@@ -7,6 +7,7 @@ import os, io, tempfile
 import urllib.request
 import urllib.parse
 import json
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -37,12 +38,30 @@ def translate_to_english(text):
         print(f'Translation error: {e}')
         return text.upper()
 
+def cloudinary_resize_url(url, width, height):
+    """Transform Cloudinary URL to resize image to exact dimensions."""
+    # Cloudinary URL format: https://res.cloudinary.com/CLOUD/image/upload/VERSION/folder/file.jpg
+    # Insert transformation: w_WIDTH,h_HEIGHT,c_fit,f_jpg,q_85
+    try:
+        transform = f'w_{width},h_{height},c_fit,f_jpg,q_85'
+        # Insert transform after /upload/
+        new_url = re.sub(r'(/upload/)', f'/upload/{transform}/', url, count=1)
+        print(f'Transformed URL: {new_url}')
+        return new_url
+    except Exception as e:
+        print(f'URL transform error: {e}')
+        return url
+
 def download_image_to_temp(url):
-    """Download image and save to temp file without any processing."""
+    """Download image and save to temp file."""
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=15) as response:
             img_data = response.read()
+        print(f'Downloaded {len(img_data)} bytes from {url[:60]}')
+        if len(img_data) < 100:
+            print('Image too small, skipping')
+            return None
         # Detect format
         if img_data[:8] == b'\x89PNG\r\n\x1a\n':
             ext = '.png'
@@ -106,16 +125,19 @@ def generate_car():
         ws['A11'] = full_desc
         ws['V16'] = repl_qty
 
-        # Insert photos directly (no Pillow needed)
+        # Insert photos using Cloudinary resize transformation
         photo_config = [
-            ('A16', 570, 170),
-            ('Z22', 700, 100),
+            ('A16', 570, 170),   # PHOTO 1
+            ('Z22', 700, 100),   # PHOTO 2
         ]
+
         for i, photo_url in enumerate(photos[:2]):
             if not photo_url:
                 continue
             anchor, w, h = photo_config[i]
-            tmp_path = download_image_to_temp(photo_url)
+            # Use Cloudinary transformation to get exact size
+            resized_url = cloudinary_resize_url(photo_url, w, h)
+            tmp_path = download_image_to_temp(resized_url)
             if tmp_path:
                 tmp_files.append(tmp_path)
                 try:
@@ -124,9 +146,17 @@ def generate_car():
                     xl_img.height = h
                     xl_img.anchor = anchor
                     ws.add_image(xl_img)
-                    print(f'Photo {i+1} inserted at {anchor}')
+                    print(f'Photo {i+1} inserted at {anchor} ({w}x{h})')
                 except Exception as e:
-                    print(f'Photo insert error: {e}')
+                    print(f'Photo {i+1} insert error: {e}')
+                    # Try without size constraints
+                    try:
+                        xl_img2 = XLImage(tmp_path)
+                        xl_img2.anchor = anchor
+                        ws.add_image(xl_img2)
+                        print(f'Photo {i+1} inserted without size at {anchor}')
+                    except Exception as e2:
+                        print(f'Photo {i+1} fallback error: {e2}')
 
         buf = io.BytesIO()
         wb.save(buf)
@@ -145,6 +175,8 @@ def generate_car():
 
     except Exception as e:
         print(f'Error: {e}')
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         for f in tmp_files:
