@@ -113,17 +113,20 @@ def generate_car():
         ws['A11'] = full_desc
         ws['V16'] = repl_qty
 
-        photo_config = [
-            ('A16', 760, 220),
-            ('Z22', 900, 130),
-        ]
+        # Photo anchors - A16, Z22, A37, Z37, A50, Z50... for unlimited photos
+        # Starting positions for each photo
+        photo_anchors = ['A16', 'Z22', 'A37', 'Z50', 'A63', 'Z63']
 
-        for i, photo_url in enumerate(photos[:2]):
+        for i, photo_url in enumerate(photos):
             if not photo_url:
                 continue
-            anchor, w, h = photo_config[i]
-            resized_url = cloudinary_resize_url(photo_url, w, h)
-            tmp_path = download_and_process(resized_url, w, h)
+            # Use predefined anchor or generate one
+            if i < len(photo_anchors):
+                anchor = photo_anchors[i]
+            else:
+                anchor = f'A{16 + (i * 15)}'
+            resized_url = cloudinary_resize_url(photo_url, 0, 0)
+            tmp_path = download_and_process(resized_url, 800, 600)
             if tmp_path:
                 tmp_files.append(tmp_path)
                 try:
