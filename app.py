@@ -7,7 +7,6 @@ import os, io, tempfile
 import urllib.request
 import urllib.parse
 import json
-from PIL import Image as PILImage
 
 app = Flask(__name__)
 CORS(app)
@@ -21,8 +20,7 @@ def translate_to_english(text):
     pt_words = ['de', 'do', 'da', 'em', 'no', 'na', 'ao', 'foi', 'com', 'para',
                 'uma', 'um', 'que', 'por', 'nossa', 'nosso', 'este', 'esta',
                 'detectamos', 'modelo', 'durante', 'processo', 'item', 'danos']
-    text_lower = text.lower()
-    is_portuguese = sum(1 for w in pt_words if f' {w} ' in f' {text_lower} ') >= 2
+    is_portuguese = sum(1 for w in pt_words if f' {w} ' in f' {text.lower()} ') >= 2
     if not is_portuguese:
         return text.upper()
     try:
@@ -39,23 +37,23 @@ def translate_to_english(text):
         print(f'Translation error: {e}')
         return text.upper()
 
-def download_and_resize(url, max_w, max_h):
-    """Download image, resize with Pillow, return temp file path."""
+def download_image_to_temp(url):
+    """Download image and save to temp file without any processing."""
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
             img_data = response.read()
-        img = PILImage.open(io.BytesIO(img_data))
-        if img.mode in ('RGBA', 'P', 'LA'):
-            img = img.convert('RGB')
-        img.thumbnail((max_w, max_h), PILImage.LANCZOS)
-        tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-        img.save(tmp.name, 'JPEG', quality=85)
+        # Detect format
+        if img_data[:8] == b'\x89PNG\r\n\x1a\n':
+            ext = '.png'
+        else:
+            ext = '.jpg'
+        tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+        tmp.write(img_data)
         tmp.close()
-        print(f"Image resized to {img.size}, saved to {tmp.name}")
         return tmp.name
     except Exception as e:
-        print(f'Image error: {e}')
+        print(f'Image download error: {e}')
         return None
 
 @app.route('/health', methods=['GET'])
@@ -108,28 +106,27 @@ def generate_car():
         ws['A11'] = full_desc
         ws['V16'] = repl_qty
 
-        # Insert photos
-        photo_areas = [
-            ('A16', 570, 170),   # PHOTO 1 area
-            ('Z22', 700, 100),   # PHOTO 2 area
+        # Insert photos directly (no Pillow needed)
+        photo_config = [
+            ('A16', 570, 170),
+            ('Z22', 700, 100),
         ]
-
         for i, photo_url in enumerate(photos[:2]):
             if not photo_url:
                 continue
-            anchor, max_w, max_h = photo_areas[i]
-            tmp_path = download_and_resize(photo_url, max_w, max_h)
+            anchor, w, h = photo_config[i]
+            tmp_path = download_image_to_temp(photo_url)
             if tmp_path:
                 tmp_files.append(tmp_path)
                 try:
                     xl_img = XLImage(tmp_path)
-                    xl_img.width = max_w
-                    xl_img.height = max_h
+                    xl_img.width = w
+                    xl_img.height = h
                     xl_img.anchor = anchor
                     ws.add_image(xl_img)
-                    print(f"Photo {i+1} inserted at {anchor}")
+                    print(f'Photo {i+1} inserted at {anchor}')
                 except Exception as e:
-                    print(f'Insert error photo {i+1}: {e}')
+                    print(f'Photo insert error: {e}')
 
         buf = io.BytesIO()
         wb.save(buf)
@@ -147,7 +144,7 @@ def generate_car():
         )
 
     except Exception as e:
-        print(f'Generate error: {e}')
+        print(f'Error: {e}')
         return jsonify({'error': str(e)}), 500
     finally:
         for f in tmp_files:
