@@ -40,8 +40,8 @@ def translate_to_english(text):
         return text.upper()
 
 def cloudinary_resize_url(url, width, height):
-    transform = f'w_{width},h_{height},c_fit,f_jpg,q_95'
-    return re.sub(r'(/upload/)', f'/upload/{transform}/', url, count=1)
+    # Return original URL without any transformation for best quality
+    return url
 
 def download_and_process(url, width, height):
     """Download image, process with Pillow, return temp file path."""
@@ -128,8 +128,6 @@ def generate_car():
                 tmp_files.append(tmp_path)
                 try:
                     xl_img = XLImage(tmp_path)
-                    xl_img.width = w
-                    xl_img.height = h
                     xl_img.anchor = anchor
                     ws.add_image(xl_img)
                     print(f'Photo {i+1} inserted at {anchor}')
