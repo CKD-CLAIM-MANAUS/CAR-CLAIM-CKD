@@ -301,6 +301,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="form-card">
           <div class="form-section-title">📦 Identificação da Peça</div>
           <div class="form-grid">
+            <div class="fg"><label>Nº CAR <span class="optional-tag">opcional</span></label><input id="fCarNum" type="text" placeholder="ex: 039" maxlength="10" style="font-weight:600;letter-spacing:0.05em"></div>
             <div class="fg"><label>Código da Peça <span class="optional-tag">opcional</span></label><input id="fPartNo" type="text" placeholder="9AWV-132000-8000"></div>
             <div class="fg"><label>Nome da Peça *</label><input id="fPartName" type="text" placeholder="REAR SEAT ASSY"></div>
             <div class="fg"><label>Modelo <span class="optional-tag">opcional</span></label><input id="fModel" type="text" placeholder="CF1000AZ-2"></div>
@@ -346,6 +347,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
 
     <div id="pageExcel" style="display:none">
+      <div class="excel-card">
+        <h2>📥 Importar Pack List</h2>
+        <p>Importa o ficheiro Pack List do fornecedor para preencher automaticamente os dados das peças ao ler o QR code.</p>
+        <div class="fg" style="margin-bottom:12px">
+          <label>Modelo <span style="color:#C62828">*</span></label>
+          <input type="text" id="importModel" placeholder="ex: CF400-8H" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%">
+        </div>
+        <div class="fg" style="margin-bottom:12px">
+          <label>Ficheiro Pack List (.xlsx)</label>
+          <input type="file" id="importFile" accept=".xlsx" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%;background:#fff">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:20px" onclick="importPackList()">📥 Importar Pack List</button>
+        <div id="importProgress" style="display:none;background:#E3F2FD;border-radius:8px;padding:12px;font-size:13px;color:#1565C0;margin-bottom:16px"></div>
+        <hr style="border:none;border-top:1px solid #ECEFF1;margin-bottom:16px">
+      </div>
       <div class="excel-card">
         <h2>📊 Relatório Excel</h2>
         <p>Exporta os incidentes para um ficheiro Excel com todos os dados e links das fotos.</p>
@@ -703,6 +719,7 @@ function drow(lbl,val){return `<div class="detail-row"><span class="detail-lbl">
 function editIncident(id){
   const inc=incidents.find(i=>i.id===id);if(!inc)return;
   editingId=id;
+  document.getElementById('fCarNum').value=inc.carNum||'';
   document.getElementById('fPartNo').value=inc.partNo||'';
   document.getElementById('fPartName').value=inc.partName||'';
   document.getElementById('fModel').value=inc.model||'';
@@ -721,7 +738,7 @@ function editIncident(id){
 
 function clearForm(){
   editingId=null;
-  ['fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected'].forEach(id=>{ var el=document.getElementById(id); if(el) el.value=''; });
+  ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected'].forEach(id=>{ var el=document.getElementById(id); if(el) el.value=''; });
   currentPhotos=[];renderPhotoGrid();
   const h=document.getElementById('photoHint');if(h)h.style.display='none';
 }
@@ -882,7 +899,10 @@ async function generateCAR(id) {
   if(!inc){showToast('Incidente nao encontrado.');return;}
   showToast('Aguarde, a gerar CAR Excel...');
   try {
-    const carNum = await getNextCARNumber();
+    // Use manual CAR number from incident if set, otherwise generate
+    const year = new Date().getFullYear().toString().slice(-2);
+    const manualNum = inc.carNum ? inc.carNum.trim() : null;
+    const carNum = manualNum ? (manualNum.padStart(3,'0') + '/' + year) : await getNextCARNumber();
     const issueDate = inc.createdAt ?
       new Date(inc.createdAt).toLocaleDateString('pt-BR') :
       new Date().toLocaleDateString('pt-BR');
@@ -916,8 +936,8 @@ async function generateCAR(id) {
     const a = document.createElement('a');
     a.href = url;
     const code = carNum.replace('/','_');
-    const part = (inc.partNo||'PART').replace(/[^a-zA-Z0-9-]/g,'_').substring(0,20);
-    a.download = 'CAR_No_'+code+'_'+part+'.xlsx';
+    const partLabel = (inc.partName||inc.partNo||'PART').replace(/[^a-zA-Z0-9 -]/g,'').trim().substring(0,30);
+    a.download = 'CAR_No_'+code+'_'+partLabel+'.xlsx';
     a.click();
     URL.revokeObjectURL(url);
     showToast('CAR Excel gerado com sucesso!');
@@ -927,6 +947,129 @@ async function generateCAR(id) {
   }
 }
 
+
+
+// ---- PACK LIST IMPORT ----
+async function importPackList() {
+  const model = document.getElementById('importModel').value.trim().toUpperCase();
+  const fileInput = document.getElementById('importFile');
+  const progress = document.getElementById('importProgress');
+
+  if(!model) { showToast('Preencha o modelo primeiro'); return; }
+  if(!fileInput.files.length) { showToast('Seleccione o ficheiro Pack List'); return; }
+
+  const file = fileInput.files[0];
+  progress.style.display = 'block';
+  progress.textContent = 'A ler ficheiro...';
+
+  try {
+    // Read Excel file with SheetJS
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, {type:'array'});
+
+    // Filter sheets (skip summary sheets)
+    const dataSheets = wb.SheetNames.filter(name =>
+      name.match(/^\d{2}[A-Z]{2}-[A-Z0-9]+-\d+$/) || name.match(/^25[A-Z]{2}/)
+    );
+
+    if(dataSheets.length === 0) {
+      // Try all sheets except obviously summary ones
+      dataSheets.push(...wb.SheetNames.filter(n => !n.includes('毛') && !n.includes('汇')));
+    }
+
+    progress.textContent = `Encontradas ${dataSheets.length} abas. A processar...`;
+
+    let totalParts = 0;
+    let batchData = {};
+    const {collection, addDoc, getDocs, doc, setDoc} = window._fb;
+
+    for(const sheetName of dataSheets) {
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      const orderNo = sheetName.trim();
+      let sheetParts = 0;
+
+      for(let i=1; i<rows.length; i++) {
+        const row = rows[i];
+        const partNo = String(row[12]||'').trim();   // Col M
+        const partName = String(row[13]||'').trim();  // Col N
+        const lotNo = String(row[16]||'').trim();     // Col Q
+        const qty = row[15] || '';                    // Col P
+
+        if(!partNo || !partName || partNo === 'PartNo.') continue;
+
+        // Key: partNo + lotNo
+        const key = (partNo + '_' + lotNo).replace(/[^a-zA-Z0-9_-]/g, '_');
+
+        batchData[key] = {
+          partNo,
+          partName: partName.toUpperCase(),
+          lotNo,
+          orderNo,
+          model,
+          qty: String(qty),
+          importedAt: Date.now(),
+          source: file.name
+        };
+        sheetParts++;
+      }
+
+      totalParts += sheetParts;
+      progress.textContent = `Processadas ${dataSheets.indexOf(sheetName)+1}/${dataSheets.length} abas... (${totalParts} peças)`;
+    }
+
+    // Save to Firebase in batches
+    progress.textContent = `A guardar ${Object.keys(batchData).length} peças no Firebase...`;
+    let saved = 0;
+
+    for(const [key, data] of Object.entries(batchData)) {
+      await setDoc(doc(window._db, 'partsDB', key), data);
+      saved++;
+      if(saved % 50 === 0) {
+        progress.textContent = `Guardando... ${saved}/${Object.keys(batchData).length}`;
+      }
+    }
+
+    progress.style.background = '#E8F5E9';
+    progress.style.color = '#2E7D32';
+    progress.textContent = `✅ Importação concluída! ${saved} peças guardadas no Firebase.`;
+    showToast('Pack List importado com sucesso!');
+
+    // Clear inputs
+    document.getElementById('importModel').value = '';
+    fileInput.value = '';
+
+  } catch(e) {
+    progress.style.background = '#FFEBEE';
+    progress.style.color = '#C62828';
+    progress.textContent = 'Erro: ' + e.message;
+    console.error(e);
+  }
+}
+
+// ---- QR AUTO-FILL FROM PARTS DB ----
+async function lookupPartFromDB(partNo, lotNo) {
+  if(!partNo) return null;
+  await waitFb();
+  try {
+    const {doc, getDoc} = window._fb;
+    const key = (partNo + '_' + lotNo).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const snap = await getDoc(doc(window._db, 'partsDB', key));
+    if(snap.exists()) return snap.data();
+    // Try without lot (fallback)
+    const snaps = await window._fb.getDocs(
+      window._fb.query(
+        window._fb.collection(window._db, 'partsDB'),
+        window._fb.orderBy('partNo')
+      )
+    );
+    const match = snaps.docs.find(d => d.data().partNo === partNo);
+    return match ? match.data() : null;
+  } catch(e) {
+    console.error('DB lookup error:', e);
+    return null;
+  }
+}
 
 // ---- QR CODE SCANNER ----
 let qrStream = null;
@@ -973,21 +1116,35 @@ function scanQR() {
   qrAnimFrame = requestAnimationFrame(scanQR);
 }
 
-function handleQRResult(data) {
+async function handleQRResult(data) {
   console.log('QR data:', data);
   closeQR();
   const parts = data.split('&');
   if(parts.length >= 4) {
+    const orderNo = parts[0].trim();
     const partNo = parts[1].trim();
+    const qty = parts[2].trim();
     const lotNo = parts[3].trim();
     clearForm();
     document.getElementById('fPartNo').value = partNo;
     document.getElementById('fLotNo').value = lotNo;
+    if(document.getElementById('fNgQty')) document.getElementById('fNgQty').value = qty;
     showPage('form');
     ['nav0','nav1','nav2'].forEach((id,i) => {
       document.getElementById(id).classList.toggle('active', i===1);
     });
-    showToast('QR lido! Complete os restantes campos.');
+    showToast('QR lido! A procurar dados da peça...');
+    // Lookup from partsDB
+    const partData = await lookupPartFromDB(partNo, lotNo);
+    if(partData) {
+      document.getElementById('fPartName').value = partData.partName || '';
+      document.getElementById('fModel').value = partData.model || '';
+      document.getElementById('fOrderNo').value = partData.orderNo || orderNo;
+      showToast('Dados preenchidos automaticamente!');
+    } else {
+      document.getElementById('fOrderNo').value = orderNo;
+      showToast('QR lido! Preencha os dados em falta.');
+    }
   } else {
     showToast('Formato QR nao reconhecido: ' + data);
   }
