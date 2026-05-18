@@ -89,10 +89,14 @@ def generate_car():
         photos      = data.get('photos', [])
 
         detected_en = translate_to_english(detected)
-        short_defect = part_name + (' (' + defect[:50] + ')' if defect else ' (DEFECT)')
-        full_desc = ('HOW DETECTED: ' + detected_en + '. ' if detected_en else '') + \
-                    (defect + ' ' if defect else '') + \
-                    'PHOTOS ARE ATTACHED FOR YOUR REFERENCE.'
+        short_defect = part_name + (' (' + defect[:50] + ')' if defect else '')
+        parts_desc = []
+        if detected_en:
+            parts_desc.append('HOW DETECTED: ' + detected_en + '.')
+        if defect:
+            parts_desc.append(defect)
+        parts_desc.append('PHOTOS ARE ATTACHED FOR YOUR REFERENCE.')
+        full_desc = ' '.join(parts_desc)
 
         wb = openpyxl.load_workbook(TEMPLATE_PATH)
         ws = wb['CAR']
