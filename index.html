@@ -48,8 +48,8 @@
   window.uploadToCloudinary = uploadToCloudinary;
 </script>
 
-<!-- jsQR for QR code reading -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<!-- ZXing QR reader (faster) -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
 <!-- SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -355,6 +355,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <input type="text" id="importModel" placeholder="ex: CF400-8H" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%">
         </div>
         <div class="fg" style="margin-bottom:12px">
+          <label>Nº Pedido manual <span class="optional-tag">opcional — se o ficheiro não tiver</span></label>
+          <input type="text" id="importOrderNo" placeholder="ex: 25BR-FM67310C-1" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%">
+        </div>
+        <div class="fg" style="margin-bottom:12px">
+          <label>Nº Pedido <span class="optional-tag">opcional — se não estiver no documento</span></label>
+          <input type="text" id="importOrderNo" placeholder="ex: 25BR-FM67310C-1" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%">
+        </div>
+        <div class="fg" style="margin-bottom:12px">
           <label>Ficheiro Pack List (.xlsx)</label>
           <input type="file" id="importFile" accept=".xlsx" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%;background:#fff">
         </div>
@@ -429,7 +437,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="qr-video-wrap">
     <video id="qrVideo" autoplay playsinline muted></video>
     <div class="qr-frame"></div>
-    <canvas class="qr-canvas" id="qrCanvas"></canvas>
   </div>
   <div class="qr-hint">Aponte a câmera para o QR code da peça</div>
 </div>
@@ -986,7 +993,8 @@ async function importPackList() {
     for(const sheetName of dataSheets) {
       const ws = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      const orderNo = sheetName.trim();
+      const manualOrderNo = document.getElementById('importOrderNo').value.trim();
+      const orderNo = manualOrderNo || sheetName.trim();
       let sheetParts = 0;
 
       for(let i=1; i<rows.length; i++) {
@@ -1037,6 +1045,7 @@ async function importPackList() {
 
     // Clear inputs
     document.getElementById('importModel').value = '';
+    document.getElementById('importOrderNo').value = '';
     fileInput.value = '';
 
   } catch(e) {
