@@ -1,1171 +1,464 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>CAR — Garantia de Peças · CFMOTO</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0D2044">
+  <title>CAR · Garantia — CFMOTO</title>
+  <link rel="stylesheet" href="css/app.css">
 
-<!-- Firebase SDKs -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyBkOtlCGjrfSkR2HgVP2OOv4UZpW6txm90",
-    authDomain: "car-garantia.firebaseapp.com",
-    projectId: "car-garantia",
-    storageBucket: "car-garantia.firebasestorage.app",
-    messagingSenderId: "1038572043129",
-    appId: "1:1038572043129:web:6769b31e0d3be9fd4c0da8"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-
-  window._db = db;
-  window._auth = auth;
-  window._fb = { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc };
-  window._fbAuth = { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile };
-  window._fbReady = true;
-  document.dispatchEvent(new Event('firebase-ready'));
-</script>
-
-<!-- Cloudinary -->
-<script>
-  window._cloudinary = { cloudName: 'dos2jsgzg', uploadPreset: 'Garantia CAR' };
-  async function uploadToCloudinary(file) {
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('upload_preset', window._cloudinary.uploadPreset);
-    fd.append('folder', 'garantia-car');
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${window._cloudinary.cloudName}/image/upload`, { method: 'POST', body: fd });
-    if(!res.ok) throw new Error('Upload failed');
-    const data = await res.json();
-    return { url: data.secure_url, publicId: data.public_id };
-  }
-  window.uploadToCloudinary = uploadToCloudinary;
-</script>
-
-<!-- ZXing QR reader (faster) -->
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
-<!-- SheetJS -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-<style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F4F6F8;color:#263238;min-height:100vh;font-size:15px}
-
-.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#0D47A1}
-.auth-card{background:#fff;border-radius:16px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
-.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px;justify-content:center}
-.auth-logo-icon{width:44px;height:44px;background:#1565C0;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px}
-.auth-logo-text{font-size:18px;font-weight:700;color:#1A237E}
-.auth-logo-sub{font-size:11px;color:#607D8B;margin-top:1px}
-.auth-tabs{display:flex;background:#F4F6F8;border-radius:8px;padding:3px;margin-bottom:20px}
-.auth-tab{flex:1;padding:8px;text-align:center;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;color:#607D8B;border:none;background:transparent;transition:all 0.15s}
-.auth-tab.active{background:#fff;color:#1565C0;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
-.auth-field{margin-bottom:14px}
-.auth-field label{display:block;font-size:12px;font-weight:600;color:#455A64;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:5px}
-.auth-field input{width:100%;padding:11px 14px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;color:#263238;background:#fff;transition:border-color 0.15s;font-family:inherit}
-.auth-field input:focus{outline:none;border-color:#1565C0;box-shadow:0 0 0 3px rgba(21,101,192,0.12)}
-.auth-btn{width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:background 0.15s;font-family:inherit;margin-top:4px}
-.auth-btn:hover{background:#0D47A1}
-.auth-btn:disabled{opacity:0.6;cursor:not-allowed}
-.auth-err{background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
-.auth-err.show{display:block}
-
-.app-wrap{display:none}
-.header{background:#1565C0;color:#fff;padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
-.header-brand{display:flex;align-items:center;gap:10px}
-.header-logo{width:36px;height:36px;background:rgba(255,255,255,0.18);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px}
-.header-title{font-size:16px;font-weight:600}
-.header-sub{font-size:11px;opacity:0.7;margin-top:1px}
-.user-chip{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border-radius:20px;padding:5px 10px 5px 6px;cursor:pointer;font-size:13px}
-.user-avatar{width:26px;height:26px;background:rgba(255,255,255,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
-.admin-badge{background:#FFB300;color:#1A237E;border-radius:4px;font-size:9px;font-weight:800;padding:1px 5px;margin-left:3px}
-
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #CFD8DC;display:flex;z-index:100;box-shadow:0 -2px 8px rgba(0,0,0,0.08)}
-.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px 10px;font-size:10px;color:#607D8B;cursor:pointer;border:none;background:transparent;gap:3px;transition:color 0.15s}
-.nav-btn .nav-ico{font-size:22px}
-.nav-btn.active{color:#1565C0}
-
-.main{padding:16px 14px 90px;max-width:680px;margin:0 auto}
-
-.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.stat{background:#fff;border-radius:10px;padding:14px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
-.stat-n{font-size:26px;font-weight:700}
-.stat-n.blue{color:#1565C0}
-.stat-n.amber{color:#E65100}
-.stat-n.green{color:#2E7D32}
-.stat-l{font-size:11px;color:#607D8B;margin-top:2px}
-
-.search-box{background:#fff;border-radius:10px;display:flex;align-items:center;gap:8px;padding:10px 14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.1);border:1px solid #CFD8DC}
-.search-box input{flex:1;border:none;outline:none;font-size:14px;color:#263238;background:transparent}
-.filter-row{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px}
-.filter-row::-webkit-scrollbar{display:none}
-.fpill{white-space:nowrap;padding:6px 14px;border-radius:20px;border:1.5px solid #CFD8DC;background:#fff;font-size:12px;color:#607D8B;cursor:pointer;transition:all 0.15s}
-.fpill.active{background:#1565C0;color:#fff;border-color:#1565C0;font-weight:600}
-
-.inc-list{display:flex;flex-direction:column;gap:10px}
-.inc-card{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.1);border-left:4px solid #CFD8DC;cursor:pointer;transition:box-shadow 0.15s}
-.inc-card.pending{border-left-color:#E65100}
-.inc-card.done{border-left-color:#2E7D32}
-.inc-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-.inc-name{font-size:14px;font-weight:600;color:#263238}
-.inc-code{font-size:11px;color:#607D8B;margin-top:2px}
-.inc-meta{font-size:11px;color:#607D8B;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px}
-.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
-.badge.pending{background:#FFF3E0;color:#E65100}
-.badge.done{background:#E8F5E9;color:#2E7D32}
-.photo-count{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#1565C0;margin-top:6px}
-
-.form-wrap{display:flex;flex-direction:column;gap:14px}
-.form-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
-.form-section-title{font-size:11px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;padding-bottom:8px;border-bottom:1.5px solid #E3F2FD}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.fg{display:flex;flex-direction:column;gap:4px}
-.fg.full{grid-column:1/-1}
-.fg label{font-size:11px;font-weight:600;color:#607D8B;text-transform:uppercase;letter-spacing:0.04em}
-.fg input,.fg select,.fg textarea{padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;color:#263238;background:#fff;font-family:inherit;width:100%;transition:border-color 0.15s}
-.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:#1565C0;box-shadow:0 0 0 3px rgba(21,101,192,0.12)}
-.fg textarea{min-height:80px;resize:vertical}
-
-.photo-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
-.photo-btn-cam,.photo-btn-gal{position:relative;padding:16px 10px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-weight:700;transition:all 0.15s;overflow:hidden}
-.photo-btn-cam{background:#1565C0;color:#fff}
-.photo-btn-cam:hover{background:#0D47A1}
-.photo-btn-gal{background:#F4F6F8;color:#263238;border:1.5px solid #CFD8DC}
-.photo-btn-gal:hover{background:#ECEFF1}
-.photo-btn-cam input,.photo-btn-gal input{display:none}
-.photo-drop-zone{border:1.5px dashed #CFD8DC;border-radius:8px;padding:12px;text-align:center;margin-top:8px;transition:all 0.2s;background:#FAFAFA;cursor:pointer}
-.photo-drop-zone.drag-over{border-color:#1565C0;background:#E3F2FD}
-.quick-banner{background:#E3F2FD;border:1.5px solid #90CAF9;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#1565C0;line-height:1.5}
-.quick-banner strong{font-weight:700}
-.optional-tag{font-size:10px;color:#90A4AE;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-left:6px;background:#ECEFF1;border-radius:4px;padding:1px 6px}
-.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:12px}
-.photo-thumb{aspect-ratio:1;border-radius:8px;overflow:hidden;position:relative;border:1.5px solid #CFD8DC}
-.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.photo-del{position:absolute;top:4px;right:4px;background:rgba(198,40,40,0.85);color:#fff;border:none;border-radius:4px;width:22px;height:22px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-
-.btn{padding:11px 20px;border-radius:8px;border:1.5px solid #CFD8DC;background:#fff;color:#263238;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all 0.15s;font-family:inherit}
-.btn:active{transform:scale(0.98)}
-.btn-primary{background:#1565C0;color:#fff;border-color:#1565C0}
-.btn-primary:hover{background:#0D47A1}
-.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
-.btn-success{background:#2E7D32;color:#fff;border-color:#2E7D32}
-.btn-danger{background:#C62828;color:#fff;border-color:#C62828}
-.btn-excel{background:#1B5E20;color:#fff;border-color:#1B5E20;width:100%;justify-content:center;font-size:15px;padding:14px}
-.btn-excel:hover{background:#2E7D32}
-.form-actions{display:flex;gap:10px;justify-content:flex-end;padding:4px 0}
-
-.detail-header{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.1);margin-bottom:12px;border-left:4px solid #1565C0}
-.detail-title{font-size:18px;font-weight:700;color:#263238}
-.detail-id{font-size:12px;color:#607D8B;margin-top:3px}
-.detail-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.1);margin-bottom:12px}
-.detail-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #ECEFF1;font-size:13px;gap:12px}
-.detail-row:last-child{border:none;padding-bottom:0}
-.detail-lbl{color:#607D8B;flex-shrink:0}
-.detail-val{font-weight:600;text-align:right;word-break:break-word}
-.detail-text-block{font-size:13px;color:#263238;white-space:pre-wrap;line-height:1.6;padding:4px 0}
-.detail-actions{display:flex;gap:8px;flex-wrap:wrap}
-.back-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#607D8B;cursor:pointer;margin-bottom:14px;padding:4px 0}
-.back-btn:hover{color:#1565C0}
-
-.excel-card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.1);margin-bottom:14px}
-.excel-card h2{font-size:16px;font-weight:700;color:#263238;margin-bottom:6px}
-.excel-card p{font-size:13px;color:#607D8B;line-height:1.6;margin-bottom:14px}
-.excel-filter{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
-.excel-filter label{font-size:12px;font-weight:600;color:#455A64;text-transform:uppercase;letter-spacing:0.04em}
-.excel-filter select{padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;color:#263238;background:#fff;font-family:inherit;width:100%}
-.excel-stat{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
-.excel-stat-item{background:#F4F6F8;border-radius:8px;padding:12px;text-align:center}
-.excel-stat-item .n{font-size:22px;font-weight:700;color:#1565C0}
-.excel-stat-item .n.amber{color:#E65100}
-.excel-stat-item .n.green{color:#2E7D32}
-.excel-stat-item .l{font-size:11px;color:#607D8B;margin-top:2px}
-
-.empty{text-align:center;padding:50px 20px;color:#607D8B}
-.empty-ico{font-size:52px;opacity:0.25;margin-bottom:12px}
-.loading-bar{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;color:#607D8B;font-size:14px}
-.spinner{width:24px;height:24px;border:3px solid #CFD8DC;border-top-color:#1565C0;border-radius:50%;animation:spin 0.8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-.fs-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:300;align-items:center;justify-content:center;flex-direction:column}
-.fs-overlay.open{display:flex}
-.fs-overlay img{max-width:95vw;max-height:85vh;border-radius:8px}
-.fs-close{position:absolute;top:16px;right:16px;color:#fff;font-size:28px;cursor:pointer;background:none;border:none}
-
-.qr-overlay{display:none;position:fixed;inset:0;background:#000;z-index:400;flex-direction:column;align-items:center;justify-content:center}
-.qr-overlay.open{display:flex}
-.qr-video-wrap{position:relative;width:100%;max-width:500px}
-.qr-video-wrap video{width:100%;border-radius:8px;display:block}
-.qr-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:220px;height:220px;border:3px solid #1565C0;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,0.6)}
-.qr-frame::before,.qr-frame::after{content:'';position:absolute;width:40px;height:40px;border-color:#fff;border-style:solid}
-.qr-frame::before{top:-3px;left:-3px;border-width:4px 0 0 4px;border-radius:8px 0 0 0}
-.qr-frame::after{bottom:-3px;right:-3px;border-width:0 4px 4px 0;border-radius:0 0 8px 0}
-.qr-hint{color:#fff;font-size:14px;margin-top:20px;text-align:center;padding:0 20px}
-.qr-close{position:absolute;top:20px;right:20px;color:#fff;font-size:28px;cursor:pointer;background:none;border:none;z-index:10}
-.qr-canvas{display:none}
-.nav-btn.qr-nav{background:#1565C0;color:#fff;border-radius:50%;width:56px;height:56px;margin:-12px 8px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
-.nav-btn.qr-nav .nav-ico{font-size:26px}
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A237E;color:#fff;padding:11px 20px;border-radius:24px;font-size:13px;font-weight:500;opacity:0;transition:all 0.3s;z-index:999;pointer-events:none;white-space:nowrap;box-shadow:0 2px 12px rgba(0,0,0,0.2)}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:flex-end;justify-content:center}
-.modal-bg.open{display:flex}
-.modal{background:#fff;border-radius:16px 16px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;animation:slideUp 0.25s ease}
-@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.modal-title{font-size:16px;font-weight:700;margin-bottom:4px;color:#263238}
-.modal-sub{font-size:13px;color:#607D8B;margin-bottom:16px}
-.modal-user-info{display:flex;align-items:center;gap:12px;padding:14px;background:#F4F6F8;border-radius:10px;margin-bottom:16px}
-.modal-av{width:44px;height:44px;background:#1565C0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0}
-.modal-name{font-size:15px;font-weight:600;color:#263238}
-.modal-email{font-size:12px;color:#607D8B;margin-top:2px}
-
-@media(max-width:400px){.form-grid{grid-template-columns:1fr}.fg.full{grid-column:1}}
-</style>
+  <!-- External libs (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
-<!-- AUTH -->
-<div class="auth-wrap" id="authScreen">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <div class="auth-logo-icon">⚙️</div>
-      <div>
-        <div class="auth-logo-text">CAR · Garantia</div>
-        <div class="auth-logo-sub">CFMOTO da Amazônia</div>
+<!-- ══════════════════════════════════════════════════════════
+     AUTH SCREEN
+═══════════════════════════════════════════════════════════ -->
+<div id="authScreen" style="display:flex">
+  <div class="auth-screen">
+    <div class="auth-card">
+
+      <div class="auth-brand">
+        <div class="auth-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div>
+          <div class="auth-brand-name">CAR · Garantia</div>
+          <div class="auth-brand-sub">CFMOTO da Amazônia</div>
+        </div>
       </div>
-    </div>
-    <div class="auth-tabs">
-      <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Entrar</button>
-      <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Criar conta</button>
-    </div>
-    <div class="auth-err" id="authErr"></div>
-    <div id="loginForm">
-      <div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <div class="auth-field"><label>Senha</label><input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <button class="auth-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
-    </div>
-    <div id="registerForm" style="display:none">
-      <div class="auth-field"><label>Nome completo</label><input type="text" id="regName" placeholder="Seu nome"></div>
-      <div class="auth-field"><label>Email</label><input type="email" id="regEmail" placeholder="seu@email.com"></div>
-      <div class="auth-field"><label>Senha</label><input type="password" id="regPass" placeholder="Mínimo 6 caracteres"></div>
-      <div class="auth-field"><label>Confirmar senha</label><input type="password" id="regPass2" placeholder="Repetir senha"></div>
-      <button class="auth-btn" id="registerBtn" onclick="doRegister()">Criar conta</button>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Entrar</button>
+        <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Criar conta</button>
+      </div>
+
+      <div class="auth-error" id="authError"></div>
+
+      <!-- Login Form -->
+      <div id="loginForm">
+        <div class="field">
+          <label class="field-label">Email</label>
+          <input class="field-input" type="email" id="loginEmail" placeholder="seu@email.com"
+            onkeydown="if(event.key==='Enter')doLogin()" autocomplete="email">
+        </div>
+        <div class="field">
+          <label class="field-label">Senha</label>
+          <input class="field-input" type="password" id="loginPass" placeholder="••••••••"
+            onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary btn-lg btn-full" id="loginBtn" onclick="doLogin()">
+          Entrar
+        </button>
+      </div>
+
+      <!-- Register Form -->
+      <div id="registerForm" style="display:none">
+        <div class="field">
+          <label class="field-label">Nome completo</label>
+          <input class="field-input" type="text" id="regName" placeholder="Seu nome" autocomplete="name">
+        </div>
+        <div class="field">
+          <label class="field-label">Email</label>
+          <input class="field-input" type="email" id="regEmail" placeholder="seu@email.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <label class="field-label">Senha</label>
+          <input class="field-input" type="password" id="regPass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label class="field-label">Confirmar senha</label>
+          <input class="field-input" type="password" id="regPass2" placeholder="Repetir senha" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary btn-lg btn-full" id="registerBtn" onclick="doRegister()">
+          Criar conta
+        </button>
+      </div>
+
     </div>
   </div>
 </div>
 
-<!-- APP -->
-<div class="app-wrap" id="appScreen">
-  <div class="header">
+
+<!-- ══════════════════════════════════════════════════════════
+     APP SCREEN
+═══════════════════════════════════════════════════════════ -->
+<div id="appScreen" class="app-screen">
+
+  <!-- Header -->
+  <header class="app-header">
     <div class="header-brand">
-      <div class="header-logo">⚙️</div>
-      <div><div class="header-title">CAR · Garantia</div><div class="header-sub">CFMOTO da Amazônia</div></div>
+      <div class="header-brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="header-brand-name">CAR · Garantia</div>
+        <div class="header-brand-sub">CFMOTO da Amazônia</div>
+      </div>
     </div>
     <div class="user-chip" onclick="openUserModal()">
-      <div class="user-avatar" id="userAv">?</div>
-      <span id="userLabel">...</span>
+      <div class="user-avatar" id="userAvatar">?</div>
+      <span class="user-name" id="userAvatarName">...</span>
       <span class="admin-badge" id="adminBadge" style="display:none">ADMIN</span>
     </div>
-  </div>
+  </header>
 
-  <div class="main">
-    <div id="pageList">
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- ── Page: List ──────────────────────────────────────── -->
+    <div class="page active" id="page-list">
       <div class="stats-row">
-        <div class="stat"><div class="stat-n blue" id="statTotal">—</div><div class="stat-l">Total</div></div>
-        <div class="stat"><div class="stat-n amber" id="statPending">—</div><div class="stat-l">Pendentes</div></div>
-        <div class="stat"><div class="stat-n green" id="statDone">—</div><div class="stat-l">Concluídos</div></div>
+        <div class="stat-card">
+          <div class="stat-value blue" id="statTotal">—</div>
+          <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value amber" id="statPending">—</div>
+          <div class="stat-label">Pendentes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value green" id="statDone">—</div>
+          <div class="stat-label">Concluídos</div>
+        </div>
       </div>
-      <div class="search-box">
-        <span style="font-size:18px;opacity:0.4">🔍</span>
-        <input type="text" id="searchInput" placeholder="Pesquisar peça, código, modelo..." oninput="renderList()">
+
+      <div class="search-bar">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="9" cy="9" r="6"/><path d="M14 14l3 3"/>
+        </svg>
+        <input type="search" id="searchInput" placeholder="Pesquisar peça, código, modelo..."
+          oninput="onSearch()" autocomplete="off">
       </div>
-      <div class="filter-row">
-        <div class="fpill active" onclick="setFilter('all',this)">Todos</div>
-        <div class="fpill" onclick="setFilter('pending',this)">⏳ Pendentes</div>
-        <div class="fpill" onclick="setFilter('done',this)">✅ Concluídos</div>
+
+      <div class="filter-chips">
+        <div class="chip active" onclick="setFilter('all', this)">Todos</div>
+        <div class="chip" onclick="setFilter('pending', this)">⏳ Pendentes</div>
+        <div class="chip" onclick="setFilter('done', this)">✅ Concluídos</div>
       </div>
-      <div id="incList" class="inc-list"><div class="loading-bar"><div class="spinner"></div> Carregando...</div></div>
+
+      <div class="incident-list" id="incidentList">
+        <div class="loading-state"><div class="spinner"></div> A carregar...</div>
+      </div>
     </div>
 
-    <div id="pageForm" style="display:none">
-      <div class="back-btn" onclick="showPage('list')">← Voltar</div>
-      <div class="form-wrap">
-        <div class="quick-banner">
-          ⚡ <strong>Registo rápido:</strong> Só o nome da peça e as fotos são obrigatórios. Podes completar o resto depois!
+    <!-- ── Page: Form ──────────────────────────────────────── -->
+    <div class="page" id="page-form">
+      <div class="form-stack">
+
+        <div class="info-banner">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+          </svg>
+          <span><strong>Registo rápido.</strong> Só o nome da peça e as fotos são obrigatórios.</span>
         </div>
+
+        <!-- Identificação -->
         <div class="form-card">
-          <div class="form-section-title">📦 Identificação da Peça</div>
+          <div class="form-card-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M7 4H4a1 1 0 00-1 1v11a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1h-3M7 4a2 2 0 012-2h2a2 2 0 012 2M7 4h6"/>
+            </svg>
+            Identificação da Peça
+          </div>
           <div class="form-grid">
-            <div class="fg"><label>Nº CAR <span class="optional-tag">opcional</span></label><input id="fCarNum" type="text" placeholder="ex: 039" maxlength="10" style="font-weight:600;letter-spacing:0.05em"></div>
-            <div class="fg"><label>Código da Peça <span class="optional-tag">opcional</span></label><input id="fPartNo" type="text" placeholder="9AWV-132000-8000"></div>
-            <div class="fg"><label>Nome da Peça *</label><input id="fPartName" type="text" placeholder="REAR SEAT ASSY"></div>
-            <div class="fg"><label>Modelo <span class="optional-tag">opcional</span></label><input id="fModel" type="text" placeholder="CF1000AZ-2"></div>
-            <div class="fg"><label>Nº Pedido <span class="optional-tag">opcional</span></label><input id="fOrderNo" type="text" placeholder="25BR-FMC38532C-1"></div>
-            <div class="fg"><label>Lote (Lot No.) <span class="optional-tag">opcional</span></label><input id="fLotNo" type="text" placeholder="10194649"></div>
-            <div class="fg"><label>Qtd. Defeituosa <span class="optional-tag">opcional</span></label><input id="fNgQty" type="number" min="1" placeholder="1"></div>
-            <div class="fg full"><label>Descrição do Defeito <span class="optional-tag">opcional</span></label><textarea id="fDefect" placeholder="Descreva o problema encontrado..."></textarea></div>
-            <div class="fg full"><label>Como foi Detectado <span class="optional-tag">opcional</span></label><textarea id="fDetected" placeholder="Desempacotamento, inspeção visual..."></textarea></div>
+
+            <div class="field">
+              <label class="field-label">Nº CAR <span class="field-optional">opcional</span></label>
+              <input class="field-input" type="text" id="fCarNum" placeholder="ex: 039" maxlength="10">
+            </div>
+
+            <div class="field">
+              <label class="field-label">Código da Peça <span class="field-optional">opcional</span></label>
+              <input class="field-input" type="text" id="fPartNo" placeholder="9AWV-132000-8000">
+            </div>
+
+            <div class="field field-full">
+              <label class="field-label">Nome da Peça <span style="color:var(--red-600)">*</span></label>
+              <input class="field-input" type="text" id="fPartName" placeholder="REAR SEAT ASSY">
+            </div>
+
+            <div class="field">
+              <label class="field-label">Modelo <span class="field-optional">opcional</span></label>
+              <input class="field-input" type="text" id="fModel" placeholder="CF1000AZ-2">
+            </div>
+
+            <div class="field">
+              <label class="field-label">Nº Pedido <span class="field-optional">opcional</span></label>
+              <input class="field-input" type="text" id="fOrderNo" placeholder="25BR-FMC38532C-1">
+            </div>
+
+            <div class="field">
+              <label class="field-label">Lote (Lot No.) <span class="field-optional">opcional</span></label>
+              <input class="field-input" type="text" id="fLotNo" placeholder="10194649">
+            </div>
+
+            <div class="field">
+              <label class="field-label">Qtd. Defeituosa <span class="field-optional">opcional</span></label>
+              <input class="field-input" type="number" id="fNgQty" min="1" placeholder="1">
+            </div>
+
+            <div class="field field-full">
+              <label class="field-label">Descrição do Defeito <span class="field-optional">opcional</span></label>
+              <textarea class="field-input field-textarea" id="fDefect" placeholder="Descreva o problema encontrado..."></textarea>
+            </div>
+
+            <div class="field field-full">
+              <label class="field-label">Como foi Detectado <span class="field-optional">opcional</span></label>
+              <textarea class="field-input field-textarea" id="fDetected" placeholder="Desempacotamento, inspeção visual..."></textarea>
+            </div>
+
           </div>
         </div>
 
+        <!-- Fotos -->
         <div class="form-card">
-          <div class="form-section-title">📷 Fotos do Incidente *</div>
-          <div class="photo-btns">
-            <button type="button" class="photo-btn-cam" onclick="document.getElementById('cameraInput').click()">
-              <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handlePhotos(this.files)">
-              📷 Tirar foto
+          <div class="form-card-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path d="M3 9.5l1.5-3h11l1.5 3v5a1 1 0 01-1 1H4a1 1 0 01-1-1v-5z"/>
+            </svg>
+            Fotos <span style="color:var(--red-600)">*</span>
+          </div>
+
+          <div class="photo-actions">
+            <!-- Camera button (uses getUserMedia on Android) -->
+            <button class="photo-btn photo-btn-primary" onclick="openCameraBtn()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <span class="photo-btn-label">Câmera</span>
+              <!-- Hidden fallback for devices that don't support getUserMedia -->
+              <input type="file" id="cameraFallback" accept="image/*" capture="environment"
+                onchange="handleFileInput(this)" style="display:none">
             </button>
-            <button type="button" class="photo-btn-gal" onclick="document.getElementById('galleryInput').click()">
-              <input type="file" id="galleryInput" accept="image/*" multiple onchange="handlePhotos(this.files)">
-              🖼️ Da galeria
+
+            <!-- Gallery button -->
+            <button class="photo-btn" onclick="document.getElementById('galleryInput').click()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <span class="photo-btn-label">Galeria</span>
+              <input type="file" id="galleryInput" accept="image/*" multiple
+                onchange="handleFileInput(this)" style="display:none">
             </button>
           </div>
-          <div class="photo-drop-zone" id="photoDropZone"
+
+          <div class="photo-hint-text"
+            id="photoDropZone"
             ondragover="event.preventDefault();this.classList.add('drag-over')"
             ondragleave="this.classList.remove('drag-over')"
             ondrop="handleDrop(event)">
-            <span style="font-size:12px;color:#90A4AE">Arraste fotos aqui ou cole com Ctrl+V</span>
+            Arraste fotos aqui ou cole com Ctrl+V
           </div>
+
           <div class="photo-grid" id="photoGrid"></div>
-          <div id="photoHint" style="font-size:12px;color:#E65100;margin-top:8px;display:none">Adicione pelo menos uma foto</div>
+          <div class="field-error" id="photoError">Adicione pelo menos uma foto</div>
         </div>
+
         <div class="form-actions">
-          <button class="btn" onclick="showPage('list')">Cancelar</button>
-          <button class="btn btn-primary" id="saveBtn" onclick="saveIncident()">💾 Guardar</button>
+          <button class="btn" onclick="goToList()">Cancelar</button>
+          <button class="btn btn-primary" id="saveBtn" onclick="saveForm()">💾 Guardar</button>
         </div>
+
       </div>
     </div>
 
-    <div id="pageDetail" style="display:none">
-      <div class="back-btn" onclick="showPage('list')">← Voltar</div>
+    <!-- ── Page: Detail ────────────────────────────────────── -->
+    <div class="page" id="page-detail">
       <div id="detailContent"></div>
     </div>
 
-    <div id="pageExcel" style="display:none">
-      <div class="excel-card">
-        <h2>📥 Importar Pack List</h2>
-        <p>Importa o ficheiro Pack List do fornecedor para preencher automaticamente os dados das peças ao ler o QR code.</p>
-        <div class="fg" style="margin-bottom:12px">
-          <label>Modelo <span style="color:#C62828">*</span></label>
-          <input type="text" id="importModel" placeholder="ex: CF400-8H" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%">
+    <!-- ── Page: Excel / Import ────────────────────────────── -->
+    <div class="page" id="page-excel">
+
+      <!-- Import Pack List -->
+      <div class="form-card" style="margin-bottom:12px">
+        <div class="form-card-title">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M3 16v-1a4 4 0 014-4h6a4 4 0 014 4v1M7 8a4 4 0 004 4M7 8a4 4 0 010-8m4 4h.01"/>
+          </svg>
+          Importar Pack List
         </div>
-        <div class="fg" style="margin-bottom:12px">
-          <label>Nº Pedido manual <span class="optional-tag">opcional — se o ficheiro não tiver</span></label>
-          <input type="text" id="importOrderNo" placeholder="ex: 25BR-FM67310C-1" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%">
+        <p class="section-desc">Importa o ficheiro Pack List para preenchimento automático via QR code.</p>
+
+        <div class="field">
+          <label class="field-label">Modelo <span style="color:var(--red-600)">*</span></label>
+          <input class="field-input" type="text" id="importModel" placeholder="ex: CF400-8H">
         </div>
-        <div class="fg" style="margin-bottom:12px">
-          <label>Nº Pedido <span class="optional-tag">opcional — se não estiver no documento</span></label>
-          <input type="text" id="importOrderNo" placeholder="ex: 25BR-FM67310C-1" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%">
+
+        <div class="field">
+          <label class="field-label">Nº Pedido manual <span class="field-optional">opcional</span></label>
+          <input class="field-input" type="text" id="importOrderNo" placeholder="ex: 25BR-FM67310C-1">
         </div>
-        <div class="fg" style="margin-bottom:12px">
-          <label>Ficheiro Pack List (.xlsx)</label>
-          <input type="file" id="importFile" accept=".xlsx" style="padding:10px 12px;border:1.5px solid #CFD8DC;border-radius:8px;font-size:14px;width:100%;background:#fff">
+
+        <div class="field">
+          <label class="field-label">Ficheiro Pack List (.xlsx)</label>
+          <input class="field-input" type="file" id="importFile" accept=".xlsx">
         </div>
-        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:20px" onclick="importPackList()">📥 Importar Pack List</button>
-        <div id="importProgress" style="display:none;background:#E3F2FD;border-radius:8px;padding:12px;font-size:13px;color:#1565C0;margin-bottom:16px"></div>
-        <hr style="border:none;border-top:1px solid #ECEFF1;margin-bottom:16px">
+
+        <button class="btn btn-primary btn-full" style="margin-top:4px" onclick="doImportPackList()">
+          📥 Importar Pack List
+        </button>
+
+        <div class="import-progress" id="importProgress"></div>
       </div>
-      <div class="excel-card">
-        <h2>📊 Relatório Excel</h2>
-        <p>Exporta os incidentes para um ficheiro Excel com todos os dados e links das fotos.</p>
-        <div class="excel-stat">
-          <div class="excel-stat-item"><div class="n" id="exSTotal">—</div><div class="l">Total</div></div>
-          <div class="excel-stat-item"><div class="n amber" id="exSPending">—</div><div class="l">Pendentes</div></div>
-          <div class="excel-stat-item"><div class="n green" id="exSDone">—</div><div class="l">Concluídos</div></div>
+
+      <hr class="divider">
+
+      <!-- Export Excel -->
+      <div class="form-card">
+        <div class="form-card-title">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M4 16v1a2 2 0 002 2h8a2 2 0 002-2v-1M8 12l4 4 4-4M12 4v12"/>
+          </svg>
+          Exportar Relatório Excel
         </div>
-        <div class="excel-filter">
-          <label>Filtrar por status</label>
-          <select id="excelFilter">
+
+        <div class="stats-row" style="margin-bottom:14px">
+          <div class="stat-card">
+            <div class="stat-value blue" id="exSTotal">—</div>
+            <div class="stat-label">Total</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value amber" id="exSPending">—</div>
+            <div class="stat-label">Pendentes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value green" id="exSDone">—</div>
+            <div class="stat-label">Concluídos</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Filtrar por status</label>
+          <select class="field-input" id="excelFilter">
             <option value="all">Todos os incidentes</option>
             <option value="pending">Só pendentes</option>
             <option value="done">Só concluídos</option>
           </select>
         </div>
-        <div class="excel-filter">
-          <label>Filtrar por período</label>
-          <select id="excelPeriod">
+
+        <div class="field">
+          <label class="field-label">Filtrar por período</label>
+          <select class="field-input" id="excelPeriod">
             <option value="all">Todo o período</option>
             <option value="7">Últimos 7 dias</option>
             <option value="30">Últimos 30 dias</option>
             <option value="90">Últimos 90 dias</option>
           </select>
         </div>
-        <button class="btn btn-excel" onclick="exportExcel()">📥 Exportar Excel</button>
+
+        <button class="btn btn-success btn-full btn-lg" style="margin-top:4px" onclick="exportExcel()">
+          📥 Exportar Excel
+        </button>
       </div>
+
     </div>
-  </div>
 
-  <div class="bottom-nav">
-    <button class="nav-btn active" id="nav0" onclick="showPage('list')"><span class="nav-ico">📋</span>Incidentes</button>
-    <button class="nav-btn" id="nav1" onclick="showPage('form');clearForm()"><span class="nav-ico">➕</span>Novo</button>
-    <button class="nav-btn qr-nav" id="navQR" onclick="openQR()"><span class="nav-ico">📷</span></button>
-    <button class="nav-btn" id="nav2" onclick="showPage('excel')"><span class="nav-ico">📊</span>Relatório</button>
-  </div>
-</div>
+  </main>
 
-<!-- USER MODAL -->
-<div class="modal-bg" id="userModal" onclick="closeUserModal(event)">
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="list" onclick="goToList()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      Incidentes
+    </button>
+
+    <button class="nav-item" data-page="form" onclick="goToForm()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>
+      </svg>
+      Novo
+    </button>
+
+    <button class="nav-item nav-qr" onclick="openQRScanner()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M3 9V5a2 2 0 012-2h4M3 15v4a2 2 0 002 2h4M15 3h4a2 2 0 012 2v4M15 21h4a2 2 0 002-2v-4"/>
+        <rect x="7" y="7" width="4" height="4" rx=".5"/>
+        <rect x="13" y="7" width="4" height="4" rx=".5"/>
+        <rect x="7" y="13" width="4" height="4" rx=".5"/>
+        <path d="M13 15h4v2h-2v2"/>
+      </svg>
+      QR
+    </button>
+
+    <button class="nav-item" data-page="excel" onclick="goToExcel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zM15 5v14m0 0H9m6 0h6"/>
+      </svg>
+      Relatório
+    </button>
+  </nav>
+
+</div><!-- /appScreen -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     OVERLAYS
+═══════════════════════════════════════════════════════════ -->
+
+<!-- User Modal -->
+<div class="modal-overlay" id="userModal" onclick="closeUserModal(event)">
   <div class="modal">
+    <div class="modal-handle"></div>
     <div class="modal-title">Minha conta</div>
     <div class="modal-sub">Sessão iniciada</div>
-    <div class="modal-user-info">
-      <div class="modal-av" id="modalAv">?</div>
+    <div class="modal-user">
+      <div class="modal-avatar" id="modalAvatar">?</div>
       <div>
-        <div class="modal-name" id="modalName">—</div>
-        <div class="modal-email" id="modalEmail">—</div>
+        <div class="modal-user-name" id="modalName">—</div>
+        <div class="modal-user-email" id="modalEmail">—</div>
         <div style="margin-top:5px" id="modalRole"></div>
       </div>
     </div>
-    <button class="btn btn-danger" style="width:100%;justify-content:center" onclick="doLogout()">🚪 Sair da conta</button>
+    <button class="btn btn-danger btn-full" onclick="doLogout()">🚪 Sair da conta</button>
   </div>
 </div>
 
-<div class="fs-overlay" id="fsOverlay" onclick="closeFs()">
+<!-- Fullscreen image -->
+<div class="fs-overlay" id="fsOverlay" onclick="closeFullscreen()">
   <button class="fs-close">✕</button>
   <img id="fsImg" src="" alt="">
 </div>
-<div class="toast" id="toast"></div>
 
 <!-- QR Scanner -->
 <div class="qr-overlay" id="qrOverlay">
-  <button class="qr-close" onclick="closeQR()">✕</button>
+  <button class="qr-close" onclick="closeQRScanner()">✕</button>
   <div class="qr-video-wrap">
     <video id="qrVideo" autoplay playsinline muted></video>
-    <div class="qr-frame"></div>
+    <div class="qr-viewfinder">
+      <div class="qr-corner qr-corner-tl"></div>
+      <div class="qr-corner qr-corner-tr"></div>
+      <div class="qr-corner qr-corner-bl"></div>
+      <div class="qr-corner qr-corner-br"></div>
+    </div>
   </div>
-  <div class="qr-hint">Aponte a câmera para o QR code da peça</div>
+  <p class="qr-hint">Aponte para o QR code da etiqueta da peça</p>
+  <canvas id="qrCanvas"></canvas>
 </div>
 
-<script>
-let incidents=[], currentFilter='all', currentPhotos=[], editingId=null, currentUser=null, isAdmin=false;
+<!-- Toast -->
+<div class="toast" id="toast"></div>
 
-function waitFb(){return new Promise(res=>{if(window._fbReady)return res();document.addEventListener('firebase-ready',res,{once:true});})}
 
-function switchAuthTab(tab){
-  document.getElementById('loginForm').style.display=tab==='login'?'block':'none';
-  document.getElementById('registerForm').style.display=tab==='register'?'block':'none';
-  document.getElementById('tabLogin').classList.toggle('active',tab==='login');
-  document.getElementById('tabRegister').classList.toggle('active',tab==='register');
-  hideErr();
-}
-function showErr(msg){const el=document.getElementById('authErr');el.textContent=msg;el.classList.add('show');}
-function hideErr(){document.getElementById('authErr').classList.remove('show');}
+<!-- App entry point (ES module) -->
+<script type="module" src="js/app.js"></script>
 
-async function doLogin(){
-  await waitFb();
-  const email=document.getElementById('loginEmail').value.trim();
-  const pass=document.getElementById('loginPass').value;
-  if(!email||!pass){showErr('Preencha email e senha.');return;}
-  const btn=document.getElementById('loginBtn');
-  btn.disabled=true;btn.textContent='Entrando...';
-  try{
-    await window._fbAuth.signInWithEmailAndPassword(window._auth,email,pass);
-  }catch(e){
-    showErr(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'?'Email ou senha incorretos.':'Erro ao entrar. Verifique os dados.');
-    btn.disabled=false;btn.textContent='Entrar';
-  }
-}
-
-async function doRegister(){
-  await waitFb();
-  const name=document.getElementById('regName').value.trim();
-  const email=document.getElementById('regEmail').value.trim();
-  const pass=document.getElementById('regPass').value;
-  const pass2=document.getElementById('regPass2').value;
-  if(!name||!email||!pass){showErr('Preencha todos os campos.');return;}
-  if(pass.length<6){showErr('A senha deve ter pelo menos 6 caracteres.');return;}
-  if(pass!==pass2){showErr('As senhas não coincidem.');return;}
-  const btn=document.getElementById('registerBtn');
-  btn.disabled=true;btn.textContent='Criando conta...';
-  try{
-    const {collection,getDocs,doc,setDoc}=window._fb;
-    const usersSnap=await getDocs(collection(window._db,'users'));
-    const isFirst=usersSnap.empty;
-    const cred=await window._fbAuth.createUserWithEmailAndPassword(window._auth,email,pass);
-    await window._fbAuth.updateProfile(cred.user,{displayName:name});
-    await setDoc(doc(window._db,'users',cred.user.uid),{name,email,role:isFirst?'admin':'user',createdAt:Date.now()});
-  }catch(e){
-    let msg='Erro ao criar conta.';
-    if(e.code==='auth/email-already-in-use')msg='Este email já está registado.';
-    if(e.code==='auth/invalid-email')msg='Email inválido.';
-    showErr(msg);
-    btn.disabled=false;btn.textContent='Criar conta';
-  }
-}
-
-async function doLogout(){await window._fbAuth.signOut(window._auth);closeUserModal();}
-
-async function initAuth(){
-  await waitFb();
-  window._fbAuth.onAuthStateChanged(window._auth,async user=>{
-    if(user){
-      currentUser=user;
-      try{
-        const {doc,getDoc}=window._fb;
-        const snap=await getDoc(doc(window._db,'users',user.uid));
-        isAdmin=snap.exists()&&snap.data().role==='admin';
-      }catch(e){isAdmin=false;}
-      const name=user.displayName||user.email;
-      const initials=name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
-      document.getElementById('userAv').textContent=initials;
-      document.getElementById('userLabel').textContent=name.split(' ')[0];
-      document.getElementById('adminBadge').style.display=isAdmin?'inline':'none';
-      document.getElementById('modalAv').textContent=initials;
-      document.getElementById('modalName').textContent=name;
-      document.getElementById('modalEmail').textContent=user.email;
-      document.getElementById('modalRole').innerHTML=isAdmin?
-        '<span class="admin-badge" style="font-size:11px;padding:2px 8px">👑 ADMIN</span>':
-        '<span style="font-size:12px;color:#607D8B">Utilizador</span>';
-      document.getElementById('authScreen').style.display='none';
-      document.getElementById('appScreen').style.display='block';
-      showPage('list');
-    }else{
-      currentUser=null;isAdmin=false;
-      document.getElementById('authScreen').style.display='flex';
-      document.getElementById('appScreen').style.display='none';
-    }
-  });
-}
-
-function openUserModal(){document.getElementById('userModal').classList.add('open');}
-function closeUserModal(e){if(!e||e.target===document.getElementById('userModal'))document.getElementById('userModal').classList.remove('open');}
-
-function showPage(page){
-  ['List','Form','Detail','Excel'].forEach(p=>{
-    document.getElementById('page'+p).style.display=p.toLowerCase()===page?'block':'none';
-  });
-  ['nav0','nav1','nav2'].forEach((id,i)=>{
-    document.getElementById(id).classList.toggle('active',(page==='list'&&i===0)||(page==='form'&&i===1)||(page==='excel'&&i===2));
-  });
-  if(page==='list')loadIncidents();
-  if(page==='excel')updateExcelStats();
-}
-
-async function loadIncidents(){
-  await waitFb();
-  const el=document.getElementById('incList');
-  el.innerHTML='<div class="loading-bar"><div class="spinner"></div> Carregando...</div>';
-  try{
-    const {collection,getDocs,query,orderBy}=window._fb;
-    const q=query(collection(window._db,'incidents'),orderBy('createdAt','desc'));
-    const snap=await getDocs(q);
-    incidents=snap.docs.map(d=>({id:d.id,...d.data()}));
-    renderList();
-  }catch(e){
-    el.innerHTML='<div class="empty"><div class="empty-ico">⚠️</div><div>Erro ao carregar dados.</div></div>';
-  }
-}
-
-async function saveIncident(){
-  const partNo=document.getElementById('fPartNo').value.trim();
-  const partName=document.getElementById('fPartName').value.trim();
-  const defect=document.getElementById('fDefect').value.trim();
-  if(!partName){showToast('Preencha o nome da peça');return;}
-  if(currentPhotos.length===0){
-    document.getElementById('photoHint').style.display='block';
-    showToast('Adicione pelo menos uma foto');return;
-  }
-  document.getElementById('photoHint').style.display='none';
-  const btn=document.getElementById('saveBtn');
-  btn.disabled=true;btn.textContent='⏳ Guardando...';
-  await waitFb();
-  try{
-    const photoUrls=[];
-    for(const p of currentPhotos){
-      if(p.isNew&&p.file){
-        const result=await window.uploadToCloudinary(p.file);
-        photoUrls.push({url:result.url,publicId:result.publicId});
-      }else{photoUrls.push({url:p.url,publicId:p.publicId});}
-    }
-    const data={
-      partNo,partName,
-      model:document.getElementById('fModel').value.trim(),
-      orderNo:document.getElementById('fOrderNo').value.trim(),
-      lotNo:document.getElementById('fLotNo').value.trim(),
-      ngQty:document.getElementById('fNgQty').value.trim(),
-      defect,
-      detected:document.getElementById('fDetected').value.trim(),
-
-      photos:photoUrls,
-      user:currentUser.displayName||currentUser.email,
-      userId:currentUser.uid,
-      updatedAt:Date.now(),
-    };
-    const {collection,addDoc,doc,updateDoc}=window._fb;
-    if(editingId){
-      await updateDoc(doc(window._db,'incidents',editingId),data);
-      showToast('✅ Actualizado!');
-    }else{
-      data.status='pending';data.createdAt=Date.now();
-      await addDoc(collection(window._db,'incidents'),data);
-      showToast('✅ Incidente registado!');
-    }
-    editingId=null;showPage('list');
-  }catch(e){showToast('Erro ao guardar. Tente novamente.');}
-  btn.disabled=false;btn.textContent='💾 Guardar';
-}
-
-async function markDone(id){
-  await waitFb();
-  const {doc,updateDoc}=window._fb;
-  await updateDoc(doc(window._db,'incidents',id),{status:'done',completedAt:Date.now()});
-  showToast('✅ Marcado como concluído!');
-  await loadIncidents();showDetail(id);
-}
-
-async function markPending(id){
-  await waitFb();
-  const {doc,updateDoc}=window._fb;
-  await updateDoc(doc(window._db,'incidents',id),{status:'pending'});
-  showToast('Reaberto como pendente');
-  await loadIncidents();showDetail(id);
-}
-
-async function deleteIncident(id){
-  if(!isAdmin){showToast('⛔ Só o admin pode eliminar.');return;}
-  if(!confirm('Eliminar este incidente? Esta acção não pode ser desfeita.'))return;
-  await waitFb();
-  const {doc,deleteDoc}=window._fb;
-  await deleteDoc(doc(window._db,'incidents',id));
-  showToast('🗑 Eliminado');showPage('list');
-}
-
-function setFilter(f,el){
-  currentFilter=f;
-  document.querySelectorAll('.fpill').forEach(p=>p.classList.remove('active'));
-  el.classList.add('active');renderList();
-}
-
-function renderList(){
-  const search=(document.getElementById('searchInput')?.value||'').toLowerCase();
-  let list=incidents.filter(inc=>{
-    const mf=currentFilter==='all'||inc.status===currentFilter;
-    const ms=!search||(inc.partNo||'').toLowerCase().includes(search)||(inc.partName||'').toLowerCase().includes(search)||(inc.model||'').toLowerCase().includes(search)||(inc.orderNo||'').toLowerCase().includes(search);
-    return mf&&ms;
-  });
-  const total=incidents.length,done=incidents.filter(i=>i.status==='done').length;
-  document.getElementById('statTotal').textContent=total;
-  document.getElementById('statPending').textContent=total-done;
-  document.getElementById('statDone').textContent=done;
-  const el=document.getElementById('incList');
-  if(!list.length){el.innerHTML=`<div class="empty"><div class="empty-ico">📂</div><div>${total?'Nenhum resultado encontrado':'Sem incidentes.<br>Toque em <strong>+</strong> para começar.'}</div></div>`;return;}
-  el.innerHTML=list.map(inc=>`
-    <div class="inc-card ${inc.status||'pending'}" onclick="showDetail('${inc.id}')">
-      <div class="inc-card-top">
-        <div><div class="inc-name">${inc.partName||'—'}</div><div class="inc-code">${inc.partNo||''}</div></div>
-        <span class="badge ${inc.status==='done'?'done':'pending'}">${inc.status==='done'?'✓ Concluído':'⏳ Pendente'}</span>
-      </div>
-      <div class="inc-meta">
-        <span>🚗 ${inc.model||'—'}</span>
-        <span>📅 ${fmtDate(inc.createdAt)}</span>
-        <span>👤 ${(inc.user||'').split(' ')[0]}</span>
-      </div>
-      ${inc.photos&&inc.photos.length?`<div class="photo-count">📷 ${inc.photos.length} foto${inc.photos.length>1?'s':''}</div>`:''}
-    </div>
-  `).join('');
-}
-
-function showDetail(id){
-  const inc=incidents.find(i=>i.id===id);if(!inc)return;
-  const photos=(inc.photos||[]).map(p=>`<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="openFs('${p.url}')"></div>`).join('');
-
-  document.getElementById('detailContent').innerHTML=`
-    <div class="detail-header" style="border-left-color:${inc.status==='done'?'#2E7D32':'#E65100'}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div><div class="detail-title">${inc.partName||'—'}</div><div class="detail-id">${inc.partNo||''} · ${fmtDate(inc.createdAt)}</div></div>
-        <span class="badge ${inc.status==='done'?'done':'pending'}">${inc.status==='done'?'✓ Concluído':'⏳ Pendente'}</span>
-      </div>
-    </div>
-    <div class="detail-card">
-      <div class="form-section-title" style="margin-bottom:8px">📦 Dados da Peça</div>
-      ${drow('Código',inc.partNo)}${drow('Modelo',inc.model)}${drow('Nº Pedido',inc.orderNo)}${drow('Lote',inc.lotNo)}${drow('Qtd. Defeituosa',inc.ngQty)}${drow('Registado por',inc.user)}
-    </div>
-    <div class="detail-card">
-      <div class="form-section-title" style="margin-bottom:8px">📝 Descrição</div>
-      <div class="detail-text-block">${inc.defect||'—'}</div>
-      ${inc.detected?`<div style="margin-top:12px;font-size:11px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Como detectado</div><div class="detail-text-block">${inc.detected}</div>`:''}
-    </div>
-
-    ${photos?`<div class="detail-card"><div class="form-section-title" style="margin-bottom:8px">📷 Fotos (${inc.photos.length})</div><div class="photo-grid">${photos}</div></div>`:''}
-    <div class="detail-card">
-      <div class="detail-actions">
-        ${inc.status!=='done'?`<button class="btn btn-success" onclick="markDone('${inc.id}')">✓ Concluído</button>`:''}
-        ${inc.status==='done'?`<button class="btn" onclick="markPending('${inc.id}')">↩ Reabrir</button>`:''}
-        <button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>
-        ${isAdmin?`<button class="btn btn-danger" onclick="deleteIncident('${inc.id}')">🗑 Eliminar</button>`:''}
-        <span id="carBtn_${inc.id}"></span>
-      </div>
-    </div>
-  `;
-  ['pageList','pageForm','pageExcel'].forEach(p=>document.getElementById(p).style.display='none');
-  document.getElementById('pageDetail').style.display='block';
-  // Set CAR button based on completeness
-  var carBtnEl = document.getElementById('carBtn_'+id);
-  if(carBtnEl){
-    var missing=[];
-    if(!inc.partNo) missing.push('Codigo da peca');
-    if(!inc.model) missing.push('Modelo');
-    if(!inc.orderNo) missing.push('N. Pedido');
-    if(!inc.lotNo) missing.push('Lote');
-    if(!inc.ngQty) missing.push('Qtd. Defeituosa');
-    if(missing.length===0){
-      carBtnEl.innerHTML='<button class="btn btn-excel" style="padding:11px 16px;font-size:13px;width:auto" onclick="generateCAR(\'' + id + '\')">Gerar CAR Excel</button>';
-    } else {
-      carBtnEl.innerHTML='<div style="background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:8px;padding:10px 14px;font-size:12px;color:#E65100;line-height:1.6"><strong>Para gerar o CAR falta:</strong> ' + missing.join(', ') + '</div>';
-    }
-  }
-}
-
-function drow(lbl,val){return `<div class="detail-row"><span class="detail-lbl">${lbl}</span><span class="detail-val">${val||'—'}</span></div>`;}
-
-function editIncident(id){
-  const inc=incidents.find(i=>i.id===id);if(!inc)return;
-  editingId=id;
-  document.getElementById('fCarNum').value=inc.carNum||'';
-  document.getElementById('fPartNo').value=inc.partNo||'';
-  document.getElementById('fPartName').value=inc.partName||'';
-  document.getElementById('fModel').value=inc.model||'';
-  document.getElementById('fOrderNo').value=inc.orderNo||'';
-  document.getElementById('fLotNo').value=inc.lotNo||'';
-  document.getElementById('fNgQty').value=inc.ngQty||'';
-  document.getElementById('fDefect').value=inc.defect||'';
-  document.getElementById('fDetected').value=inc.detected||'';
-
-  currentPhotos=(inc.photos||[]).map(p=>({url:p.url,publicId:p.publicId,isNew:false}));
-  renderPhotoGrid();
-  ['pageList','pageDetail','pageExcel'].forEach(p=>document.getElementById(p).style.display='none');
-  document.getElementById('pageForm').style.display='block';
-  ['nav0','nav1','nav2'].forEach((id,i)=>document.getElementById(id).classList.toggle('active',i===1));
-}
-
-function clearForm(){
-  editingId=null;
-  ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected'].forEach(id=>{ var el=document.getElementById(id); if(el) el.value=''; });
-  currentPhotos=[];renderPhotoGrid();
-  const h=document.getElementById('photoHint');if(h)h.style.display='none';
-}
-
-async function compressImage(file, maxSizeKB=900, maxW=1600){
-  return new Promise(res=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const img=new Image();
-      img.onload=()=>{
-        let w=img.width,h=img.height;
-        if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
-        const canvas=document.createElement('canvas');
-        canvas.width=w;canvas.height=h;
-        const ctx=canvas.getContext('2d');
-        ctx.drawImage(img,0,0,w,h);
-        let quality=0.82;
-        const tryEncode=()=>{
-          const dataUrl=canvas.toDataURL('image/jpeg',quality);
-          const kb=(dataUrl.length*3/4)/1024;
-          if(kb>maxSizeKB&&quality>0.35){quality-=0.1;tryEncode();return;}
-          // Convert dataUrl back to File-like blob for Cloudinary
-          const byteStr=atob(dataUrl.split(',')[1]);
-          const arr=new Uint8Array(byteStr.length);
-          for(let i=0;i<byteStr.length;i++)arr[i]=byteStr.charCodeAt(i);
-          const blob=new Blob([arr],{type:'image/jpeg'});
-          const compFile=new File([blob],file.name.replace(/\.[^.]+$/,'.jpg'),{type:'image/jpeg'});
-          res({dataUrl,compFile});
-        };
-        tryEncode();
-      };
-      img.src=e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-function handleDrop(e) {
-  e.preventDefault();
-  document.getElementById('photoDropZone').classList.remove('drag-over');
-  handlePhotos(e.dataTransfer.files);
-}
-
-// Paste handler (Ctrl+V)
-document.addEventListener('paste', function(e) {
-  var page = document.getElementById('pageForm');
-  if(!page || page.style.display === 'none') return;
-  var items = (e.clipboardData || e.originalEvent.clipboardData).items;
-  var imageFiles = [];
-  for(var i=0; i<items.length; i++) {
-    if(items[i].type.indexOf('image') !== -1) {
-      imageFiles.push(items[i].getAsFile());
-    }
-  }
-  if(imageFiles.length > 0) {
-    handlePhotos(imageFiles);
-    showToast('Foto colada com sucesso!');
-  }
-});
-
-function handlePhotos(files){
-  Array.from(files).forEach(async file=>{
-    try{
-      const {dataUrl,compFile}=await compressImage(file);
-      currentPhotos.push({url:dataUrl,isNew:true,file:compFile,localPreview:dataUrl});
-      renderPhotoGrid();
-    }catch(e){
-      // fallback sem compressão
-      const reader=new FileReader();
-      reader.onload=ev=>{currentPhotos.push({url:ev.target.result,isNew:true,file,localPreview:ev.target.result});renderPhotoGrid();};
-      reader.readAsDataURL(file);
-    }
-  });
-}
-
-function removePhoto(i,e){e.stopPropagation();currentPhotos.splice(i,1);renderPhotoGrid();}
-
-function renderPhotoGrid(){
-  document.getElementById('photoGrid').innerHTML=currentPhotos.map((p,i)=>`
-    <div class="photo-thumb"><img src="${p.localPreview||p.url}" alt="foto ${i+1}"><button class="photo-del" onclick="removePhoto(${i},event)">✕</button></div>
-  `).join('');
-}
-
-function updateExcelStats(){
-  const total=incidents.length,done=incidents.filter(i=>i.status==='done').length;
-  document.getElementById('exSTotal').textContent=total;
-  document.getElementById('exSPending').textContent=total-done;
-  document.getElementById('exSDone').textContent=done;
-}
-
-function exportExcel(){
-  const filter=document.getElementById('excelFilter').value;
-  const period=document.getElementById('excelPeriod').value;
-  const now=Date.now();
-  let list=incidents.filter(inc=>{
-    const mf=filter==='all'||inc.status===filter;
-    const mp=period==='all'||(now-(inc.createdAt||0))<=parseInt(period)*24*60*60*1000;
-    return mf&&mp;
-  });
-  if(!list.length){showToast('Nenhum incidente para exportar.');return;}
-  const rows=list.map((inc,i)=>({
-    'Nº':i+1,'ID':inc.id,
-    'Status':inc.status==='done'?'Concluído':'Pendente',
-    'Código da Peça':inc.partNo||'','Nome da Peça':inc.partName||'',
-    'Modelo':inc.model||'','Nº Pedido':inc.orderNo||'','Lote':inc.lotNo||'',
-    'Qtd. Defeituosa':inc.ngQty||'','Descrição do Defeito':inc.defect||'',
-    'Como Detectado':inc.detected||'','Ação KD':inc.action||'',
-    'Reposição':inc.replacement||'','Observações':inc.notes||'',
-    'Registado por':inc.user||'','Data Registo':fmtDate(inc.createdAt),
-    'Data Conclusão':inc.completedAt?fmtDate(inc.completedAt):'',
-    'Nº Fotos':(inc.photos||[]).length,
-    'Links das Fotos':(inc.photos||[]).map(p=>p.url).join(' | '),
-  }));
-  const ws=XLSX.utils.json_to_sheet(rows);
-  ws['!cols']=[{wch:5},{wch:16},{wch:12},{wch:20},{wch:22},{wch:14},{wch:22},{wch:14},{wch:8},{wch:40},{wch:30},{wch:14},{wch:14},{wch:30},{wch:20},{wch:14},{wch:14},{wch:8},{wch:60}];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Incidentes CAR');
-  const summary=[
-    ['RELATÓRIO CAR — GARANTIA DE PEÇAS'],['CFMOTO da Amazônia'],[''],
-    ['Data de exportação',new Date().toLocaleDateString('pt-BR')],
-    ['Total de incidentes',list.length],
-    ['Pendentes',list.filter(i=>i.status!=='done').length],
-    ['Concluídos',list.filter(i=>i.status==='done').length],
-  ];
-  const ws2=XLSX.utils.aoa_to_sheet(summary);
-  ws2['!cols']=[{wch:25},{wch:20}];
-  XLSX.utils.book_append_sheet(wb,ws2,'Resumo');
-  const date=new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb,`CAR-Garantia-${date}.xlsx`);
-  showToast('📥 Excel exportado!');
-}
-
-function openFs(url){document.getElementById('fsImg').src=url;document.getElementById('fsOverlay').classList.add('open');}
-function closeFs(){document.getElementById('fsOverlay').classList.remove('open');}
-function fmtDate(ts){if(!ts)return '—';return new Date(ts).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});}
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
-
-
-// ---- CAR NUMBER ----
-async function getNextCARNumber() {
-  await waitFb();
-  const {collection, getDocs, addDoc} = window._fb;
-  const year = new Date().getFullYear().toString().slice(-2);
-  const snap = await getDocs(collection(window._db, 'carNumbers'));
-  const yearDocs = snap.docs.filter(d => d.data().year === year);
-  const nextNum = yearDocs.length + 1;
-  await addDoc(collection(window._db, 'carNumbers'), {year, num: nextNum, createdAt: Date.now()});
-  return String(nextNum).padStart(3,'0') + '/' + year;
-}
-
-// ---- GENERATE CAR EXCEL ----
-// ---- CAR EXCEL via servidor Python ----
-// Actualiza este URL depois de criar o servidor no Render
-const CAR_SERVER_URL = 'https://web-production-6bff6.up.railway.app';
-
-async function generateCAR(id) {
-  const inc = incidents.find(i=>i.id===id);
-  if(!inc){showToast('Incidente nao encontrado.');return;}
-  showToast('Aguarde, a gerar CAR Excel...');
-  try {
-    // Use manual CAR number from incident if set, otherwise generate
-    const year = new Date().getFullYear().toString().slice(-2);
-    const manualNum = inc.carNum ? inc.carNum.trim() : null;
-    const carNum = manualNum ? (manualNum.padStart(3,'0') + '/' + year) : await getNextCARNumber();
-    const issueDate = inc.createdAt ?
-      new Date(inc.createdAt).toLocaleDateString('pt-BR') :
-      new Date().toLocaleDateString('pt-BR');
-
-    const payload = {
-      carNum,
-      partName: inc.partName || '',
-      partNo: inc.partNo || '',
-      model: inc.model || '',
-      orderNo: inc.orderNo || '',
-      lotNo: inc.lotNo || '',
-      ngQty: inc.ngQty || 1,
-      defect: inc.defect || '',
-      detected: inc.detected || '',
-      user: inc.user || '',
-      replacement: inc.replacement || 'NEED',
-      issueDate,
-      photos: (inc.photos || []).map(p => p.url || p)
-    };
-
-    const res = await fetch(CAR_SERVER_URL + '/generate-car', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    });
-
-    if(!res.ok) throw new Error('Erro no servidor: ' + res.status);
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const code = carNum.replace('/','_');
-    const partLabel = (inc.partName||inc.partNo||'PART').replace(/[^a-zA-Z0-9 -]/g,'').trim().substring(0,30);
-    a.download = 'CAR_No_'+code+'_'+partLabel+'.xlsx';
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('CAR Excel gerado com sucesso!');
-  } catch(e) {
-    console.error('CAR error:',e);
-    showToast('Erro: ' + e.message);
-  }
-}
-
-
-
-// ---- PACK LIST IMPORT ----
-async function importPackList() {
-  const model = document.getElementById('importModel').value.trim().toUpperCase();
-  const fileInput = document.getElementById('importFile');
-  const progress = document.getElementById('importProgress');
-
-  if(!model) { showToast('Preencha o modelo primeiro'); return; }
-  if(!fileInput.files.length) { showToast('Seleccione o ficheiro Pack List'); return; }
-
-  const file = fileInput.files[0];
-  progress.style.display = 'block';
-  progress.textContent = 'A ler ficheiro...';
-
-  try {
-    // Read Excel file with SheetJS
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, {type:'array'});
-
-    // Filter sheets (skip summary sheets)
-    const dataSheets = wb.SheetNames.filter(name =>
-      name.match(/^\d{2}[A-Z]{2}-[A-Z0-9]+-\d+$/) || name.match(/^25[A-Z]{2}/)
-    );
-
-    if(dataSheets.length === 0) {
-      // Try all sheets except obviously summary ones
-      dataSheets.push(...wb.SheetNames.filter(n => !n.includes('毛') && !n.includes('汇')));
-    }
-
-    progress.textContent = `Encontradas ${dataSheets.length} abas. A processar...`;
-
-    let totalParts = 0;
-    let batchData = {};
-    const {collection, addDoc, getDocs, doc, setDoc} = window._fb;
-
-    for(const sheetName of dataSheets) {
-      const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      const manualOrderNo = document.getElementById('importOrderNo').value.trim();
-      const orderNo = manualOrderNo || sheetName.trim();
-      let sheetParts = 0;
-
-      for(let i=1; i<rows.length; i++) {
-        const row = rows[i];
-        const partNo = String(row[12]||'').trim();   // Col M
-        const partName = String(row[13]||'').trim();  // Col N
-        const lotNo = String(row[16]||'').trim();     // Col Q
-        const qty = row[15] || '';                    // Col P
-
-        if(!partNo || !partName || partNo === 'PartNo.') continue;
-
-        // Key: partNo + lotNo
-        const key = (partNo + '_' + lotNo).replace(/[^a-zA-Z0-9_-]/g, '_');
-
-        batchData[key] = {
-          partNo,
-          partName: partName.toUpperCase(),
-          lotNo,
-          orderNo,
-          model,
-          qty: String(qty),
-          importedAt: Date.now(),
-          source: file.name
-        };
-        sheetParts++;
-      }
-
-      totalParts += sheetParts;
-      progress.textContent = `Processadas ${dataSheets.indexOf(sheetName)+1}/${dataSheets.length} abas... (${totalParts} peças)`;
-    }
-
-    // Save to Firebase in batches
-    progress.textContent = `A guardar ${Object.keys(batchData).length} peças no Firebase...`;
-    let saved = 0;
-
-    for(const [key, data] of Object.entries(batchData)) {
-      await setDoc(doc(window._db, 'partsDB', key), data);
-      saved++;
-      if(saved % 50 === 0) {
-        progress.textContent = `Guardando... ${saved}/${Object.keys(batchData).length}`;
-      }
-    }
-
-    progress.style.background = '#E8F5E9';
-    progress.style.color = '#2E7D32';
-    progress.textContent = `✅ Importação concluída! ${saved} peças guardadas no Firebase.`;
-    showToast('Pack List importado com sucesso!');
-
-    // Clear inputs
-    document.getElementById('importModel').value = '';
-    document.getElementById('importOrderNo').value = '';
-    fileInput.value = '';
-
-  } catch(e) {
-    progress.style.background = '#FFEBEE';
-    progress.style.color = '#C62828';
-    progress.textContent = 'Erro: ' + e.message;
-    console.error(e);
-  }
-}
-
-// ---- QR AUTO-FILL FROM PARTS DB ----
-async function lookupPartFromDB(partNo, lotNo) {
-  if(!partNo) return null;
-  await waitFb();
-  try {
-    const {doc, getDoc} = window._fb;
-    const key = (partNo + '_' + lotNo).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const snap = await getDoc(doc(window._db, 'partsDB', key));
-    if(snap.exists()) return snap.data();
-    // Try without lot (fallback)
-    const snaps = await window._fb.getDocs(
-      window._fb.query(
-        window._fb.collection(window._db, 'partsDB'),
-        window._fb.orderBy('partNo')
-      )
-    );
-    const match = snaps.docs.find(d => d.data().partNo === partNo);
-    return match ? match.data() : null;
-  } catch(e) {
-    console.error('DB lookup error:', e);
-    return null;
-  }
-}
-
-// ---- QR CODE SCANNER ----
-let qrStream = null;
-let qrAnimFrame = null;
-
-async function openQR() {
-  const overlay = document.getElementById('qrOverlay');
-  overlay.classList.add('open');
-  try {
-    qrStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} }
-    });
-    const video = document.getElementById('qrVideo');
-    video.srcObject = qrStream;
-    video.addEventListener('loadedmetadata', () => {
-      video.play();
-      qrAnimFrame = requestAnimationFrame(scanQR);
-    });
-  } catch(e) {
-    showToast('Erro ao aceder a camera: ' + e.message);
-    closeQR();
-  }
-}
-
-function scanQR() {
-  const video = document.getElementById('qrVideo');
-  const canvas = document.getElementById('qrCanvas');
-  if(!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-    qrAnimFrame = requestAnimationFrame(scanQR);
-    return;
-  }
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const code = jsQR(imageData.data, imageData.width, imageData.height, {
-    inversionAttempts: 'dontInvert'
-  });
-  if(code) {
-    handleQRResult(code.data);
-    return;
-  }
-  qrAnimFrame = requestAnimationFrame(scanQR);
-}
-
-async function handleQRResult(data) {
-  console.log('QR data:', data);
-  closeQR();
-  const parts = data.split('&');
-  if(parts.length >= 4) {
-    const orderNo = parts[0].trim();
-    const partNo = parts[1].trim();
-    const qty = parts[2].trim();
-    const lotNo = parts[3].trim();
-    clearForm();
-    document.getElementById('fPartNo').value = partNo;
-    document.getElementById('fLotNo').value = lotNo;
-    if(document.getElementById('fNgQty')) document.getElementById('fNgQty').value = qty;
-    showPage('form');
-    ['nav0','nav1','nav2'].forEach((id,i) => {
-      document.getElementById(id).classList.toggle('active', i===1);
-    });
-    showToast('QR lido! A procurar dados da peça...');
-    // Lookup from partsDB
-    const partData = await lookupPartFromDB(partNo, lotNo);
-    if(partData) {
-      document.getElementById('fPartName').value = partData.partName || '';
-      document.getElementById('fModel').value = partData.model || '';
-      document.getElementById('fOrderNo').value = partData.orderNo || orderNo;
-      showToast('Dados preenchidos automaticamente!');
-    } else {
-      document.getElementById('fOrderNo').value = orderNo;
-      showToast('QR lido! Preencha os dados em falta.');
-    }
-  } else {
-    showToast('Formato QR nao reconhecido: ' + data);
-  }
-}
-
-function closeQR() {
-  document.getElementById('qrOverlay').classList.remove('open');
-  if(qrAnimFrame){ cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
-  if(qrStream){ qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
-}
-
-initAuth();
-</script>
 </body>
 </html>
