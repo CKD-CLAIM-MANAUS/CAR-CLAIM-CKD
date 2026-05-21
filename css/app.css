@@ -432,6 +432,15 @@ img { display: block; max-width: 100%; }
   margin: 0 auto;
 }
 
+/* Força layout desktop acima de 900px */
+@media (min-width: 900px) {
+  .main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
 /* ── Pages ──────────────────────────────────────────────────── */
 .page { display: none; }
 .page.active { display: block; }
