@@ -213,11 +213,13 @@ window.setFilter = (f, el) => {
 
 window.onSearch = () => renderList();
 
-// ── Detail view ───────────────────────────────────────────────
-window.showDetail = (id) => {
-  const inc = incidents.find(i => i.id === id);
-  if (!inc) return;
+// ── Helper: is desktop? ───────────────────────────────────────
+function isDesktop() {
+  return window.innerWidth >= 900;
+}
 
+// ── Build detail HTML ─────────────────────────────────────────
+function buildDetailHTML(inc) {
   const photos = (inc.photos || []).map(p =>
     `<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="openFullscreen('${p.url}')"></div>`
   ).join('');
@@ -227,7 +229,7 @@ window.showDetail = (id) => {
     ? `<button class="btn btn-primary" onclick="doGenerateCAR('${inc.id}')">📄 Gerar CAR Excel</button>`
     : `<div class="car-warning"><strong>Para gerar o CAR falta:</strong> ${missing.join(', ')}</div>`;
 
-  document.getElementById('detailContent').innerHTML = `
+  return `
     <button class="back-btn" onclick="goToList()">
       ${svgIcon('arrow-left')} Voltar
     </button>
@@ -279,8 +281,31 @@ window.showDetail = (id) => {
       <div style="margin-top:12px">${carBlock}</div>
     </div>
   `;
+}
 
-  showPage('detail');
+// ── Detail view ───────────────────────────────────────────────
+window.showDetail = (id) => {
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) return;
+
+  // Marca card seleccionado
+  document.querySelectorAll('.incident-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.incident-card[onclick*="${id}"]`);
+  if (card) card.classList.add('selected');
+
+  const html = buildDetailHTML(inc);
+
+  if (isDesktop()) {
+    // Desktop: mostra no painel direito sem mudar de página
+    const empty   = document.getElementById('desktopDetailEmpty');
+    const content = document.getElementById('desktopDetailContent');
+    if (empty)   empty.style.display   = 'none';
+    if (content) { content.style.display = 'block'; content.innerHTML = html; content.scrollTop = 0; }
+  } else {
+    // Mobile: navega para página de detalhe como antes
+    document.getElementById('detailContent').innerHTML = html;
+    showPage('detail');
+  }
 };
 
 window.doMarkDone = async (id) => {
