@@ -1,148 +1,182 @@
-// ── qr.js ─────────────────────────────────────────────────────
-let qrStream = null;
-let qrAnimFrame = null;
-let qrOpen = false;
-let onResultCallback = null;
+// ── camera.js ─────────────────────────────────────────────────
+// Usa getUserMedia para câmera directa (evita bugs Android com input capture)
 
-// ── Open QR Scanner ───────────────────────────────────────────
-export async function openQR(onResult, onError) {
-  // Prevent double-open
-  if (qrOpen) {
-    closeQR();
-    await new Promise(r => setTimeout(r, 300));
-  }
+let cameraStream = null;
 
-  qrOpen = true;
-  onResultCallback = onResult;
+// ── Compress image before upload ──────────────────────────────
+export async function compressImage(file, maxW = 1600, maxKB = 900) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
 
-  const overlay = document.getElementById('qrOverlay');
-  overlay.classList.add('open');
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
 
-  // Stop any existing stream first
-  stopAllStreams();
+        let quality = 0.82;
+        const encode = () => {
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          const kb = (dataUrl.length * 3 / 4) / 1024;
+          if (kb > maxKB && quality > 0.35) { quality -= 0.1; encode(); return; }
 
-  try {
-    // Request only ONE camera stream
-    let stream;
+          const byteStr = atob(dataUrl.split(',')[1]);
+          const arr = new Uint8Array(byteStr.length);
+          for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
+          const blob = new Blob([arr], { type: 'image/jpeg' });
+          const compFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+          resolve({ dataUrl, compFile });
+        };
+        encode();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Handle files from gallery input ──────────────────────────
+export async function processFiles(files, onPhoto) {
+  for (const file of Array.from(files)) {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width:  { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
+      const { dataUrl, compFile } = await compressImage(file);
+      onPhoto({ url: dataUrl, localPreview: dataUrl, isNew: true, file: compFile });
     } catch {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
+      // fallback sem compressão
+      await new Promise((res) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          onPhoto({ url: ev.target.result, localPreview: ev.target.result, isNew: true, file });
+          res();
+        };
+        reader.readAsDataURL(file);
       });
     }
+  }
+}
 
-    qrStream = stream;
-    const video = document.getElementById('qrVideo');
+// ── Open native camera via getUserMedia ───────────────────────
+export async function openCamera(onCapture, onError) {
+  // Prefer getUserMedia (more reliable on Android)
+  // Falls back to input[capture] if not supported
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    onError(new Error('Camera API not supported'));
+    return;
+  }
 
-    // Clear any previous src
-    video.srcObject = null;
-    video.srcObject = stream;
-
-    await new Promise((res, rej) => {
-      video.onloadedmetadata = () => {
-        video.play().then(res).catch(rej);
-      };
-      video.onerror = rej;
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
     });
 
-    scanLoop(video);
+    // Create camera UI
+    const overlay = createCameraOverlay(cameraStream, async (canvas) => {
+      closeCamera();
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      const byteStr = atob(dataUrl.split(',')[1]);
+      const arr = new Uint8Array(byteStr.length);
+      for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
+      const blob = new Blob([arr], { type: 'image/jpeg' });
+      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const { dataUrl: compUrl, compFile } = await compressImage(file);
+      onCapture({ url: compUrl, localPreview: compUrl, isNew: true, file: compFile });
+    }, () => {
+      closeCamera();
+    });
+
+    document.body.appendChild(overlay);
 
   } catch (e) {
-    qrOpen = false;
-    overlay.classList.remove('open');
+    console.warn('getUserMedia failed:', e.message);
     onError(e);
   }
 }
 
-function scanLoop(video) {
-  const canvas = document.getElementById('qrCanvas');
+function createCameraOverlay(stream, onCapture, onClose) {
+  const overlay = document.createElement('div');
+  overlay.id = 'cameraOverlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: #000; z-index: 500;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  `;
 
-  const tick = () => {
-    if (!qrOpen) return;
-    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-      qrAnimFrame = requestAnimationFrame(tick);
-      return;
-    }
+  const video = document.createElement('video');
+  video.autoplay = true;
+  video.playsInline = true;
+  video.muted = true;
+  video.srcObject = stream;
+  video.style.cssText = 'width: 100%; max-height: 80vh; object-fit: cover;';
 
-    canvas.width  = video.videoWidth;
+  const canvas = document.createElement('canvas');
+  canvas.style.display = 'none';
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display: flex; gap: 20px; padding: 24px; align-items: center;';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '✕';
+  closeBtn.style.cssText = `
+    width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.15);
+    border: none; color: white; font-size: 22px; cursor: pointer;
+  `;
+  closeBtn.onclick = onClose;
+
+  const captureBtn = document.createElement('button');
+  captureBtn.style.cssText = `
+    width: 72px; height: 72px; border-radius: 50%; background: white;
+    border: 4px solid rgba(255,255,255,0.5); cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+  `;
+  captureBtn.onclick = () => {
+    canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    if (typeof jsQR === 'undefined') {
-      qrAnimFrame = requestAnimationFrame(tick);
-      return;
-    }
-
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth'
-    });
-
-    if (code && code.data) {
-      const result = code.data;
-      closeQR();
-      if (onResultCallback) onResultCallback(result);
-      return;
-    }
-
-    qrAnimFrame = requestAnimationFrame(tick);
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    onCapture(canvas);
   };
 
-  qrAnimFrame = requestAnimationFrame(tick);
+  btnRow.appendChild(closeBtn);
+  btnRow.appendChild(captureBtn);
+  overlay.appendChild(video);
+  overlay.appendChild(canvas);
+  overlay.appendChild(btnRow);
+
+  return overlay;
 }
 
-// ── Close QR Scanner ──────────────────────────────────────────
-export function closeQR() {
-  qrOpen = false;
-
-  if (qrAnimFrame) {
-    cancelAnimationFrame(qrAnimFrame);
-    qrAnimFrame = null;
+function closeCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
   }
-
-  stopAllStreams();
-
-  const overlay = document.getElementById('qrOverlay');
-  if (overlay) overlay.classList.remove('open');
-
-  const video = document.getElementById('qrVideo');
-  if (video) video.srcObject = null;
+  const overlay = document.getElementById('cameraOverlay');
+  if (overlay) overlay.remove();
 }
 
-function stopAllStreams() {
-  if (qrStream) {
-    qrStream.getTracks().forEach(t => t.stop());
-    qrStream = null;
-  }
-  // Also stop any orphaned streams on the video element
-  const video = document.getElementById('qrVideo');
-  if (video && video.srcObject) {
-    video.srcObject.getTracks().forEach(t => t.stop());
-    video.srcObject = null;
-  }
-}
+// ── Upload to Cloudinary ──────────────────────────────────────
+export async function uploadPhoto(file) {
+  const cloudName   = 'dos2jsgzg';
+  const uploadPreset = 'Garantia CAR';
 
-// ── Parse QR data ─────────────────────────────────────────────
-export function parseQRData(data) {
-  const parts = data.split('&');
-  if (parts.length >= 4) {
-    return {
-      orderNo: parts[0].trim(),
-      partNo:  parts[1].trim(),
-      qty:     parts[2].trim(),
-      lotNo:   parts[3].trim(),
-    };
-  }
-  return null;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('upload_preset', uploadPreset);
+  fd.append('folder', 'garantia-car');
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body: fd
+  });
+
+  if (!res.ok) throw new Error('Falha no upload da foto');
+  const data = await res.json();
+  return { url: data.secure_url, publicId: data.public_id };
 }
