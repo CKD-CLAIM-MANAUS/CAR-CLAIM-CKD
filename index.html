@@ -85,39 +85,60 @@
   <!-- Main content -->
   <main class="main">
 
-    <!-- ── Page: List ──────────────────────────────────────── -->
+    <!-- ── Page: List (desktop: two-column layout) ───────────── -->
     <div class="page active" id="page-list">
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-value blue" id="statTotal">—</div>
-          <div class="stat-label">Total</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value amber" id="statPending">—</div>
-          <div class="stat-label">Pendentes</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value green" id="statDone">—</div>
-          <div class="stat-label">Concluídos</div>
-        </div>
-      </div>
 
-      <div class="search-bar">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-          <circle cx="9" cy="9" r="6"/><path d="M14 14l3 3"/>
-        </svg>
-        <input type="search" id="searchInput" placeholder="Pesquisar peça, código, modelo..."
-          oninput="onSearch()" autocomplete="off">
-      </div>
+      <!-- Desktop two-column wrapper -->
+      <div class="desktop-layout">
 
-      <div class="filter-chips">
-        <div class="chip active" onclick="setFilter('all', this)">Todos</div>
-        <div class="chip" onclick="setFilter('pending', this)">⏳ Pendentes</div>
-        <div class="chip" onclick="setFilter('done', this)">✅ Concluídos</div>
-      </div>
+        <!-- LEFT: list panel -->
+        <div class="desktop-list-panel">
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-value blue" id="statTotal">—</div>
+              <div class="stat-label">Total</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value amber" id="statPending">—</div>
+              <div class="stat-label">Pendentes</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value green" id="statDone">—</div>
+              <div class="stat-label">Concluídos</div>
+            </div>
+          </div>
 
-      <div class="incident-list" id="incidentList">
-        <div class="loading-state"><div class="spinner"></div> A carregar...</div>
+          <div class="search-bar">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="9" cy="9" r="6"/><path d="M14 14l3 3"/>
+            </svg>
+            <input type="search" id="searchInput" placeholder="Pesquisar peça, código, modelo..."
+              oninput="onSearch()" autocomplete="off">
+          </div>
+
+          <div class="filter-chips">
+            <div class="chip active" onclick="setFilter('all', this)">Todos</div>
+            <div class="chip" onclick="setFilter('pending', this)">⏳ Pendentes</div>
+            <div class="chip" onclick="setFilter('done', this)">✅ Concluídos</div>
+          </div>
+
+          <div class="incident-list" id="incidentList">
+            <div class="loading-state"><div class="spinner"></div> A carregar...</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: detail panel (desktop only) -->
+        <div class="desktop-detail-panel" id="desktopDetailPanel">
+          <div class="desktop-detail-empty" id="desktopDetailEmpty">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2" style="width:48px;height:48px;opacity:0.12;margin-bottom:12px;">
+              <path d="M9 5H7a2 2 0 00-2 2v34a2 2 0 002 2h34a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h26a2 2 0 002-2M9 5a2 2 0 012-2h26a2 2 0 012 2M16 17h16M16 25h16M16 33h8"/>
+            </svg>
+            <div style="font-size:14px;font-weight:600;color:var(--ink-300,rgba(255,255,255,0.4));">Selecciona um incidente</div>
+            <div style="font-size:12px;color:var(--ink-400,rgba(255,255,255,0.25));margin-top:4px;">O detalhe aparece aqui</div>
+          </div>
+          <div id="desktopDetailContent" style="display:none;height:100%;overflow-y:auto;padding:20px;"></div>
+        </div>
+
       </div>
     </div>
 
