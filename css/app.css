@@ -1098,118 +1098,7 @@ img { display: block; max-width: 100%; }
    Mobile não é afectado
 ══════════════════════════════════════════════════════════ */
 
-@media (min-width: 900px) {
 
-  /* App shell — sem limite de largura no desktop */
-  .main {
-    max-width: 100%;
-    padding: 0;
-    padding-bottom: 0;
-  }
-
-  /* Header mais largo */
-  .app-header {
-    padding: 0 28px;
-  }
-
-  /* Esconde bottom nav no desktop */
-  .bottom-nav {
-    display: none;
-  }
-
-  /* Layout duas colunas */
-  .desktop-layout {
-    display: grid;
-    grid-template-columns: 360px 1fr;
-    height: calc(100vh - var(--header-h));
-    overflow: hidden;
-  }
-
-  /* Painel esquerdo — lista */
-  .desktop-list-panel {
-    border-right: 1px solid var(--border);
-    overflow-y: auto;
-    padding: 16px 14px;
-    background: var(--bg-base);
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-md) transparent;
-  }
-
-  .desktop-list-panel::-webkit-scrollbar { width: 5px; }
-  .desktop-list-panel::-webkit-scrollbar-track { background: transparent; }
-  .desktop-list-panel::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 3px; }
-
-  /* Painel direito — detalhe */
-  .desktop-detail-panel {
-    background: var(--bg-deep);
-    overflow: hidden;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* Estado vazio do painel direito */
-  .desktop-detail-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    text-align: center;
-    padding: 40px;
-  }
-
-  /* Detalhe dentro do painel direito */
-  #desktopDetailContent {
-    flex: 1;
-  }
-
-  #desktopDetailContent .back-btn {
-    display: none; /* sem botão voltar no desktop */
-  }
-
-  #desktopDetailContent .detail-header,
-  #desktopDetailContent .form-card {
-    border-radius: var(--radius-md);
-  }
-
-  /* Cards da lista ligeiramente mais compactos no desktop */
-  .incident-card {
-    border-radius: var(--radius-md);
-  }
-
-  /* Card seleccionado na lista */
-  .incident-card.selected {
-    border-color: rgba(59,116,232,0.4);
-    background: var(--bg-hover);
-    box-shadow: inset 0 0 0 1px rgba(59,116,232,0.2);
-  }
-
-  /* Páginas que não são a list ficam centradas como antes */
-  #page-form,
-  #page-detail,
-  #page-excel {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 20px 20px calc(20px);
-  }
-
-  /* No desktop, page-detail é gerido pelo painel direito — esconde a versão mobile */
-  #page-detail {
-    display: none !important;
-  }
-
-  /* Stats mais compactas na lista */
-  .stats-row {
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-
-  .stat-value {
-    font-size: 24px;
-  }
-
-}
 
 
 
@@ -1287,17 +1176,86 @@ img { display: block; max-width: 100%; }
 
 
 /* ── Desktop layout — largura final da lista lateral ───────── */
+
+
+/* ── Desktop layout ─────────────────────────────────────────── */
 @media (min-width: 900px) {
+  .main { max-width: 100%; padding: 0; padding-bottom: 0; }
+  .app-header { padding: 0 28px; }
+  .bottom-nav { display: none; }
+
   .desktop-layout {
+    display: grid;
     grid-template-columns: 1fr 380px;
     grid-template-areas: "detail list";
+    height: calc(100vh - var(--header-h));
+    overflow: hidden;
   }
+
   .desktop-list-panel {
     grid-area: list;
-    border-right: none;
     border-left: 1px solid var(--border);
+    border-right: none;
+    overflow-y: auto;
+    padding: 16px 14px;
+    background: var(--bg-base);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-md) transparent;
   }
+
+  .desktop-list-panel::-webkit-scrollbar { width: 5px; }
+  .desktop-list-panel::-webkit-scrollbar-track { background: transparent; }
+  .desktop-list-panel::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 3px; }
+
   .desktop-detail-panel {
     grid-area: detail;
+    background: var(--bg-deep);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
   }
+
+  .desktop-detail-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 40px;
+  }
+
+  #desktopDetailContent { flex: 1; }
+  #desktopDetailContent .back-btn { display: none; }
+
+  .incident-card.selected {
+    border-color: rgba(59,116,232,0.4);
+    background: var(--bg-hover);
+    box-shadow: inset 0 0 0 1px rgba(59,116,232,0.2);
+  }
+
+  #page-form, #page-excel {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  #page-detail { display: none !important; }
+
+  #desktopDetailContent .detail-title { font-size: 22px; }
+  #desktopDetailContent .detail-subtitle { font-size: 13px; }
+  #desktopDetailContent .detail-row { font-size: 14px; padding: 12px 0; }
+  #desktopDetailContent .detail-text { font-size: 14px; line-height: 1.7; }
+  #desktopDetailContent .badge { font-size: 12px; padding: 4px 12px; }
+  #desktopDetailContent .photo-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+  #desktopDetailContent .btn { font-size: 14px; padding: 12px 20px; min-height: 46px; }
+  #desktopDetailContent .form-card { padding: 20px; margin-bottom: 14px !important; }
+  #desktopDetailContent .detail-header { padding: 20px; margin-bottom: 14px; }
+
+  .desktop-list-panel .stat-value { font-size: 20px; }
+  .desktop-list-panel .stat-card { padding: 10px 6px; }
+  .desktop-list-panel .stat-label { font-size: 9px; }
+
+  .form-grid { grid-template-columns: 1fr 1fr; }
 }
