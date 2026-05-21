@@ -136,9 +136,16 @@ window.doCreateUser = async () => {
 };
 
 // ── Navigation ────────────────────────────────────────────────
-window.goToList  = () => { showPage('list');   loadAndRender(); };
-window.goToForm  = () => { clearForm(); showPage('form'); };
-window.goToExcel = () => { showPage('excel');  updateExcelStats(); };
+// ── Desktop nav tab sync ──────────────────────────────────────
+function setDesktopTab(tabId) {
+  document.querySelectorAll('.desktop-nav-tab').forEach(t => t.classList.remove('active'));
+  const tab = document.getElementById('dnt-' + tabId);
+  if (tab) tab.classList.add('active');
+}
+
+window.goToList  = () => { showPage('list');  setDesktopTab('list');  loadAndRender(); };
+window.goToForm  = () => { clearForm(); showPage('form'); setDesktopTab('form'); };
+window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); updateExcelStats(); };
 
 // ── Load & Render list ────────────────────────────────────────
 async function loadAndRender() {
