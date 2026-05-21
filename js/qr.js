@@ -2,21 +2,27 @@
 let qrStream = null;
 let qrAnimFrame = null;
 let qrOpen = false;
-
-export function initQR() {
-  // jsQR is loaded via script tag in index.html
-}
+let onResultCallback = null;
 
 // ── Open QR Scanner ───────────────────────────────────────────
 export async function openQR(onResult, onError) {
-  if (qrOpen) return;
+  // Prevent double-open
+  if (qrOpen) {
+    closeQR();
+    await new Promise(r => setTimeout(r, 300));
+  }
+
   qrOpen = true;
+  onResultCallback = onResult;
 
   const overlay = document.getElementById('qrOverlay');
   overlay.classList.add('open');
 
+  // Stop any existing stream first
+  stopAllStreams();
+
   try {
-    // Try rear camera first, fall back to any camera
+    // Request only ONE camera stream
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -24,21 +30,31 @@ export async function openQR(onResult, onError) {
           facingMode: { ideal: 'environment' },
           width:  { ideal: 1280 },
           height: { ideal: 720 }
-        }
+        },
+        audio: false
       });
     } catch {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
     }
 
     qrStream = stream;
     const video = document.getElementById('qrVideo');
+
+    // Clear any previous src
+    video.srcObject = null;
     video.srcObject = stream;
 
-    await new Promise(res => {
-      video.onloadedmetadata = () => { video.play(); res(); };
+    await new Promise((res, rej) => {
+      video.onloadedmetadata = () => {
+        video.play().then(res).catch(rej);
+      };
+      video.onerror = rej;
     });
 
-    scanLoop(video, onResult);
+    scanLoop(video);
 
   } catch (e) {
     qrOpen = false;
@@ -47,7 +63,7 @@ export async function openQR(onResult, onError) {
   }
 }
 
-function scanLoop(video, onResult) {
+function scanLoop(video) {
   const canvas = document.getElementById('qrCanvas');
 
   const tick = () => {
@@ -64,7 +80,6 @@ function scanLoop(video, onResult) {
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    // jsQR must be loaded globally
     if (typeof jsQR === 'undefined') {
       qrAnimFrame = requestAnimationFrame(tick);
       return;
@@ -75,8 +90,9 @@ function scanLoop(video, onResult) {
     });
 
     if (code && code.data) {
+      const result = code.data;
       closeQR();
-      onResult(code.data);
+      if (onResultCallback) onResultCallback(result);
       return;
     }
 
@@ -95,17 +111,29 @@ export function closeQR() {
     qrAnimFrame = null;
   }
 
+  stopAllStreams();
+
+  const overlay = document.getElementById('qrOverlay');
+  if (overlay) overlay.classList.remove('open');
+
+  const video = document.getElementById('qrVideo');
+  if (video) video.srcObject = null;
+}
+
+function stopAllStreams() {
   if (qrStream) {
     qrStream.getTracks().forEach(t => t.stop());
     qrStream = null;
   }
-
-  const overlay = document.getElementById('qrOverlay');
-  if (overlay) overlay.classList.remove('open');
+  // Also stop any orphaned streams on the video element
+  const video = document.getElementById('qrVideo');
+  if (video && video.srcObject) {
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+  }
 }
 
 // ── Parse QR data ─────────────────────────────────────────────
-// Format: orderNo&partNo&qty&lotNo
 export function parseQRData(data) {
   const parts = data.split('&');
   if (parts.length >= 4) {
