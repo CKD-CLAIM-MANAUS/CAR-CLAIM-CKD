@@ -1210,3 +1210,87 @@ img { display: block; max-width: 100%; }
   }
 
 }
+
+/* ── Correcção desktop — detalhe maior, lista à direita ─────── */
+@media (min-width: 900px) {
+
+  /* Inverte colunas: detalhe à esquerda (maior), lista à direita */
+  .desktop-layout {
+    grid-template-columns: 1fr 320px;
+    grid-template-areas: "detail list";
+  }
+
+  .desktop-list-panel {
+    grid-area: list;
+    border-right: none;
+    border-left: 1px solid var(--border);
+  }
+
+  .desktop-detail-panel {
+    grid-area: detail;
+  }
+
+  /* Texto maior no painel de detalhe */
+  #desktopDetailContent .detail-title {
+    font-size: 22px;
+  }
+
+  #desktopDetailContent .detail-subtitle {
+    font-size: 13px;
+  }
+
+  #desktopDetailContent .detail-row {
+    font-size: 14px;
+    padding: 12px 0;
+  }
+
+  #desktopDetailContent .detail-text {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  #desktopDetailContent .form-card-title {
+    font-size: 11px;
+    margin-bottom: 16px;
+  }
+
+  #desktopDetailContent .badge {
+    font-size: 12px;
+    padding: 4px 12px;
+  }
+
+  #desktopDetailContent .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+  }
+
+  #desktopDetailContent .btn {
+    font-size: 14px;
+    padding: 12px 20px;
+    min-height: 46px;
+  }
+
+  #desktopDetailContent .form-card {
+    padding: 20px;
+    margin-bottom: 14px !important;
+  }
+
+  #desktopDetailContent .detail-header {
+    padding: 20px;
+    margin-bottom: 14px;
+  }
+
+  /* Stats na lista lateral mais compactas */
+  .desktop-list-panel .stat-value {
+    font-size: 20px;
+  }
+
+  .desktop-list-panel .stat-card {
+    padding: 10px 6px;
+  }
+
+  .desktop-list-panel .stat-label {
+    font-size: 9px;
+  }
+
+}
