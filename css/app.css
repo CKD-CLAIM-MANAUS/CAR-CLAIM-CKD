@@ -1301,3 +1301,10 @@ img { display: block; max-width: 100%; }
     grid-template-columns: 1fr 360px;
   }
 }
+
+/* ── Ajuste final largura lista lateral 240px ───────────────── */
+@media (min-width: 900px) {
+  .desktop-layout {
+    grid-template-columns: 1fr 240px;
+  }
+}
