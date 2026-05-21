@@ -6,7 +6,6 @@ let onResultCallback = null;
 
 // ── Open QR Scanner ───────────────────────────────────────────
 export async function openQR(onResult, onError) {
-  // Prevent double-open
   if (qrOpen) {
     closeQR();
     await new Promise(r => setTimeout(r, 300));
@@ -18,39 +17,31 @@ export async function openQR(onResult, onError) {
   const overlay = document.getElementById('qrOverlay');
   overlay.classList.add('open');
 
-  // Stop any existing stream first
   stopAllStreams();
 
   try {
-    // Request only ONE camera stream
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
-          width:  { ideal: 1280 },
-          height: { ideal: 720 }
+          width:  { ideal: 640 },   // Resolução menor = scan mais rápido
+          height: { ideal: 480 },
+          frameRate: { ideal: 30 }
         },
         audio: false
       });
     } catch {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     }
 
     qrStream = stream;
     const video = document.getElementById('qrVideo');
-
-    // Clear any previous src
     video.srcObject = null;
     video.srcObject = stream;
 
     await new Promise((res, rej) => {
-      video.onloadedmetadata = () => {
-        video.play().then(res).catch(rej);
-      };
+      video.onloadedmetadata = () => { video.play().then(res).catch(rej); };
       video.onerror = rej;
     });
 
@@ -63,9 +54,11 @@ export async function openQR(onResult, onError) {
   }
 }
 
-function scanLoop(video) {
-  const canvas = document.getElementById('qrCanvas');
+// ── Scan loop — corre a cada frame mas só processa 1 em cada 3 ─
+let frameCount = 0;
+const canvas = document.createElement('canvas');  // canvas reutilizável fora do DOM
 
+function scanLoop(video) {
   const tick = () => {
     if (!qrOpen) return;
     if (video.readyState !== video.HAVE_ENOUGH_DATA) {
@@ -73,12 +66,23 @@ function scanLoop(video) {
       return;
     }
 
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+    // Só processa 1 em cada 3 frames para não bloquear o UI
+    frameCount++;
+    if (frameCount % 3 !== 0) {
+      qrAnimFrame = requestAnimationFrame(tick);
+      return;
+    }
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // Usa resolução reduzida para jsQR (mais rápido)
+    const scanW = Math.min(video.videoWidth,  640);
+    const scanH = Math.min(video.videoHeight, 480);
+    canvas.width  = scanW;
+    canvas.height = scanH;
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, scanW, scanH);
+
+    const imageData = ctx.getImageData(0, 0, scanW, scanH);
 
     if (typeof jsQR === 'undefined') {
       qrAnimFrame = requestAnimationFrame(tick);
@@ -86,7 +90,7 @@ function scanLoop(video) {
     }
 
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth'
+      inversionAttempts: 'dontInvert'  // Mais rápido — QR codes normais não precisam inversão
     });
 
     if (code && code.data) {
@@ -102,9 +106,10 @@ function scanLoop(video) {
   qrAnimFrame = requestAnimationFrame(tick);
 }
 
-// ── Close QR Scanner ──────────────────────────────────────────
+// ── Close ─────────────────────────────────────────────────────
 export function closeQR() {
   qrOpen = false;
+  frameCount = 0;
 
   if (qrAnimFrame) {
     cancelAnimationFrame(qrAnimFrame);
@@ -125,7 +130,6 @@ function stopAllStreams() {
     qrStream.getTracks().forEach(t => t.stop());
     qrStream = null;
   }
-  // Also stop any orphaned streams on the video element
   const video = document.getElementById('qrVideo');
   if (video && video.srcObject) {
     video.srcObject.getTracks().forEach(t => t.stop());
@@ -133,7 +137,7 @@ function stopAllStreams() {
   }
 }
 
-// ── Parse QR data ─────────────────────────────────────────────
+// ── Parse QR data — formato: orderNo&partNo&qty&lotNo ─────────
 export function parseQRData(data) {
   const parts = data.split('&');
   if (parts.length >= 4) {
