@@ -20,10 +20,11 @@
 <!-- ══════════════════════════════════════════════════════════
      AUTH SCREEN
 ═══════════════════════════════════════════════════════════ -->
-<div id="authScreen" style="display:flex">
-  <div class="auth-screen">
+<div id="authScreen" style="display:flex; min-height:100vh; align-items:center; justify-content:center; background:var(--bg-base, #060E1A); background-image:radial-gradient(ellipse at 30% 40%, rgba(26,86,204,0.15) 0%, transparent 60%);">
+  <div style="width:100%; max-width:400px; padding:20px;">
     <div class="auth-card">
 
+      <!-- Brand -->
       <div class="auth-brand">
         <img class="auth-logo" src="logo.png" alt="CFMOTO">
         <div class="auth-brand-divider"></div>
@@ -33,51 +34,25 @@
         </div>
       </div>
 
-      <div class="auth-tabs">
-        <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Entrar</button>
-        <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Criar conta</button>
-      </div>
-
       <div class="auth-error" id="authError"></div>
 
       <!-- Login Form -->
-      <div id="loginForm">
-        <div class="field">
-          <label class="field-label">Email</label>
-          <input class="field-input" type="email" id="loginEmail" placeholder="seu@email.com"
-            onkeydown="if(event.key==='Enter')doLogin()" autocomplete="email">
-        </div>
-        <div class="field">
-          <label class="field-label">Senha</label>
-          <input class="field-input" type="password" id="loginPass" placeholder="••••••••"
-            onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
-        </div>
-        <button class="btn btn-primary btn-lg btn-full" id="loginBtn" onclick="doLogin()">
-          Entrar
-        </button>
+      <div class="field">
+        <label class="field-label">Email</label>
+        <input class="field-input" type="email" id="loginEmail" placeholder="seu@email.com"
+          onkeydown="if(event.key==='Enter')doLogin()" autocomplete="email">
       </div>
+      <div class="field">
+        <label class="field-label">Senha</label>
+        <input class="field-input" type="password" id="loginPass" placeholder="••••••••"
+          onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary btn-lg btn-full" id="loginBtn" onclick="doLogin()">
+        Entrar
+      </button>
 
-      <!-- Register Form -->
-      <div id="registerForm" style="display:none">
-        <div class="field">
-          <label class="field-label">Nome completo</label>
-          <input class="field-input" type="text" id="regName" placeholder="Seu nome" autocomplete="name">
-        </div>
-        <div class="field">
-          <label class="field-label">Email</label>
-          <input class="field-input" type="email" id="regEmail" placeholder="seu@email.com" autocomplete="email">
-        </div>
-        <div class="field">
-          <label class="field-label">Senha</label>
-          <input class="field-input" type="password" id="regPass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-        </div>
-        <div class="field">
-          <label class="field-label">Confirmar senha</label>
-          <input class="field-input" type="password" id="regPass2" placeholder="Repetir senha" autocomplete="new-password">
-        </div>
-        <button class="btn btn-primary btn-lg btn-full" id="registerBtn" onclick="doRegister()">
-          Criar conta
-        </button>
+      <div style="margin-top:16px; text-align:center; font-size:12px; color:var(--ink-400, rgba(255,255,255,0.25));">
+        Acesso restrito · Contacte o administrador para obter acesso
       </div>
 
     </div>
@@ -421,7 +396,48 @@
         <div style="margin-top:5px" id="modalRole"></div>
       </div>
     </div>
+    <div id="adminUserBtn" style="display:none; margin-bottom:10px;">
+      <button class="btn btn-full" onclick="closeUserModal(); openUsersModal()" style="justify-content:center;">
+        👥 Gerir utilizadores
+      </button>
+    </div>
     <button class="btn btn-danger btn-full" onclick="doLogout()">🚪 Sair da conta</button>
+  </div>
+</div>
+
+<!-- Users Management Modal (admin only) -->
+<div class="modal-overlay" id="usersModal" onclick="closeUsersModal(event)">
+  <div class="modal" style="max-height:90vh; overflow-y:auto;">
+    <div class="modal-handle"></div>
+    <div class="modal-title">👥 Gerir utilizadores</div>
+    <div class="modal-sub">Criar e gerir acessos à app</div>
+
+    <!-- Create user form -->
+    <div style="background:var(--bg-card,#0D1E35); border-radius:12px; padding:14px; margin-bottom:16px; border:1px solid var(--border,rgba(255,255,255,0.07));">
+      <div style="font-size:11px; font-weight:700; color:var(--blue-400,#3B74E8); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:12px;">Novo utilizador</div>
+      <div class="field">
+        <label class="field-label">Nome completo</label>
+        <input class="field-input" type="text" id="newUserName" placeholder="Ex: João Silva">
+      </div>
+      <div class="field">
+        <label class="field-label">Email</label>
+        <input class="field-input" type="email" id="newUserEmail" placeholder="joao@cfmoto.com">
+      </div>
+      <div class="field">
+        <label class="field-label">Senha temporária</label>
+        <input class="field-input" type="text" id="newUserPass" placeholder="Min. 6 caracteres">
+      </div>
+      <div id="createUserError" style="font-size:12px; color:#FF6B6B; margin-bottom:10px; display:none;"></div>
+      <button class="btn btn-primary btn-full" id="createUserBtn" onclick="doCreateUser()">
+        ➕ Criar utilizador
+      </button>
+    </div>
+
+    <!-- Users list -->
+    <div style="font-size:11px; font-weight:700; color:var(--ink-300,rgba(255,255,255,0.4)); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px;">Utilizadores activos</div>
+    <div id="usersList">
+      <div class="loading-state"><div class="spinner"></div> A carregar...</div>
+    </div>
   </div>
 </div>
 
