@@ -119,27 +119,37 @@ function renderList() {
     return;
   }
 
-  el.innerHTML = list.map(inc => `
+  el.innerHTML = list.map(inc => {
+    const firstPhoto = inc.photos && inc.photos.length ? inc.photos[0].url : null;
+    const photoCount = inc.photos ? inc.photos.length : 0;
+    const thumb = firstPhoto
+      ? `<div class="incident-thumb">
+           <img src="${firstPhoto}" loading="lazy" alt="">
+           ${photoCount > 1 ? `<div class="photo-count-pill">${photoCount}</div>` : ''}
+         </div>`
+      : `<div class="incident-thumb-empty">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+             <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+             <circle cx="12" cy="13" r="4"/>
+           </svg>
+         </div>`;
+    return `
     <div class="incident-card ${inc.status || 'pending'}" onclick="showDetail('${inc.id}')">
-      <div class="incident-card-top">
+      ${thumb}
+      <div class="incident-info">
         <div>
           <div class="incident-name">${inc.partName || '—'}</div>
           <div class="incident-code">${inc.partNo || ''}</div>
         </div>
-        <span class="badge ${inc.status === 'done' ? 'badge-done' : 'badge-pending'}">
-          ${inc.status === 'done' ? '✓ Concluído' : '⏳ Pendente'}
-        </span>
+        <div class="incident-footer">
+          <span class="incident-meta">${inc.model || '—'} · ${fmtDate(inc.createdAt)}</span>
+          <span class="badge ${inc.status === 'done' ? 'badge-done' : 'badge-pending'}">
+            ${inc.status === 'done' ? '✓ Concluído' : '⏳ Pendente'}
+          </span>
+        </div>
       </div>
-      <div class="incident-meta">
-        <span class="incident-meta-item">${svgIcon('car')} ${inc.model || '—'}</span>
-        <span class="incident-meta-item">${svgIcon('calendar')} ${fmtDate(inc.createdAt)}</span>
-        <span class="incident-meta-item">${svgIcon('user')} ${(inc.user || '').split(' ')[0]}</span>
-      </div>
-      ${inc.photos && inc.photos.length
-        ? `<div class="photo-count-badge">${svgIcon('camera')} ${inc.photos.length} foto${inc.photos.length > 1 ? 's' : ''}</div>`
-        : ''}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 window.setFilter = (f, el) => {
