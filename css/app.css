@@ -1294,3 +1294,10 @@ img { display: block; max-width: 100%; }
   }
 
 }
+
+/* ── Ajuste largura lista lateral desktop ───────────────────── */
+@media (min-width: 900px) {
+  .desktop-layout {
+    grid-template-columns: 1fr 360px;
+  }
+}
