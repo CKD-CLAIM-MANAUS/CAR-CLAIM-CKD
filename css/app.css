@@ -1211,20 +1211,7 @@ img { display: block; max-width: 100%; }
 
 }
 
-/* ── Correcção desktop — detalhe maior, lista à direita ─────── */
-@media (min-width: 900px) {
 
-  /* Inverte colunas: detalhe à esquerda (maior), lista à direita */
-  .desktop-layout {
-    grid-template-columns: 1fr 320px;
-    grid-template-areas: "detail list";
-  }
-
-  .desktop-list-panel {
-    grid-area: list;
-    border-right: none;
-    border-left: 1px solid var(--border);
-  }
 
   .desktop-detail-panel {
     grid-area: detail;
@@ -1295,16 +1282,22 @@ img { display: block; max-width: 100%; }
 
 }
 
-/* ── Ajuste largura lista lateral desktop ───────────────────── */
-@media (min-width: 900px) {
-  .desktop-layout {
-    grid-template-columns: 1fr 360px;
-  }
-}
 
-/* ── Ajuste final largura lista lateral 240px ───────────────── */
+
+
+
+/* ── Desktop layout — largura final da lista lateral ───────── */
 @media (min-width: 900px) {
   .desktop-layout {
-    grid-template-columns: 1fr 240px;
+    grid-template-columns: 1fr 380px;
+    grid-template-areas: "detail list";
+  }
+  .desktop-list-panel {
+    grid-area: list;
+    border-right: none;
+    border-left: 1px solid var(--border);
+  }
+  .desktop-detail-panel {
+    grid-area: detail;
   }
 }
