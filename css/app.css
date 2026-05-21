@@ -1114,7 +1114,7 @@ img { display: block; max-width: 100%; }
 
   .desktop-layout {
     display: grid;
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: 1fr 480px;
     grid-template-areas: "detail list";
     height: calc(100vh - var(--header-h));
     overflow: hidden;
