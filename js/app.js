@@ -1,11 +1,11 @@
 // ── app.js ────────────────────────────────────────────────────
-import { initAuth, login, register, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
+import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
 import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
 import { importPackList } from './packList.js';
-import { showToast, showPage, openFullscreen, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, switchAuthTab } from './ui.js';
+import { showToast, showPage, openFullscreen, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading } from './ui.js';
 
 // ── State ─────────────────────────────────────────────────────
 let currentFilter = 'all';
@@ -15,19 +15,22 @@ let editingId     = null;
 // ── Auth ──────────────────────────────────────────────────────
 initAuth(
   (user, admin) => {
-    // On login
-    const initials = getUserInitials(user);
+    const initials  = getUserInitials(user);
     const firstName = getUserFirstName(user);
 
-    document.getElementById('userAvatar').textContent  = initials;
+    document.getElementById('userAvatar').textContent     = initials;
     document.getElementById('userAvatarName').textContent = firstName;
     document.getElementById('adminBadge').style.display   = admin ? 'inline' : 'none';
-    document.getElementById('modalAvatar').textContent = initials;
-    document.getElementById('modalName').textContent   = user.displayName || user.email;
-    document.getElementById('modalEmail').textContent  = user.email;
-    document.getElementById('modalRole').innerHTML     = admin
+    document.getElementById('modalAvatar').textContent    = initials;
+    document.getElementById('modalName').textContent      = user.displayName || user.email;
+    document.getElementById('modalEmail').textContent     = user.email;
+    document.getElementById('modalRole').innerHTML        = admin
       ? '<span class="admin-badge">👑 ADMIN</span>'
       : '<span style="font-size:12px;color:var(--ink-300)">Utilizador</span>';
+
+    // Mostra botão de gerir utilizadores só para admin
+    const adminBtn = document.getElementById('adminUserBtn');
+    if (adminBtn) adminBtn.style.display = admin ? 'block' : 'none';
 
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('appScreen').classList.add('visible');
@@ -35,15 +38,12 @@ initAuth(
     loadAndRender();
   },
   () => {
-    // On logout
     document.getElementById('authScreen').style.display = 'flex';
     document.getElementById('appScreen').classList.remove('visible');
   }
 );
 
-// ── Auth form handlers ────────────────────────────────────────
-window.switchAuthTab = switchAuthTab;
-
+// ── Login — guarda senha para restaurar sessão admin após criar user ──
 window.doLogin = async () => {
   hideAuthError();
   const email = document.getElementById('loginEmail').value.trim();
@@ -51,24 +51,10 @@ window.doLogin = async () => {
   setAuthLoading('loginBtn', true, 'Entrar');
   try {
     await login(email, pass);
+    sessionStorage.setItem('_ap', pass); // guarda para restaurar sessão admin
   } catch (e) {
     showAuthError(e.message);
     setAuthLoading('loginBtn', false, 'Entrar');
-  }
-};
-
-window.doRegister = async () => {
-  hideAuthError();
-  const name  = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const pass  = document.getElementById('regPass').value;
-  const pass2 = document.getElementById('regPass2').value;
-  setAuthLoading('registerBtn', true, 'Criar conta');
-  try {
-    await register(name, email, pass, pass2);
-  } catch (e) {
-    showAuthError(e.message);
-    setAuthLoading('registerBtn', false, 'Criar conta');
   }
 };
 
@@ -81,6 +67,72 @@ window.doLogout = async () => {
 window.openUserModal  = () => openModal('userModal');
 window.closeUserModal = (e) => {
   if (!e || e.target === document.getElementById('userModal')) closeModal('userModal');
+};
+
+// ── Users management modal ────────────────────────────────────
+window.openUsersModal = async () => {
+  openModal('usersModal');
+  await renderUsersList();
+};
+
+window.closeUsersModal = (e) => {
+  if (!e || e.target === document.getElementById('usersModal')) closeModal('usersModal');
+};
+
+async function renderUsersList() {
+  const el = document.getElementById('usersList');
+  if (!el) return;
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    const users = await loadUsers();
+    if (!users.length) {
+      el.innerHTML = '<div style="font-size:13px;color:var(--ink-300);text-align:center;padding:16px;">Nenhum utilizador</div>';
+      return;
+    }
+    el.innerHTML = users.map(u => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-card,#0D1E35);border-radius:10px;margin-bottom:8px;border:1px solid var(--border,rgba(255,255,255,0.07));">
+        <div style="width:36px;height:36px;background:var(--blue-500,#1A56CC);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;flex-shrink:0;">
+          ${(u.name || u.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2)}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:var(--ink-100,rgba(255,255,255,0.88));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name || '—'}</div>
+          <div style="font-size:11px;color:var(--ink-300,rgba(255,255,255,0.4));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.email || ''}</div>
+        </div>
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${u.role === 'admin' ? 'rgba(255,179,0,0.15)' : 'var(--blue-50,#111E38)'};color:${u.role === 'admin' ? '#FFB300' : 'var(--blue-300,#6B9BF0)'};">
+          ${u.role === 'admin' ? '👑 Admin' : 'User'}
+        </span>
+      </div>
+    `).join('');
+  } catch {
+    el.innerHTML = '<div style="font-size:13px;color:#FF6B6B;padding:10px;">Erro ao carregar utilizadores.</div>';
+  }
+}
+
+window.doCreateUser = async () => {
+  const name  = document.getElementById('newUserName').value.trim();
+  const email = document.getElementById('newUserEmail').value.trim();
+  const pass  = document.getElementById('newUserPass').value.trim();
+  const errEl = document.getElementById('createUserError');
+  const btn   = document.getElementById('createUserBtn');
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = '⏳ A criar...';
+
+  try {
+    await createUser(name, email, pass);
+    document.getElementById('newUserName').value  = '';
+    document.getElementById('newUserEmail').value = '';
+    document.getElementById('newUserPass').value  = '';
+    showToast(`✅ ${name} adicionado com sucesso!`);
+    await renderUsersList();
+  } catch (e) {
+    errEl.textContent    = e.message;
+    errEl.style.display  = 'block';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '➕ Criar utilizador';
 };
 
 // ── Navigation ────────────────────────────────────────────────
