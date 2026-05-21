@@ -1095,91 +1095,10 @@ img { display: block; max-width: 100%; }
 
 /* ══════════════════════════════════════════════════════════
    DESKTOP LAYOUT — só activo em ecrãs ≥ 900px
-   Mobile não é afectado
+   Mobile fica 100% igual
 ══════════════════════════════════════════════════════════ */
-
-
-
-
-
-  .desktop-detail-panel {
-    grid-area: detail;
-  }
-
-  /* Texto maior no painel de detalhe */
-  #desktopDetailContent .detail-title {
-    font-size: 22px;
-  }
-
-  #desktopDetailContent .detail-subtitle {
-    font-size: 13px;
-  }
-
-  #desktopDetailContent .detail-row {
-    font-size: 14px;
-    padding: 12px 0;
-  }
-
-  #desktopDetailContent .detail-text {
-    font-size: 14px;
-    line-height: 1.7;
-  }
-
-  #desktopDetailContent .form-card-title {
-    font-size: 11px;
-    margin-bottom: 16px;
-  }
-
-  #desktopDetailContent .badge {
-    font-size: 12px;
-    padding: 4px 12px;
-  }
-
-  #desktopDetailContent .photo-grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 10px;
-  }
-
-  #desktopDetailContent .btn {
-    font-size: 14px;
-    padding: 12px 20px;
-    min-height: 46px;
-  }
-
-  #desktopDetailContent .form-card {
-    padding: 20px;
-    margin-bottom: 14px !important;
-  }
-
-  #desktopDetailContent .detail-header {
-    padding: 20px;
-    margin-bottom: 14px;
-  }
-
-  /* Stats na lista lateral mais compactas */
-  .desktop-list-panel .stat-value {
-    font-size: 20px;
-  }
-
-  .desktop-list-panel .stat-card {
-    padding: 10px 6px;
-  }
-
-  .desktop-list-panel .stat-label {
-    font-size: 9px;
-  }
-
-}
-
-
-
-
-
-/* ── Desktop layout — largura final da lista lateral ───────── */
-
-
-/* ── Desktop layout ─────────────────────────────────────────── */
 @media (min-width: 900px) {
+
   .main { max-width: 100%; padding: 0; padding-bottom: 0; }
   .app-header { padding: 0 28px; }
   .bottom-nav { display: none; }
@@ -1235,12 +1154,7 @@ img { display: block; max-width: 100%; }
     box-shadow: inset 0 0 0 1px rgba(59,116,232,0.2);
   }
 
-  #page-form, #page-excel {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 20px;
-  }
-
+  #page-form, #page-excel { max-width: 680px; margin: 0 auto; padding: 20px; }
   #page-detail { display: none !important; }
 
   #desktopDetailContent .detail-title { font-size: 22px; }
