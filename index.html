@@ -75,6 +75,23 @@
         <div class="header-brand-sub">CFMOTO da Amazônia</div>
       </div>
     </div>
+
+    <!-- Desktop nav tabs (escondidas no mobile) -->
+    <nav class="desktop-nav-tabs" id="desktopNavTabs">
+      <button class="desktop-nav-tab active" id="dnt-list" onclick="goToList()">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Incidentes
+      </button>
+      <button class="desktop-nav-tab" id="dnt-form" onclick="goToForm()">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="8"/><path d="M10 7v6M7 10h6"/></svg>
+        Novo
+      </button>
+      <button class="desktop-nav-tab" id="dnt-excel" onclick="goToExcel()">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 17v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2a2 2 0 002-2zM13 4v13M9 4h8"/></svg>
+        Relatório
+      </button>
+    </nav>
+
     <div class="user-chip" onclick="openUserModal()">
       <div class="user-avatar" id="userAvatar">?</div>
       <span class="user-name" id="userAvatarName">...</span>
