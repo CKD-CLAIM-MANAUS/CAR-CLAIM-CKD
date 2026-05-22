@@ -144,8 +144,20 @@ function setDesktopTab(tabId) {
 }
 
 window.goToList  = () => { showPage('list');  setDesktopTab('list');  loadAndRender(); checkForDraft(); };
-window.goToForm  = () => { clearForm(); showPage('form'); setDesktopTab('form'); startDraftTimer(); };
+window.goToForm  = () => { clearForm(); showPage('form'); setDesktopTab('form'); startDraftTimer(); attachDraftListeners(); };
 window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); updateExcelStats(); };
+
+// ── Listeners para guardar rascunho ao digitar ────────────────
+function attachDraftListeners() {
+  const fields = ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', saveDraft);
+      el.addEventListener('change', saveDraft);
+    }
+  });
+}
 
 // ── Load & Render list ────────────────────────────────────────
 async function loadAndRender() {
@@ -382,7 +394,9 @@ function saveDraft() {
 
 function startDraftTimer() {
   stopDraftTimer();
-  draftTimer = setInterval(saveDraft, 30000); // a cada 30 segundos
+  // Guarda imediatamente e depois a cada 5 segundos
+  saveDraft();
+  draftTimer = setInterval(saveDraft, 5000);
 }
 
 function stopDraftTimer() {
@@ -597,6 +611,8 @@ function renderPhotoGrid() {
       <button class="photo-thumb-del" onclick="removePhoto(${i}, event)">✕</button>
     </div>
   `).join('');
+  // Guarda rascunho sempre que fotos mudam
+  if (draftTimer !== null) saveDraft();
 }
 
 // Paste photos
