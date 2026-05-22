@@ -1,7 +1,6 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v7';
+const CACHE_NAME = 'car-garantia-v8';
 
-// Ficheiros essenciais para funcionar offline
 const STATIC_ASSETS = [
   '/CAR-CLAIM-CKD/',
   '/CAR-CLAIM-CKD/index.html',
@@ -19,31 +18,35 @@ const STATIC_ASSETS = [
   '/CAR-CLAIM-CKD/manifest.json',
 ];
 
-// ── Install — guarda assets em cache ─────────────────────────
+// ── Install ───────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
   );
 });
 
-// ── Activate — limpa caches antigos ──────────────────────────
+// ── Activate — limpa caches antigos e notifica clientes ───────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      );
-    }).then(() => self.clients.claim())
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    ).then(() => {
+      self.clients.claim();
+      // Notifica todos os clientes que há uma nova versão
+      self.clients.matchAll({ type: 'window' }).then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+      });
+    })
   );
 });
 
-// ── Fetch — serve do cache, actualiza em background ──────────
+// ── Fetch — cache first, actualiza em background ──────────────
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Firebase, Cloudinary, CDNs — sempre da rede
+  // Serviços externos — sempre da rede
   if (
     url.hostname.includes('firebase') ||
     url.hostname.includes('firestore') ||
@@ -57,17 +60,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Assets estáticos — cache first, actualiza em background
+  // Assets estáticos — cache first
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request).then((response) => {
+    caches.match(event.request).then(cached => {
+      const fetchPromise = fetch(event.request).then(response => {
         if (response && response.status === 200) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
       }).catch(() => cached);
-
       return cached || fetchPromise;
     })
   );
