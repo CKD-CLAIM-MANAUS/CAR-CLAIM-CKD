@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v8';
+const CACHE_NAME = 'car-garantia-v9';
 
 const STATIC_ASSETS = [
   '/CAR-CLAIM-CKD/',
@@ -23,7 +23,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting())
+    // SEM skipWaiting() — o SW novo fica em espera até o utilizador confirmar
   );
 });
 
@@ -34,12 +34,19 @@ self.addEventListener('activate', (event) => {
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => {
       self.clients.claim();
-      // Notifica todos os clientes que há uma nova versão
+      // Notifica clientes que há update disponível
       self.clients.matchAll({ type: 'window' }).then(clients => {
         clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
       });
     })
   );
+});
+
+// ── Mensagem do cliente para aplicar update ───────────────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // ── Fetch — cache first, actualiza em background ──────────────
