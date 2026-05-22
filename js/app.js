@@ -332,6 +332,17 @@ window.doDelete = async (id) => {
   catch { showToast('Erro ao eliminar.'); }
 };
 
+// ── Form helpers ──────────────────────────────────────────────
+function clearForm() {
+  editingId = null;
+  currentPhotos = [];
+  stopDraftTimer();
+  ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  renderPhotoGrid();
+  document.getElementById('photoError')?.classList.remove('visible');
+}
+
 // ── Draft auto-save ───────────────────────────────────────────
 const DRAFT_KEY = 'car_form_draft';
 let draftTimer = null;
