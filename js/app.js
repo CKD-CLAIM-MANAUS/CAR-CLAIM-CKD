@@ -36,6 +36,8 @@ initAuth(
     document.getElementById('appScreen').classList.add('visible');
     showPage('list');
     loadAndRender();
+    // Verifica rascunho após login — pequeno delay para garantir que a UI carregou
+    setTimeout(checkForDraft, 1000);
   },
   () => {
     document.getElementById('authScreen').style.display = 'flex';
@@ -484,23 +486,40 @@ function showDraftBanner(draft, timeAgo) {
 
 window.recoverDraft = () => {
   try {
-    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY));
-    if (!draft) return;
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) { showToast('Rascunho não encontrado.'); return; }
+    const draft = JSON.parse(raw);
 
-    clearForm();
-    Object.entries(draft.fields || {}).forEach(([key, val]) => {
-      const el = document.getElementById('f' + key.charAt(0).toUpperCase() + key.slice(1));
-      if (el) el.value = val;
-    });
-
+    // Navega para o formulário SEM limpar (não chama clearForm)
+    editingId = null;
     currentPhotos = draft.photos || [];
-    renderPhotoGrid();
+
+    // Mostra a página do formulário directamente
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-form')?.classList.add('active');
+    setDesktopTab('form');
+
+    // Preenche os campos após o DOM estar visível
+    setTimeout(() => {
+      const fieldMap = {
+        carNum: 'fCarNum', partNo: 'fPartNo', partName: 'fPartName',
+        model: 'fModel', orderNo: 'fOrderNo', lotNo: 'fLotNo',
+        ngQty: 'fNgQty', defect: 'fDefect', detected: 'fDetected'
+      };
+      Object.entries(draft.fields || {}).forEach(([key, val]) => {
+        const el = document.getElementById(fieldMap[key]);
+        if (el) el.value = val;
+      });
+      renderPhotoGrid();
+      document.getElementById('photoError')?.classList.remove('visible');
+      startDraftTimer();
+      attachDraftListeners();
+    }, 50);
 
     document.getElementById('draftBanner')?.remove();
-    goToForm();
-    startDraftTimer();
     showToast('✅ Rascunho recuperado!');
   } catch (e) {
+    console.error('Recover draft error:', e);
     showToast('Erro ao recuperar rascunho.');
   }
 };
