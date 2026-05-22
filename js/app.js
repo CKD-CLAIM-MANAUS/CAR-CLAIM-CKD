@@ -143,8 +143,8 @@ function setDesktopTab(tabId) {
   if (tab) tab.classList.add('active');
 }
 
-window.goToList  = () => { showPage('list');  setDesktopTab('list');  loadAndRender(); };
-window.goToForm  = () => { clearForm(); showPage('form'); setDesktopTab('form'); };
+window.goToList  = () => { showPage('list');  setDesktopTab('list');  loadAndRender(); checkForDraft(); };
+window.goToForm  = () => { clearForm(); showPage('form'); setDesktopTab('form'); startDraftTimer(); };
 window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); updateExcelStats(); };
 
 // ── Load & Render list ────────────────────────────────────────
@@ -332,18 +332,161 @@ window.doDelete = async (id) => {
   catch { showToast('Erro ao eliminar.'); }
 };
 
-// ── Form ──────────────────────────────────────────────────────
-function clearForm() {
-  editingId = null;
-  currentPhotos = [];
-  ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  renderPhotoGrid();
-  document.getElementById('photoError')?.classList.remove('visible');
+// ── Draft auto-save ───────────────────────────────────────────
+const DRAFT_KEY = 'car_form_draft';
+let draftTimer = null;
+
+function saveDraft() {
+  if (!editingId) { // só guarda rascunhos de incidentes novos
+    try {
+      const draft = {
+        savedAt: Date.now(),
+        fields: {
+          carNum:   document.getElementById('fCarNum')?.value   || '',
+          partNo:   document.getElementById('fPartNo')?.value   || '',
+          partName: document.getElementById('fPartName')?.value || '',
+          model:    document.getElementById('fModel')?.value    || '',
+          orderNo:  document.getElementById('fOrderNo')?.value  || '',
+          lotNo:    document.getElementById('fLotNo')?.value    || '',
+          ngQty:    document.getElementById('fNgQty')?.value    || '',
+          defect:   document.getElementById('fDefect')?.value   || '',
+          detected: document.getElementById('fDetected')?.value || '',
+        },
+        // Guarda só fotos já enviadas (URL) — fotos novas não cabem no localStorage
+        photos: currentPhotos
+          .filter(p => !p.isNew)
+          .map(p => ({ url: p.url, publicId: p.publicId, isNew: false, localPreview: p.url }))
+      };
+
+      // Só guarda se tiver algum conteúdo
+      const hasContent = Object.values(draft.fields).some(v => v.trim() !== '');
+      if (hasContent || draft.photos.length > 0) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      }
+    } catch (e) {
+      console.warn('Draft save failed:', e);
+    }
+  }
 }
 
+function startDraftTimer() {
+  stopDraftTimer();
+  draftTimer = setInterval(saveDraft, 30000); // a cada 30 segundos
+}
+
+function stopDraftTimer() {
+  if (draftTimer) { clearInterval(draftTimer); draftTimer = null; }
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+  stopDraftTimer();
+}
+
+function checkForDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+
+    // Ignora rascunhos com mais de 7 dias
+    if (Date.now() - draft.savedAt > 7 * 24 * 60 * 60 * 1000) {
+      clearDraft(); return;
+    }
+
+    // Só mostra se tiver conteúdo relevante
+    const hasContent = Object.values(draft.fields || {}).some(v => v.trim() !== '');
+    if (!hasContent && (!draft.photos || draft.photos.length === 0)) return;
+
+    const timeAgo = formatTimeAgo(draft.savedAt);
+    showDraftBanner(draft, timeAgo);
+  } catch (e) {
+    clearDraft();
+  }
+}
+
+function formatTimeAgo(ts) {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  if (mins < 1)   return 'agora mesmo';
+  if (mins < 60)  return `há ${mins} min`;
+  if (hours < 24) return `há ${hours}h`;
+  return `há ${Math.floor(hours / 24)} dias`;
+}
+
+function showDraftBanner(draft, timeAgo) {
+  // Remove banner anterior se existir
+  document.getElementById('draftBanner')?.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'draftBanner';
+  banner.style.cssText = `
+    position: fixed; bottom: calc(var(--bottom-h) + 12px); left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card, #0D1E35);
+    border: 1.5px solid var(--blue-500, #1A56CC);
+    border-radius: 12px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    z-index: 150; max-width: calc(100vw - 32px);
+    animation: slideUp 0.25s ease;
+  `;
+
+  banner.innerHTML = `
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:13px;font-weight:700;color:var(--ink-100,rgba(255,255,255,0.88));">📝 Rascunho guardado</div>
+      <div style="font-size:11px;color:var(--ink-300,rgba(255,255,255,0.4));margin-top:2px;">
+        ${draft.fields.partName || 'Incidente'} · ${timeAgo}
+      </div>
+    </div>
+    <button onclick="recoverDraft()" style="
+      padding:7px 14px; background:var(--blue-500,#1A56CC); color:white;
+      border:none; border-radius:8px; font-size:12px; font-weight:700;
+      cursor:pointer; white-space:nowrap; font-family:var(--font-sans);">
+      Recuperar
+    </button>
+    <button onclick="dismissDraft()" style="
+      padding:7px 10px; background:transparent; color:var(--ink-300,rgba(255,255,255,0.4));
+      border:1px solid var(--border,rgba(255,255,255,0.07)); border-radius:8px;
+      font-size:12px; cursor:pointer; font-family:var(--font-sans);">
+      Descartar
+    </button>
+  `;
+
+  document.body.appendChild(banner);
+}
+
+window.recoverDraft = () => {
+  try {
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY));
+    if (!draft) return;
+
+    clearForm();
+    Object.entries(draft.fields || {}).forEach(([key, val]) => {
+      const el = document.getElementById('f' + key.charAt(0).toUpperCase() + key.slice(1));
+      if (el) el.value = val;
+    });
+
+    currentPhotos = draft.photos || [];
+    renderPhotoGrid();
+
+    document.getElementById('draftBanner')?.remove();
+    goToForm();
+    startDraftTimer();
+    showToast('✅ Rascunho recuperado!');
+  } catch (e) {
+    showToast('Erro ao recuperar rascunho.');
+  }
+};
+
+window.dismissDraft = () => {
+  clearDraft();
+  document.getElementById('draftBanner')?.remove();
+  showToast('Rascunho descartado.');
+};
+
 window.editIncident = (id) => {
-  const inc = incidents.find(i => i.id === id);
   if (!inc) return;
   editingId = id;
   document.getElementById('fCarNum').value   = inc.carNum   || '';
@@ -388,6 +531,7 @@ window.saveForm = async () => {
     };
 
     await saveIncident(formData, currentPhotos, editingId, currentUser);
+    clearDraft();
     showToast(editingId ? '✅ Actualizado!' : '✅ Incidente registado!');
     editingId = null;
     goToList();
