@@ -598,8 +598,10 @@ window.dismissDraft = () => {
 };
 
 window.editIncident = (id) => {
+  const inc = incidents.find(i => i.id === id);
   if (!inc) return;
   editingId = id;
+  currentIncidentType = inc.incidentType || 'normal';
   document.getElementById('fCarNum').value   = inc.carNum   || '';
   document.getElementById('fPartNo').value   = inc.partNo   || '';
   document.getElementById('fPartName').value = inc.partName || '';
@@ -611,7 +613,11 @@ window.editIncident = (id) => {
   document.getElementById('fDetected').value = inc.detected || '';
   currentPhotos = (inc.photos || []).map(p => ({ url: p.url, publicId: p.publicId, isNew: false, localPreview: p.url }));
   renderPhotoGrid();
+  setTimeout(() => setIncidentType(currentIncidentType), 50);
   showPage('form');
+  setDesktopTab('form');
+  startDraftTimer();
+  attachDraftListeners();
 };
 
 window.saveForm = async () => {
