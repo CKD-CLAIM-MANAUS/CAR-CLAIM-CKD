@@ -174,11 +174,38 @@
     <div class="page" id="page-form">
       <div class="form-stack">
 
-        <div class="info-banner">
+        <!-- Selector de tipo -->
+        <div class="form-card" style="padding:14px;">
+          <div class="form-card-title" style="margin-bottom:12px;">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            Tipo de Incidente
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button class="incident-type-btn active" id="typeNormal" onclick="setIncidentType('normal')">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" style="width:22px;height:22px;margin-bottom:4px;">
+                <path d="M11 3H5a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-7M18 2l-8 8M15 2h3v3"/>
+              </svg>
+              <span class="incident-type-label">Defeito / Falta</span>
+              <span class="incident-type-sub">Peça partida, em falta ou trocada</span>
+            </button>
+            <button class="incident-type-btn" id="typePaint" onclick="setIncidentType('paint')">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" style="width:22px;height:22px;margin-bottom:4px;">
+                <path d="M4 13.5A4.5 4.5 0 008.5 18v0a4.5 4.5 0 004.5-4.5V12a4 4 0 00-4-4H8a4 4 0 00-4 4v1.5z"/>
+                <path d="M13 8V4M13 4h2M13 4l-2 2"/>
+              </svg>
+              <span class="incident-type-label">Pintura</span>
+              <span class="incident-type-sub">Defeito de pintura ou acabamento</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="info-banner" id="formBanner">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
           </svg>
-          <span><strong>Registo rápido.</strong> Só o nome da peça e as fotos são obrigatórios.</span>
+          <span id="formBannerText"><strong>Registo rápido.</strong> Só o nome da peça e as fotos são obrigatórios.</span>
         </div>
 
         <!-- Identificação -->
@@ -187,11 +214,11 @@
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M7 4H4a1 1 0 00-1 1v11a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1h-3M7 4a2 2 0 012-2h2a2 2 0 012 2M7 4h6"/>
             </svg>
-            Identificação da Peça
+            <span id="formCardTitle">Identificação da Peça</span>
           </div>
           <div class="form-grid">
 
-            <div class="field">
+            <div class="field" id="fieldCarNum">
               <label class="field-label">Nº CAR <span class="field-optional">opcional</span></label>
               <input class="field-input" type="text" id="fCarNum" placeholder="ex: 039" maxlength="10">
             </div>
@@ -203,7 +230,7 @@
 
             <div class="field field-full">
               <label class="field-label">Nome da Peça <span style="color:var(--red-600)">*</span></label>
-              <input class="field-input" type="text" id="fPartName" placeholder="REAR SEAT ASSY">
+              <input class="field-input" type="text" id="fPartName" placeholder="REAR SEAT ASSY" oninput="onPartNameChange()">
             </div>
 
             <div class="field">
@@ -222,18 +249,31 @@
             </div>
 
             <div class="field">
-              <label class="field-label">Qtd. Defeituosa <span class="field-optional">opcional</span></label>
-              <input class="field-input" type="number" id="fNgQty" min="1" placeholder="1">
+              <label class="field-label">Qtd. Defeituosa <span class="field-optional" id="qtyOptional">opcional</span><span style="color:var(--red-600);display:none" id="qtyRequired">*</span></label>
+              <input class="field-input" type="number" id="fNgQty" min="1" placeholder="1" oninput="onQtyChange()">
             </div>
 
-            <div class="field field-full">
+            <!-- Campos visíveis só no tipo NORMAL -->
+            <div class="field field-full" id="fieldDefect">
               <label class="field-label">Descrição do Defeito <span class="field-optional">opcional</span></label>
               <textarea class="field-input field-textarea" id="fDefect" placeholder="Descreva o problema encontrado..."></textarea>
             </div>
 
-            <div class="field field-full">
+            <div class="field field-full" id="fieldDetected">
               <label class="field-label">Como foi Detectado <span class="field-optional">opcional</span></label>
               <textarea class="field-input field-textarea" id="fDetected" placeholder="Desempacotamento, inspeção visual..."></textarea>
+            </div>
+
+            <!-- Descrição automática para PINTURA -->
+            <div class="field field-full" id="fieldPaintDesc" style="display:none;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <label class="field-label" style="margin-bottom:0;">Descrição</label>
+                <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(239,159,39,0.12);border:1px solid rgba(239,159,39,0.25);border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700;color:var(--amber-500);">
+                  ⚡ Gerada automaticamente
+                </span>
+              </div>
+              <textarea class="field-input field-textarea" id="fPaintDesc" rows="5" readonly
+                style="color:var(--ink-300);border-color:rgba(239,159,39,0.2);background:rgba(239,159,39,0.03);font-size:12px;line-height:1.6;"></textarea>
             </div>
 
           </div>
@@ -250,19 +290,16 @@
           </div>
 
           <div class="photo-actions">
-            <!-- Camera button (uses getUserMedia on Android) -->
             <button class="photo-btn photo-btn-primary" onclick="openCameraBtn()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
               <span class="photo-btn-label">Câmera</span>
-              <!-- Hidden fallback for devices that don't support getUserMedia -->
               <input type="file" id="cameraFallback" accept="image/*" capture="environment"
                 onchange="handleFileInput(this)" style="display:none">
             </button>
 
-            <!-- Gallery button -->
             <button class="photo-btn" onclick="document.getElementById('galleryInput').click()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
