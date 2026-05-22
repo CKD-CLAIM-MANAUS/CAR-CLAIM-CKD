@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v5';
+const CACHE_NAME = 'car-garantia-v6';
 
 // Ficheiros essenciais para funcionar offline
 const STATIC_ASSETS = [
