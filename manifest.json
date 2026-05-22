@@ -1,0 +1,28 @@
+{
+  "name": "CAR · Garantia CFMOTO",
+  "short_name": "CAR Garantia",
+  "description": "Gestão de incidentes de garantia de peças CFMOTO da Amazônia",
+  "start_url": "/CAR-CLAIM-CKD/",
+  "scope": "/CAR-CLAIM-CKD/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#060E1A",
+  "theme_color": "#060E1A",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "screenshots": []
+}
