@@ -1239,3 +1239,47 @@ img { display: block; max-width: 100%; }
     display: none !important;
   }
 }
+
+/* ── Incident type selector ──────────────────────────────────── */
+.incident-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border-md);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.15s;
+  touch-action: manipulation;
+  font-family: var(--font-sans);
+}
+
+.incident-type-btn:active { transform: scale(0.97); }
+
+.incident-type-btn.active {
+  border-color: var(--blue-500);
+  background: rgba(26,86,204,0.12);
+}
+
+.incident-type-btn.active-paint {
+  border-color: var(--amber-500);
+  background: rgba(239,159,39,0.08);
+}
+
+.incident-type-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-200);
+}
+
+.incident-type-btn.active .incident-type-label { color: var(--blue-400); }
+.incident-type-btn.active-paint .incident-type-label { color: var(--amber-500); }
+
+.incident-type-sub {
+  font-size: 10px;
+  color: var(--ink-400);
+  text-align: center;
+  line-height: 1.4;
+}
