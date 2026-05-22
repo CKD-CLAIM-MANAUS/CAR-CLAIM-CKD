@@ -53,7 +53,6 @@ window.doLogin = async () => {
   setAuthLoading('loginBtn', true, 'Entrar');
   try {
     await login(email, pass);
-    sessionStorage.setItem('_ap', pass); // guarda para restaurar sessão admin
   } catch (e) {
     showAuthError(e.message);
     setAuthLoading('loginBtn', false, 'Entrar');
@@ -122,15 +121,27 @@ window.doCreateUser = async () => {
   btn.textContent = '⏳ A criar...';
 
   try {
-    await createUser(name, email, pass);
+    const result = await createUser(name, email, pass);
     document.getElementById('newUserName').value  = '';
     document.getElementById('newUserEmail').value = '';
     document.getElementById('newUserPass').value  = '';
-    showToast(`✅ ${name} adicionado com sucesso!`);
-    await renderUsersList();
+
+    if (result.requiresRelogin) {
+      // Firebase fez logout do admin ao criar o novo utilizador
+      // Mostra mensagem clara antes de redirecionar para login
+      closeModal('usersModal');
+      showToast(`✅ ${name} criado! Faça login novamente.`);
+      setTimeout(() => {
+        document.getElementById('appScreen').classList.remove('visible');
+        document.getElementById('authScreen').style.display = 'flex';
+      }, 2000);
+    } else {
+      showToast(`✅ ${name} adicionado com sucesso!`);
+      await renderUsersList();
+    }
   } catch (e) {
-    errEl.textContent    = e.message;
-    errEl.style.display  = 'block';
+    errEl.textContent   = e.message;
+    errEl.style.display = 'block';
   }
 
   btn.disabled = false;
