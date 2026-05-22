@@ -346,13 +346,77 @@ window.doDelete = async (id) => {
   catch { showToast('Erro ao eliminar.'); }
 };
 
+// ── Incident type ─────────────────────────────────────────────
+let currentIncidentType = 'normal'; // 'normal' | 'paint'
+
+window.setIncidentType = (type) => {
+  currentIncidentType = type;
+
+  const btnNormal = document.getElementById('typeNormal');
+  const btnPaint  = document.getElementById('typePaint');
+  const fieldDefect    = document.getElementById('fieldDefect');
+  const fieldDetected  = document.getElementById('fieldDetected');
+  const fieldPaintDesc = document.getElementById('fieldPaintDesc');
+  const qtyOptional    = document.getElementById('qtyOptional');
+  const qtyRequired    = document.getElementById('qtyRequired');
+  const banner         = document.getElementById('formBannerText');
+
+  if (type === 'paint') {
+    btnNormal?.classList.remove('active');
+    btnPaint?.classList.remove('active');
+    btnPaint?.classList.add('active', 'active-paint');
+
+    if (fieldDefect)   fieldDefect.style.display   = 'none';
+    if (fieldDetected) fieldDetected.style.display  = 'none';
+    if (fieldPaintDesc) fieldPaintDesc.style.display = 'grid-column: 1/-1; display: block;';
+    if (fieldPaintDesc) fieldPaintDesc.style.display = 'block';
+    fieldPaintDesc.style.gridColumn = '1 / -1';
+
+    if (qtyOptional) qtyOptional.style.display = 'none';
+    if (qtyRequired) qtyRequired.style.display = 'inline';
+
+    if (banner) banner.innerHTML = '<strong>Pintura.</strong> Preencha o nome da peça e a quantidade — a descrição é gerada automaticamente.';
+
+    updatePaintDescription();
+  } else {
+    btnPaint?.classList.remove('active', 'active-paint');
+    btnNormal?.classList.add('active');
+
+    if (fieldDefect)    fieldDefect.style.display    = 'block';
+    if (fieldDetected)  fieldDetected.style.display   = 'block';
+    if (fieldPaintDesc) fieldPaintDesc.style.display  = 'none';
+
+    if (qtyOptional) qtyOptional.style.display = 'inline';
+    if (qtyRequired) qtyRequired.style.display = 'none';
+
+    if (banner) banner.innerHTML = '<strong>Registo rápido.</strong> Só o nome da peça e as fotos são obrigatórios.';
+  }
+
+  saveDraft();
+};
+
+function updatePaintDescription() {
+  if (currentIncidentType !== 'paint') return;
+  const partName = (document.getElementById('fPartName')?.value || '').trim().toUpperCase() || '[PART NAME]';
+  const qty      = document.getElementById('fNgQty')?.value || '[QTY]';
+  const desc = `DURING OUR UNPACKING PROCESS, IT WAS DETECTED THAT ${qty} ${partName} PRESENTED PAINT DEFECTS. THIS DEFECT WAS REWORKED USING ADDITIONAL MATERIALS TO CONTINUE WITH THE ASSEMBLY AND AVOID LOSSES IN OUR PRODUCTION, ALSO PREVENTING THE NEED TO REMOVE PARTS FROM ANOTHER CONTAINER IN THE PLANT. WE SUGGEST THAT PREVENTIVE MEASURES AND MORE RIGOROUS INSPECTIONS BE TAKEN TO ENSURE THAT THIS ISSUE DOES NOT RECUR IN FUTURE DELIVERIES.`;
+  const el = document.getElementById('fPaintDesc');
+  if (el) el.value = desc;
+}
+
+window.onPartNameChange = () => { if (currentIncidentType === 'paint') updatePaintDescription(); saveDraft(); };
+window.onQtyChange      = () => { if (currentIncidentType === 'paint') updatePaintDescription(); saveDraft(); };
+
 // ── Form helpers ──────────────────────────────────────────────
 function clearForm() {
   editingId = null;
   currentPhotos = [];
+  currentIncidentType = 'normal';
   stopDraftTimer();
   ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  // Reset tipo para normal
+  setTimeout(() => setIncidentType('normal'), 50);
   renderPhotoGrid();
   document.getElementById('photoError')?.classList.remove('visible');
 }
@@ -366,6 +430,7 @@ function saveDraft() {
     try {
       const draft = {
         savedAt: Date.now(),
+        incidentType: currentIncidentType,
         fields: {
           carNum:   document.getElementById('fCarNum')?.value   || '',
           partNo:   document.getElementById('fPartNo')?.value   || '',
@@ -493,6 +558,7 @@ window.recoverDraft = () => {
     // Navega para o formulário SEM limpar (não chama clearForm)
     editingId = null;
     currentPhotos = draft.photos || [];
+    currentIncidentType = draft.incidentType || 'normal';
 
     // Mostra a página do formulário directamente
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -510,6 +576,7 @@ window.recoverDraft = () => {
         const el = document.getElementById(fieldMap[key]);
         if (el) el.value = val;
       });
+      setIncidentType(draft.incidentType || 'normal');
       renderPhotoGrid();
       document.getElementById('photoError')?.classList.remove('visible');
       startDraftTimer();
@@ -563,15 +630,20 @@ window.saveForm = async () => {
 
   try {
     const formData = {
-      partNo:   document.getElementById('fPartNo').value,
+      partNo:       document.getElementById('fPartNo').value,
       partName,
-      model:    document.getElementById('fModel').value,
-      orderNo:  document.getElementById('fOrderNo').value,
-      lotNo:    document.getElementById('fLotNo').value,
-      ngQty:    document.getElementById('fNgQty').value,
-      defect:   document.getElementById('fDefect').value,
-      detected: document.getElementById('fDetected').value,
-      carNum:   document.getElementById('fCarNum').value,
+      model:        document.getElementById('fModel').value,
+      orderNo:      document.getElementById('fOrderNo').value,
+      lotNo:        document.getElementById('fLotNo').value,
+      ngQty:        document.getElementById('fNgQty').value,
+      defect:       currentIncidentType === 'paint'
+                      ? document.getElementById('fPaintDesc')?.value || ''
+                      : document.getElementById('fDefect').value,
+      detected:     currentIncidentType === 'paint'
+                      ? (document.getElementById('fPartName').value.trim().toUpperCase() || '') + ' (DEFECTIVE PAINT)'
+                      : document.getElementById('fDetected').value,
+      carNum:       document.getElementById('fCarNum').value,
+      incidentType: currentIncidentType,
     };
 
     await saveIncident(formData, currentPhotos, editingId, currentUser);
