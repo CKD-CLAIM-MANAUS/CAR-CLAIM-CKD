@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // Usuários: cada um lê o próprio perfil; admin lê todos e gerencia
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Incidentes: todos autenticados leem e criam; só dono ou admin edita/deleta
+    match /incidents/{incidentId} {
+      allow read, create: if isAuth();
+      allow update: if isAuth() && (isOwner(resource.data.userId) || isAdmin());
+      allow delete: if isAuth() && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Numeração CAR: qualquer autenticado pode ler e registrar
+    match /carNumbers/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // Base de peças: todos leem; só admin importa e sobrescreve
+    match /partsDB/{partId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+  }
+}
