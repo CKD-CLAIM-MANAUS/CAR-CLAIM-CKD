@@ -189,9 +189,28 @@ function renderList() {
   const list   = filterIncidents(incidents, { filter: currentFilter, search });
   const stats  = getStats(incidents);
 
+  // Calcula tendência — compara com há 30 dias
+  const now = Date.now();
+  const month = 30 * 24 * 60 * 60 * 1000;
+  const thisMonth  = incidents.filter(i => now - (i.createdAt || 0) < month).length;
+  const lastMonth  = incidents.filter(i => {
+    const age = now - (i.createdAt || 0);
+    return age >= month && age < month * 2;
+  }).length;
+  const diff = thisMonth - lastMonth;
+  const trendHTML = diff > 0
+    ? `<div class="stat-trend up">↑ +${diff} este mês</div>`
+    : diff < 0
+    ? `<div class="stat-trend down">↓ ${diff} este mês</div>`
+    : `<div class="stat-trend flat">— igual ao mês anterior</div>`;
+
   document.getElementById('statTotal').textContent   = stats.total;
   document.getElementById('statPending').textContent = stats.pending;
   document.getElementById('statDone').textContent    = stats.done;
+
+  // Adiciona tendência ao card total
+  const trendEl = document.getElementById('statTrend');
+  if (trendEl) trendEl.innerHTML = trendHTML;
 
   const el = document.getElementById('incidentList');
 
