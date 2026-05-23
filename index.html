@@ -191,6 +191,7 @@
             <div class="stat-card">
               <div class="stat-value blue" id="statTotal">—</div>
               <div class="stat-label">Total</div>
+              <div id="statTrend"></div>
             </div>
             <div class="stat-card">
               <div class="stat-value amber" id="statPending">—</div>
@@ -250,17 +251,21 @@
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <button class="incident-type-btn active" id="typeNormal" onclick="setIncidentType('normal')">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" style="width:22px;height:22px;margin-bottom:4px;">
-                <path d="M11 3H5a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-7M18 2l-8 8M15 2h3v3"/>
-              </svg>
+              <div class="type-icon-wrap blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                </svg>
+              </div>
               <span class="incident-type-label">Defeito / Falta</span>
               <span class="incident-type-sub">Peça partida, em falta ou trocada</span>
             </button>
             <button class="incident-type-btn" id="typePaint" onclick="setIncidentType('paint')">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" style="width:22px;height:22px;margin-bottom:4px;">
-                <path d="M4 13.5A4.5 4.5 0 008.5 18v0a4.5 4.5 0 004.5-4.5V12a4 4 0 00-4-4H8a4 4 0 00-4 4v1.5z"/>
-                <path d="M13 8V4M13 4h2M13 4l-2 2"/>
-              </svg>
+              <div class="type-icon-wrap amber">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M2 13.5A4.5 4.5 0 006.5 18v0a4.5 4.5 0 004.5-4.5V12a4 4 0 00-4-4H6a4 4 0 00-4 4v1.5z"/>
+                  <path d="M14.5 5l5 5M14.5 5l2-2 3 3-2 2M14.5 5L13 6.5"/>
+                </svg>
+              </div>
               <span class="incident-type-label">Pintura</span>
               <span class="incident-type-sub">Defeito de pintura ou acabamento</span>
             </button>
