@@ -1123,6 +1123,64 @@ img { display: block; max-width: 100%; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
+/* ── Incident Type Selector ─────────────────────────────────── */
+.incident-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border-md);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: var(--font-sans);
+  text-align: center;
+  touch-action: manipulation;
+}
+.incident-type-btn:active { transform: scale(0.97); }
+.incident-type-btn.active {
+  border-color: var(--blue-500);
+  background: var(--blue-100);
+  box-shadow: 0 0 0 3px rgba(255,102,0,0.15);
+}
+
+.type-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.type-icon-wrap svg {
+  width: 24px;
+  height: 24px;
+}
+.type-icon-wrap.blue {
+  background: rgba(255,102,0,0.15);
+  color: var(--blue-400);
+}
+.type-icon-wrap.amber {
+  background: rgba(245,158,11,0.15);
+  color: var(--amber-500);
+}
+
+.incident-type-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-100);
+  line-height: 1.2;
+}
+
+.incident-type-sub {
+  font-size: 11px;
+  color: var(--ink-300);
+  line-height: 1.4;
+}
+
 /* ── Animação entrada dos cards ─────────────────────────────── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
