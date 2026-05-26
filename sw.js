@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v11';
+const CACHE_NAME = 'car-garantia-v12';
 
 const STATIC_ASSETS = [
   '/CAR-CLAIM-CKD/',
@@ -23,7 +23,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS))
-    // SEM skipWaiting() — o SW novo fica em espera até o utilizador confirmar
+      .then(() => self.skipWaiting())  // activa imediatamente sem esperar confirmação
   );
 });
 
