@@ -38,5 +38,16 @@ service cloud.firestore {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
+
+    // Stock: todos autenticados leem e escrevem (criação/actualização automática)
+    match /stock/{partId} {
+      allow read, write: if isAuth();
+    }
+
+    // Movimentos de stock: todos autenticados leem e criam; só admin elimina
+    match /stockMovements/{moveId} {
+      allow read, create: if isAuth();
+      allow delete: if isAdmin();
+    }
   }
 }
