@@ -19,6 +19,16 @@
             console.log('SW registado:', reg.scope);
             // Verifica updates periodicamente
             setInterval(() => reg.update(), 60 * 60 * 1000); // a cada hora
+
+            // Detecta novo SW em espera
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              newWorker?.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  showUpdateBanner();
+                }
+              });
+            });
           })
           .catch(err => console.warn('SW erro:', err));
 
@@ -27,16 +37,6 @@
           if (event.data?.type === 'SW_UPDATED') {
             showUpdateBanner();
           }
-        });
-
-        // Detecta novo SW em espera
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          newWorker?.addEventListener('statechange', () => {
-            if (newWorker.statechange === 'installed' && navigator.serviceWorker.controller) {
-              showUpdateBanner();
-            }
-          });
         });
       });
     }

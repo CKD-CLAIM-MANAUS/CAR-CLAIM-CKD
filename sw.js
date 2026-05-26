@@ -61,7 +61,8 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('googleapis') ||
     url.hostname.includes('gstatic') ||
     url.hostname.includes('jsdelivr') ||
-    url.hostname.includes('fonts.google')
+    url.hostname.includes('fonts.google') ||
+    url.hostname.includes('railway.app')
   ) {
     event.respondWith(fetch(event.request).catch(() => new Response('')));
     return;
