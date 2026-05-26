@@ -217,6 +217,9 @@
             <div class="chip" onclick="setFilter('inprogress', this)">📤 Em Curso</div>
             <div class="chip" onclick="setFilter('done', this)">✅ Encerrados</div>
           </div>
+          <button class="btn-batch-eta-trigger" onclick="openBatchETA()">
+            📦 Confirmar envio da China (lote)
+          </button>
 
           <div class="incident-list" id="incidentList">
             <div class="loading-state"><div class="spinner"></div> A carregar...</div>
@@ -637,6 +640,42 @@
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
+
+<!-- ── Batch ETA / Tracking Modal ──────────────────────────── -->
+<div class="modal-overlay" id="batchETAModal" onclick="closeBatchETA(event)">
+  <div class="modal" style="max-height:90vh;overflow-y:auto;">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📦 Confirmar Envio da China</div>
+    <div class="modal-sub">Aplica tracking e ETA a múltiplos incidentes de uma vez</div>
+
+    <div class="field">
+      <label class="field-label">Nº Tracking (FedEx / DHL / UPS)</label>
+      <input class="field-input" type="text" id="batchTracking"
+             placeholder="ex: 748926481935" style="font-family:var(--font-mono,monospace);letter-spacing:0.05em">
+    </div>
+    <div class="field">
+      <label class="field-label">Data prevista de chegada (ETA)</label>
+      <input class="field-input" type="date" id="batchETA">
+    </div>
+
+    <div class="batch-list-header">
+      <span id="batchSelectedCount" style="font-size:12px;color:rgba(255,255,255,0.5);">A carregar...</span>
+      <div style="display:flex;gap:8px;">
+        <button class="batch-sel-btn" onclick="batchSelectAll(true)">Todos</button>
+        <button class="batch-sel-btn" onclick="batchSelectAll(false)">Nenhum</button>
+      </div>
+    </div>
+
+    <div id="batchIncidentList" style="max-height:300px;overflow-y:auto;"></div>
+
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="btn" onclick="closeBatchETA()">Cancelar</button>
+      <button class="btn btn-primary" id="batchConfirmBtn" style="flex:1" onclick="doBatchConfirmETA()">
+        ✓ Confirmar ETA
+      </button>
+    </div>
+  </div>
+</div>
 
 
 <!-- App entry point (ES module) -->

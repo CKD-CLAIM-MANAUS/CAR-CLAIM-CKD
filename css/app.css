@@ -1756,3 +1756,110 @@ img { display: block; max-width: 100%; }
 .btn-tracking:hover {
   background: rgba(59,116,232,0.25);
 }
+
+/* ── Batch ETA modal ─────────────────────────────────────── */
+.btn-batch-eta-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  margin-top: 8px;
+  background: rgba(59,116,232,0.08);
+  border: 1.5px dashed rgba(59,116,232,0.3);
+  border-radius: 10px;
+  color: #3B74E8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-batch-eta-trigger:hover {
+  background: rgba(59,116,232,0.14);
+  border-color: rgba(59,116,232,0.5);
+}
+
+.batch-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 4px;
+}
+
+.batch-sel-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.batch-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+}
+
+.batch-item:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.batch-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #1A56CC;
+  margin-top: 2px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.batch-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.batch-item-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 3px;
+  align-items: center;
+}
+
+.batch-tracking-badge {
+  background: rgba(59,116,232,0.15);
+  border: 1px solid rgba(59,116,232,0.3);
+  color: #3B74E8;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+}

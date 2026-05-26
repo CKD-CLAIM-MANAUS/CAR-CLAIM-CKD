@@ -558,6 +558,98 @@ window.doConfirmETA = async (id) => {
   } catch (e) { showToast('Erro: ' + e.message); }
 };
 
+// ── Batch ETA / Tracking ──────────────────────────────────────
+const BATCH_ELIGIBLE = ['sent', 'awaiting', 'eta_confirmed'];
+
+window.openBatchETA = () => {
+  const eligible = incidents.filter(i => BATCH_ELIGIBLE.includes(i.status || ''));
+  const listEl   = document.getElementById('batchIncidentList');
+
+  if (!eligible.length) {
+    listEl.innerHTML = `
+      <div style="text-align:center;padding:24px;color:rgba(255,255,255,0.3);font-size:13px;">
+        Não há incidentes enviados ou em aguardo.<br>
+        Muda o status de um incidente para "Enviado" primeiro.
+      </div>`;
+  } else {
+    listEl.innerHTML = eligible.map(i => {
+      const stCfg = STATUS_CONFIG[i.status] || STATUS_CONFIG.pending;
+      const hasTracking = i.tracking ? `<span class="batch-tracking-badge">📦 ${i.tracking}</span>` : '';
+      return `
+        <label class="batch-item">
+          <input type="checkbox" class="batch-cb" value="${i.id}" checked
+                 onchange="updateBatchCount()">
+          <div class="batch-item-info">
+            <span class="batch-item-name">${i.partName || '—'}</span>
+            <span class="batch-item-meta">
+              ${i.partNo ? i.partNo + ' · ' : ''}${i.model || ''} · ${i.ngQty || '—'} un
+              <span style="color:${stCfg.color}">${stCfg.icon} ${stCfg.label}</span>
+              ${hasTracking}
+            </span>
+          </div>
+        </label>`;
+    }).join('');
+  }
+
+  updateBatchCount();
+  openModal('batchETAModal');
+};
+
+window.closeBatchETA = (e) => {
+  if (!e || e.target === document.getElementById('batchETAModal')) closeModal('batchETAModal');
+};
+
+window.batchSelectAll = (checked) => {
+  document.querySelectorAll('.batch-cb').forEach(cb => { cb.checked = checked; });
+  updateBatchCount();
+};
+
+window.updateBatchCount = () => {
+  const total    = document.querySelectorAll('.batch-cb').length;
+  const selected = document.querySelectorAll('.batch-cb:checked').length;
+  const el = document.getElementById('batchSelectedCount');
+  if (el) el.textContent = `${selected} de ${total} incidentes selecionados`;
+  const btn = document.getElementById('batchConfirmBtn');
+  if (btn) btn.textContent = selected > 0
+    ? `✓ Confirmar ETA nos ${selected} incidente${selected > 1 ? 's' : ''}`
+    : '✓ Confirmar ETA';
+};
+
+window.doBatchConfirmETA = async () => {
+  const trackingEl = document.getElementById('batchTracking');
+  const etaEl      = document.getElementById('batchETA');
+  const tracking   = (trackingEl?.value || '').trim().replace(/\s+/g, '');
+  const etaRaw     = etaEl?.value || '';
+
+  if (!tracking)  { showToast('⚠️ Insere o número de tracking'); return; }
+  if (!etaRaw)    { showToast('⚠️ Selecciona a data ETA');       return; }
+
+  const selected = [...document.querySelectorAll('.batch-cb:checked')].map(cb => cb.value);
+  if (!selected.length) { showToast('⚠️ Selecciona pelo menos 1 incidente'); return; }
+
+  const d   = new Date(etaRaw + 'T00:00:00');
+  const eta = d.toLocaleDateString('pt-BR');
+  const note = `ETA confirmado: ${eta} · Tracking: ${tracking}`;
+
+  const btn = document.getElementById('batchConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ A actualizar...'; }
+
+  try {
+    await Promise.all(
+      selected.map(id => updateIncidentStatus(id, 'eta_confirmed', currentUser, note, eta, tracking))
+    );
+    closeModal('batchETAModal');
+    showToast(`✅ ${selected.length} incidente${selected.length > 1 ? 's' : ''} actualizados · ${tracking}`);
+    if (trackingEl) trackingEl.value = '';
+    if (etaEl)      etaEl.value      = '';
+    renderList();
+  } catch (e) {
+    showToast('❌ Erro: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; updateBatchCount(); }
+  }
+};
+
 window.doAddNote = async (id) => {
   const input = document.getElementById(`noteInput-${id}`);
   if (!input) return;
