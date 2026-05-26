@@ -167,6 +167,10 @@
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 17v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2a2 2 0 002-2zM13 4v13M9 4h8"/></svg>
         Relatório
       </button>
+      <button class="desktop-nav-tab" id="dnt-stock" onclick="goToStock()">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h14M3 8h14M3 12h8M3 16h5"/><rect x="12" y="11" width="6" height="7" rx="1"/><path d="M15 11V9"/></svg>
+        Stock
+      </button>
     </nav>
 
     <div class="user-chip" onclick="openUserModal()">
@@ -432,6 +436,47 @@
       </div>
     </div>
 
+    <!-- ── Page: Stock ───────────────────────────────────────── -->
+    <div class="page" id="page-stock">
+      <div class="stock-wrap">
+
+        <!-- Sumário de topo -->
+        <div class="stock-summary-row">
+          <div class="stock-summary-chip">
+            <span class="stock-summary-val" id="stockSummaryTotal">—</span>
+            <span class="stock-summary-lbl">Referências</span>
+          </div>
+          <div class="stock-summary-chip">
+            <span class="stock-summary-val green" id="stockSummaryIn">—</span>
+            <span class="stock-summary-lbl">Com stock</span>
+          </div>
+          <div class="stock-summary-chip">
+            <span class="stock-summary-val red" id="stockSummaryZero">—</span>
+            <span class="stock-summary-lbl">Sem stock</span>
+          </div>
+        </div>
+
+        <!-- Barra de pesquisa + botão ajuste -->
+        <div class="stock-toolbar">
+          <div class="search-bar" style="flex:1">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="9" cy="9" r="6"/><path d="M14 14l3 3"/>
+            </svg>
+            <input type="search" id="stockSearch" placeholder="Pesquisar peça ou código..."
+              oninput="filterStock()" autocomplete="off">
+          </div>
+          <button class="btn btn-primary" style="white-space:nowrap;padding:0 16px;"
+            onclick="openStockAdjust('')">+ Ajuste</button>
+        </div>
+
+        <!-- Lista de peças -->
+        <div id="stockList">
+          <div class="loading-state"><div class="spinner"></div> A carregar...</div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- ── Page: Detail ────────────────────────────────────── -->
     <div class="page" id="page-detail">
       <div id="detailContent"></div>
@@ -573,9 +618,94 @@
       </svg>
       Relatório
     </button>
+
+    <button class="nav-item" data-page="stock" onclick="goToStock()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+        <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+        <line x1="12" y1="12" x2="12" y2="16"/>
+        <line x1="10" y1="14" x2="14" y2="14"/>
+      </svg>
+      Stock
+    </button>
   </nav>
 
 </div><!-- /appScreen -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     STOCK MODALS
+═══════════════════════════════════════════════════════════ -->
+
+<!-- Stock Detail Modal -->
+<div class="modal-overlay" id="stockDetailModal" onclick="closeStockDetail(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+
+    <!-- Header da peça -->
+    <div class="stock-detail-header">
+      <div>
+        <div class="modal-title" id="stockDetailTitle">—</div>
+        <div class="stock-detail-code" id="stockDetailCode">—</div>
+      </div>
+      <div class="stock-detail-qty-wrap">
+        <div class="stock-detail-qty" id="stockDetailQty">—</div>
+        <div class="stock-detail-qty-lbl">em stock</div>
+      </div>
+    </div>
+
+    <!-- Botão ajustar -->
+    <button class="btn btn-primary btn-full" style="margin-bottom:16px;"
+      onclick="openStockAdjust(stockDetailPartNo)">🔧 Ajustar Stock</button>
+
+    <!-- Histórico -->
+    <div class="stock-history-title">Histórico de Movimentos</div>
+    <div id="stockDetailHistory">
+      <div class="loading-state"><div class="spinner"></div></div>
+    </div>
+
+    <button class="btn btn-full" style="margin-top:12px;" onclick="closeModal('stockDetailModal')">Fechar</button>
+  </div>
+</div>
+
+<!-- Stock Adjust Modal -->
+<div class="modal-overlay" id="stockAdjustModal" onclick="closeStockAdjust(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Ajustar Stock</div>
+
+    <div class="field">
+      <label class="field-label">Código da Peça (Part No)</label>
+      <input class="field-input" type="text" id="adjustPartNoInput"
+        placeholder="ex: 8GR8-070100" style="font-family:var(--font-mono)">
+    </div>
+
+    <div class="field">
+      <label class="field-label">Tipo de movimento</label>
+      <select class="field-input" id="adjustType">
+        <option value="in">📥 Entrada — adicionar ao stock</option>
+        <option value="out">📤 Saída — remover do stock</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Quantidade</label>
+      <input class="field-input" type="number" id="adjustQty"
+        min="1" placeholder="ex: 3">
+    </div>
+
+    <div class="field">
+      <label class="field-label">Nota <span class="field-optional">opcional</span></label>
+      <input class="field-input" type="text" id="adjustNote"
+        placeholder="ex: Stock inicial, Devolução, Quebra...">
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn btn-full" onclick="closeModal('stockAdjustModal')">Cancelar</button>
+      <button class="btn btn-primary btn-full" id="adjustConfirmBtn" onclick="doStockAdjust()">✓ Confirmar</button>
+    </div>
+  </div>
+</div>
 
 
 <!-- ══════════════════════════════════════════════════════════

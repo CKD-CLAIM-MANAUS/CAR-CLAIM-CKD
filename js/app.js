@@ -7,11 +7,14 @@ import { generateCAR, downloadBlob, getMissingFields } from './car.js';
 import { importPackList } from './packList.js';
 import { showToast, showPage, openFullscreen, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading } from './ui.js';
 import { renderDashboard, setDashPeriod } from './dashboard.js';
+import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 
 // ── State ─────────────────────────────────────────────────────
 let currentFilter = 'all';
 let currentPhotos = [];
 let editingId     = null;
+let stockItems    = [];
+let stockDetailPartNo = null;
 
 // ── Auth ──────────────────────────────────────────────────────
 initAuth(
@@ -160,6 +163,192 @@ function setDesktopTab(tabId) {
 window.goToList  = () => { showPage('list');  setDesktopTab('list');  loadAndRender(); checkForDraft(); };
 window.goToForm  = () => { clearForm(); showPage('form'); setDesktopTab('form'); startDraftTimer(); attachDraftListeners(); };
 window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); updateExcelStats(); renderDashboard(); };
+window.goToStock = () => { showPage('stock'); setDesktopTab('stock'); renderStockPage(); };
+
+// ══════════════════════════════════════════════════════════════
+// STOCK — funções de página
+// ══════════════════════════════════════════════════════════════
+
+async function renderStockPage() {
+  const el = document.getElementById('stockList');
+  if (!el) return;
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div> A carregar...</div>';
+  try {
+    stockItems = await loadStock();
+    renderStockList();
+    updateStockSummary();
+  } catch (e) {
+    el.innerHTML = `<div class="loading-state" style="color:var(--red-500)">Erro: ${e.message}</div>`;
+  }
+}
+
+function renderStockList(search = '') {
+  const el = document.getElementById('stockList');
+  if (!el) return;
+  const q = (search || '').toLowerCase();
+  const filtered = q
+    ? stockItems.filter(i =>
+        (i.partName || '').toLowerCase().includes(q) ||
+        (i.partNo   || '').toLowerCase().includes(q))
+    : stockItems;
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="loading-state" style="color:var(--ink-400);font-size:13px;">
+      ${q ? 'Nenhuma peça encontrada.' : 'Nenhuma peça em stock.<br>O stock actualiza automaticamente quando incidentes mudam de status.'}
+    </div>`;
+    return;
+  }
+
+  // Ordenar: zero/negativo primeiro, depois crescente por qty, depois nome
+  const sorted = [...filtered].sort((a, b) => {
+    const qa = a.qty || 0, qb = b.qty || 0;
+    if (qa <= 0 && qb > 0) return -1;
+    if (qa > 0 && qb <= 0) return 1;
+    if (qa <= 2 && qb > 2) return -1;
+    if (qa > 2 && qb <= 2) return 1;
+    return (a.partName || '').localeCompare(b.partName || '');
+  });
+
+  el.innerHTML = sorted.map(item => {
+    const qty = item.qty || 0;
+    const cls = qty <= 0 ? 'stock-zero' : qty <= 2 ? 'stock-low' : 'stock-ok';
+    const dot = qty <= 0 ? 'var(--red-500)' : qty <= 2 ? 'var(--amber-500)' : 'var(--green-500)';
+    const safePartNo = (item.partNo || '').replace(/'/g, "\\'");
+    return `
+      <div class="stock-card" onclick="openStockDetail('${safePartNo}')">
+        <span class="stock-dot" style="background:${dot}"></span>
+        <div class="stock-info">
+          <div class="stock-name">${item.partName || '—'}</div>
+          <div class="stock-code">${item.partNo || '—'}</div>
+        </div>
+        <div class="stock-qty ${cls}">${qty}</div>
+      </div>`;
+  }).join('');
+}
+
+function updateStockSummary() {
+  const total   = stockItems.length;
+  const inStock = stockItems.filter(i => (i.qty || 0) > 0).length;
+  const zero    = stockItems.filter(i => (i.qty || 0) <= 0).length;
+  const t = document.getElementById('stockSummaryTotal');
+  const s = document.getElementById('stockSummaryIn');
+  const z = document.getElementById('stockSummaryZero');
+  if (t) t.textContent = total;
+  if (s) s.textContent = inStock;
+  if (z) z.textContent = zero;
+}
+
+window.filterStock = () => {
+  renderStockList(document.getElementById('stockSearch')?.value || '');
+};
+
+window.openStockDetail = async (partNo) => {
+  stockDetailPartNo = partNo;
+  const item = stockItems.find(i => i.partNo === partNo) || { partNo, partName: '', qty: 0 };
+  const qty  = item.qty || 0;
+  const cls  = qty <= 0 ? 'stock-zero' : qty <= 2 ? 'stock-low' : 'stock-ok';
+
+  const titleEl = document.getElementById('stockDetailTitle');
+  const codeEl  = document.getElementById('stockDetailCode');
+  const qtyEl   = document.getElementById('stockDetailQty');
+  if (titleEl) titleEl.textContent = item.partName || partNo;
+  if (codeEl)  codeEl.textContent  = partNo;
+  if (qtyEl)   { qtyEl.textContent = qty; qtyEl.className = 'stock-detail-qty ' + cls; }
+
+  const histEl = document.getElementById('stockDetailHistory');
+  if (histEl) histEl.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+
+  openModal('stockDetailModal');
+
+  try {
+    const history = await getStockHistory(partNo);
+    if (!history.length) {
+      histEl.innerHTML = '<p style="color:var(--ink-400);font-size:13px;text-align:center;padding:16px 0;">Sem movimentos registados</p>';
+      return;
+    }
+    histEl.innerHTML = history.map(m => {
+      const icon  = m.type === 'in' ? '📥' : m.type === 'out' ? '📤' : '🔧';
+      const sign  = m.qty > 0 ? '+' : '';
+      const color = m.qty > 0 ? 'var(--green-500)' : 'var(--red-500)';
+      const d     = new Date(m.date);
+      const ds    = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      return `
+        <div class="stock-move-row">
+          <span class="stock-move-icon">${icon}</span>
+          <div class="stock-move-info">
+            <span class="stock-move-label">${m.note || (m.type === 'in' ? 'Entrada' : m.type === 'out' ? 'Saída' : 'Ajuste')}</span>
+            ${m.carNum ? `<span class="stock-move-car">${m.carNum}</span>` : ''}
+          </div>
+          <div class="stock-move-right">
+            <span class="stock-move-qty" style="color:${color}">${sign}${m.qty}</span>
+            <span class="stock-move-date">${ds}</span>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    if (histEl) histEl.innerHTML = `<p style="color:var(--red-500);font-size:13px;text-align:center;">Erro: ${e.message}</p>`;
+  }
+};
+
+window.closeStockDetail = (e) => {
+  if (!e || e.target === document.getElementById('stockDetailModal')) closeModal('stockDetailModal');
+};
+
+window.openStockAdjust = (partNo) => {
+  const pNo  = partNo || '';
+  const item = stockItems.find(i => i.partNo === pNo) || { partNo: pNo, partName: '', qty: 0 };
+
+  const pnEl = document.getElementById('adjustPartNoInput');
+  const qEl  = document.getElementById('adjustQty');
+  const nEl  = document.getElementById('adjustNote');
+  const tEl  = document.getElementById('adjustType');
+  if (pnEl) pnEl.value = item.partNo || '';
+  if (qEl)  qEl.value  = '';
+  if (nEl)  nEl.value  = '';
+  if (tEl)  tEl.value  = 'in';
+  openModal('stockAdjustModal');
+};
+
+window.closeStockAdjust = (e) => {
+  if (!e || e.target === document.getElementById('stockAdjustModal')) closeModal('stockAdjustModal');
+};
+
+window.doStockAdjust = async () => {
+  const partNoVal = (document.getElementById('adjustPartNoInput')?.value || '').trim();
+  const type      = document.getElementById('adjustType')?.value || 'in';
+  const qtyRaw    = parseInt(document.getElementById('adjustQty')?.value || '0');
+  const note      = (document.getElementById('adjustNote')?.value || '').trim();
+
+  if (!partNoVal)       { showToast('⚠️ Código da peça em falta'); return; }
+  if (!qtyRaw || qtyRaw <= 0) { showToast('⚠️ Quantidade inválida'); return; }
+
+  const item = stockItems.find(i => i.partNo === partNoVal) || { partNo: partNoVal, partName: '' };
+  const qty  = type === 'out' ? -qtyRaw : qtyRaw;
+
+  const btn = document.getElementById('adjustConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ A guardar...'; }
+
+  try {
+    await recordStockMovement({
+      partNo:   item.partNo,
+      partName: item.partName,
+      type:     'adjust',
+      qty,
+      user:     currentUser?.displayName || currentUser?.email || '',
+      note:     note || (type === 'in' ? 'Entrada manual' : 'Saída manual'),
+    });
+    closeModal('stockAdjustModal');
+    showToast(type === 'in'
+      ? `📥 +${qtyRaw} adicionado ao stock`
+      : `📤 −${qtyRaw} removido do stock`);
+    await renderStockPage();
+    if (stockDetailPartNo === partNoVal) await window.openStockDetail(partNoVal);
+  } catch (e) {
+    showToast('❌ Erro: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Confirmar'; }
+  }
+};
 
 // ── Sub-tabs da página Relatório ──────────────────────────────
 window.showExcelTab = (tab) => {
@@ -517,8 +706,23 @@ window.showDetail = (id) => {
 };
 
 window.doMarkDone = async (id) => {
-  try { await updateIncidentStatus(id, 'done', currentUser); showToast('✅ Claim encerrado!'); window.showDetail(id); renderList(); }
-  catch { showToast('Erro ao actualizar.'); }
+  try {
+    await updateIncidentStatus(id, 'done', currentUser);
+    // Stock OUT automático
+    const inc = incidents.find(i => i.id === id);
+    if (inc?.partNo && inc?.ngQty) {
+      const qty = parseInt(inc.ngQty) || 0;
+      if (qty > 0) recordStockMovement({
+        partNo: inc.partNo, partName: inc.partName || '',
+        type: 'out', qty: -qty,
+        incidentId: id, carNum: inc.carNum || null,
+        user: currentUser?.displayName || currentUser?.email || '',
+        note: `Instalado · ${inc.carNum || id}`,
+      }).catch(e => console.warn('Stock OUT:', e));
+    }
+    showToast('✅ Claim encerrado!');
+    window.showDetail(id); renderList();
+  } catch { showToast('Erro ao actualizar.'); }
 };
 
 window.doMarkPending = async (id) => {
@@ -537,6 +741,32 @@ window.doAdvanceStatus = async (id, newStatus) => {
   };
   try {
     await updateIncidentStatus(id, newStatus, currentUser);
+
+    // ── Stock automático ────────────────────────────────────
+    const inc = incidents.find(i => i.id === id);
+    if (inc?.partNo && inc?.ngQty) {
+      const qty = parseInt(inc.ngQty) || 0;
+      if (qty > 0 && newStatus === 'received') {
+        recordStockMovement({
+          partNo: inc.partNo, partName: inc.partName || '',
+          type: 'in', qty,
+          incidentId: id, carNum: inc.carNum || null,
+          user: currentUser?.displayName || currentUser?.email || '',
+          note: `Recebido · ${inc.carNum || id}`,
+        }).catch(e => console.warn('Stock IN:', e));
+      }
+      if (qty > 0 && newStatus === 'done') {
+        recordStockMovement({
+          partNo: inc.partNo, partName: inc.partName || '',
+          type: 'out', qty: -qty,
+          incidentId: id, carNum: inc.carNum || null,
+          user: currentUser?.displayName || currentUser?.email || '',
+          note: `Instalado · ${inc.carNum || id}`,
+        }).catch(e => console.warn('Stock OUT:', e));
+      }
+    }
+    // ────────────────────────────────────────────────────────
+
     showToast(LABELS[newStatus] || 'Status actualizado');
     window.showDetail(id);
     renderList();

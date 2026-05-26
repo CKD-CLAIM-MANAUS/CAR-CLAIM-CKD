@@ -1945,3 +1945,230 @@ img { display: block; max-width: 100%; }
   font-weight: 600;
   font-family: var(--font-mono, monospace);
 }
+
+/* ══════════════════════════════════════════════════════════
+   STOCK PAGE
+══════════════════════════════════════════════════════════ */
+
+.stock-wrap {
+  padding: 14px 12px;
+  padding-bottom: calc(var(--bottom-h) + 14px);
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Sumário de topo ──────────────────────────────────────── */
+.stock-summary-row {
+  display: flex;
+  gap: 8px;
+}
+
+.stock-summary-chip {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.stock-summary-val {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink-100);
+  line-height: 1.1;
+}
+.stock-summary-val.green { color: var(--green-500); }
+.stock-summary-val.red   { color: var(--red-500);   }
+
+.stock-summary-lbl {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-300);
+  margin-top: 3px;
+}
+
+/* ── Toolbar pesquisa + botão ─────────────────────────────── */
+.stock-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Card de peça ─────────────────────────────────────────── */
+.stock-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  margin-bottom: 6px;
+}
+
+.stock-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-md);
+}
+
+.stock-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stock-info { flex: 1; min-width: 0; }
+
+.stock-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-100);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.stock-code {
+  font-size: 11px;
+  color: var(--ink-300);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.stock-qty {
+  font-size: 20px;
+  font-weight: 800;
+  min-width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+  letter-spacing: -0.02em;
+}
+
+/* cores de quantidade */
+.stock-ok   { color: var(--green-500); }
+.stock-low  { color: var(--amber-500); }
+.stock-zero { color: var(--red-500);   }
+
+/* ── Stock Detail Modal ───────────────────────────────────── */
+.stock-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.stock-detail-code {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-300);
+  margin-top: 3px;
+}
+
+.stock-detail-qty-wrap { text-align: right; }
+
+.stock-detail-qty {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.stock-detail-qty-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-300);
+  margin-top: 2px;
+}
+
+.stock-history-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-300);
+  margin-bottom: 8px;
+}
+
+/* ── Linha de movimento ───────────────────────────────────── */
+.stock-move-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.stock-move-row:last-child { border-bottom: none; }
+
+.stock-move-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+}
+
+.stock-move-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.stock-move-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-200);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stock-move-car {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--ink-400);
+  margin-top: 2px;
+}
+
+.stock-move-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.stock-move-qty {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.stock-move-date {
+  display: block;
+  font-size: 10px;
+  color: var(--ink-400);
+  margin-top: 1px;
+}
+
+/* ── Desktop: stock page full-width ──────────────────────── */
+@media (min-width: 900px) {
+  .stock-wrap {
+    max-width: 720px;
+    padding-bottom: 24px;
+  }
+}
