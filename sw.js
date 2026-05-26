@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v10';
+const CACHE_NAME = 'car-garantia-v11';
 
 const STATIC_ASSETS = [
   '/CAR-CLAIM-CKD/',
