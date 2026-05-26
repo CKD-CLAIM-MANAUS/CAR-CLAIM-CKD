@@ -224,13 +224,16 @@ function renderList() {
   document.getElementById('statPending').textContent = stats.pending;
   document.getElementById('statDone').textContent    = stats.done;
 
-  // Empty state KPIs (desktop detail panel)
-  const emT = document.getElementById('emptyTotal');
-  const emP = document.getElementById('emptyPending');
-  const emD = document.getElementById('emptyDone');
-  if (emT) emT.textContent = stats.total;
-  if (emP) emP.textContent = stats.pending;
-  if (emD) emD.textContent = stats.done;
+  // Empty state KPIs (desktop detail panel) — 4 grupos
+  const IN_TRANSIT = ['sent', 'awaiting', 'eta_confirmed', 'received'];
+  const emT  = document.getElementById('emptyTotal');
+  const emP  = document.getElementById('emptyPending');
+  const emTr = document.getElementById('emptyInTransit');
+  const emD  = document.getElementById('emptyDone');
+  if (emT)  emT.textContent  = incidents.length;
+  if (emP)  emP.textContent  = incidents.filter(i => (i.status || 'pending') === 'pending').length;
+  if (emTr) emTr.textContent = incidents.filter(i => IN_TRANSIT.includes(i.status)).length;
+  if (emD)  emD.textContent  = incidents.filter(i => i.status === 'done').length;
 
   // Adiciona tendência ao card total
   const trendEl = document.getElementById('statTrend');

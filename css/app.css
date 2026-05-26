@@ -1116,7 +1116,7 @@ img { display: block; max-width: 100%; }
 
 .empty-kpi {
   text-align: center;
-  padding: 24px 36px;
+  padding: 22px 26px;
 }
 
 .empty-kpi-sep {
@@ -1133,8 +1133,9 @@ img { display: block; max-width: 100%; }
   letter-spacing: -0.03em;
 }
 
-.empty-kpi-val.orange { color: var(--blue-500); }
+.empty-kpi-val.orange { color: var(--blue-500);  }
 .empty-kpi-val.amber  { color: var(--amber-500); }
+.empty-kpi-val.cyan   { color: #06B6D4;          }
 .empty-kpi-val.green  { color: var(--green-500); }
 
 .empty-kpi-lbl {
