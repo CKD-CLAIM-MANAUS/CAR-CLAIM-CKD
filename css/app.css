@@ -1073,7 +1073,23 @@ img { display: block; max-width: 100%; }
     height: 100%;
     text-align: center;
     padding: 40px;
-    background: radial-gradient(ellipse at 50% 40%, rgba(255,102,0,0.07) 0%, transparent 65%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Logo CFMOTO como watermark de fundo */
+  .desktop-detail-empty::before {
+    content: '';
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    background: url('../logo.png') center / contain no-repeat;
+    filter: invert(1) saturate(0);
+    opacity: 0.035;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -62%);
+    pointer-events: none;
   }
 
   #desktopDetailContent { flex: 1; }
@@ -1084,73 +1100,70 @@ img { display: block; max-width: 100%; }
     background: var(--bg-hover);
     box-shadow: inset 0 0 0 1px rgba(255,102,0,0.2);
   }
+}
 
-  /* ── Empty state: logo + KPIs ───────────────────────────── */
-  .empty-logo {
-    height: 100px;
-    filter: invert(1) brightness(1.3) saturate(0) contrast(0.8);
-    opacity: 0.55;
-    margin-bottom: 16px;
-  }
-  .empty-brand-name {
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--ink-100);
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-  }
-  .empty-brand-sub {
-    font-size: 12px;
-    color: var(--ink-300);
-    margin-top: 3px;
-    margin-bottom: 32px;
-  }
-  .empty-divider {
-    width: 48px;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, rgba(255,102,0,0.5), transparent);
-    border-radius: 1px;
-    margin: 0 auto 28px;
-  }
-  .empty-kpi-grid {
-    display: flex;
-    gap: 36px;
-    align-items: flex-start;
-    margin-bottom: 32px;
-  }
-  .empty-kpi { text-align: center; }
-  .empty-kpi-val {
-    font-size: 40px;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.03em;
-  }
-  .empty-kpi-val.orange { color: var(--blue-500); }
-  .empty-kpi-val.amber  { color: var(--amber-500); }
-  .empty-kpi-val.green  { color: var(--green-500); }
-  .empty-kpi-lbl {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-300);
-    margin-top: 6px;
-  }
-  .empty-hint {
-    font-size: 13px;
-    color: var(--ink-400);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .empty-hint-arrow {
-    font-size: 16px;
-    animation: hintArrow 1.6s ease-in-out infinite;
-  }
-  @keyframes hintArrow {
-    0%, 100% { transform: translateX(0); opacity: 0.5; }
-    50%       { transform: translateX(-5px); opacity: 1; }
-  }
+/* ── Empty state KPIs (fora do @media para garantir parsing) ── */
+.empty-kpi-grid {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.empty-kpi {
+  text-align: center;
+  padding: 24px 36px;
+}
+
+.empty-kpi-sep {
+  width: 1px;
+  height: 44px;
+  background: rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+
+.empty-kpi-val {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.empty-kpi-val.orange { color: var(--blue-500); }
+.empty-kpi-val.amber  { color: var(--amber-500); }
+.empty-kpi-val.green  { color: var(--green-500); }
+
+.empty-kpi-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.3);
+  margin-top: 8px;
+}
+
+.empty-hint {
+  font-size: 13px;
+  color: rgba(255,255,255,0.22);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.empty-hint-arrow {
+  display: inline-block;
+  animation: hintArrow 1.8s ease-in-out infinite;
+}
+
+@keyframes hintArrow {
+  0%, 100% { transform: translateX(0);   opacity: 0.35; }
+  50%       { transform: translateX(-7px); opacity: 0.9;  }
 }
 
 /* ── Nav com glow laranja ───────────────────────────────────── */
