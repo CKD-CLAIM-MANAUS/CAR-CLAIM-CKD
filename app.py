@@ -1,5 +1,7 @@
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
+import firebase_admin
+from firebase_admin import credentials, auth as fb_auth
 import openpyxl
 from openpyxl.drawing.image import Image as XLImage
 from datetime import datetime
@@ -10,11 +12,56 @@ import json
 import re
 from PIL import Image as PILImage
 
+# ── Firebase Admin SDK ────────────────────────────────────────
+# Credenciais definidas como variável de ambiente no Railway
+_cred_json = os.environ.get('FIREBASE_ADMIN_CREDENTIALS')
+if _cred_json:
+    _cred = credentials.Certificate(json.loads(_cred_json))
+    firebase_admin.initialize_app(_cred)
+
+# ── App & CORS ────────────────────────────────────────────────
+ALLOWED_ORIGIN  = os.environ.get('ALLOWED_ORIGIN', 'https://ckd-claim-manaus.github.io')
+CLOUDINARY_BASE = 'https://res.cloudinary.com/dos2jsgzg/'
+TEMPLATE_PATH   = os.path.join(os.path.dirname(__file__), 'template.xlsx')
+
 app = Flask(__name__)
-CORS(app)
+CORS(app,
+     origins=[ALLOWED_ORIGIN],
+     methods=['GET', 'POST', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'])
 
-TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'template.xlsx')
+# ── Auth ──────────────────────────────────────────────────────
+def verify_token():
+    """Verifica o Firebase ID token no header Authorization: Bearer <token>"""
+    header = request.headers.get('Authorization', '')
+    if not header.startswith('Bearer '):
+        return None
+    token = header.split('Bearer ', 1)[1].strip()
+    try:
+        return fb_auth.verify_id_token(token)
+    except Exception:
+        return None
 
+# ── Validação ─────────────────────────────────────────────────
+def is_valid_cloudinary_url(url):
+    """Aceita apenas URLs do Cloudinary do projeto."""
+    if not url or not isinstance(url, str):
+        return False
+    return url.startswith(CLOUDINARY_BASE)
+
+def sanitize_str(value, max_len=500):
+    if not value:
+        return ''
+    return str(value).strip()[:max_len]
+
+def sanitize_int(value, default=1, min_val=0, max_val=9999):
+    try:
+        v = int(value if value is not None else default)
+        return max(min_val, min(max_val, v))
+    except (TypeError, ValueError):
+        return default
+
+# ── Tradução ──────────────────────────────────────────────────
 def translate_to_english(text):
     if not text:
         return ''
@@ -39,12 +86,12 @@ def translate_to_english(text):
         print(f'Translation error: {e}')
         return text.upper()
 
-def cloudinary_resize_url(url, width, height):
-    # Return original URL without any transformation for best quality
-    return url
-
+# ── Processamento de imagem ───────────────────────────────────
 def download_and_process(url, width, height):
-    """Download image, process with Pillow, return temp file path."""
+    """Baixa imagem apenas de URLs Cloudinary e processa com Pillow."""
+    if not is_valid_cloudinary_url(url):
+        print(f'URL rejeitada (não Cloudinary): {url}')
+        return None
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=15) as response:
@@ -63,31 +110,45 @@ def download_and_process(url, width, height):
         print(f'Image processing error: {e}')
         return None
 
+# ── Rotas ─────────────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'pillow': PILImage.__version__})
 
 @app.route('/generate-car', methods=['POST'])
 def generate_car():
+    # 1. Autenticação obrigatória
+    user_token = verify_token()
+    if not user_token:
+        return jsonify({'error': 'Não autorizado. Faça login novamente.'}), 401
+
     tmp_files = []
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({'error': 'Dados inválidos.'}), 400
 
-        car_num     = data.get('carNum', '000/26')
-        part_name   = (data.get('partName', '') or '').upper()
-        part_no     = (data.get('partNo', '') or '').upper()
-        model       = (data.get('model', '') or '').upper()
-        order_no    = (data.get('orderNo', '') or '').upper()
-        lot_no      = (data.get('lotNo', '') or '').upper()
-        ng_qty      = int(data.get('ngQty', 1) or 1)
-        defect      = (data.get('defect', '') or '').upper()
-        detected    = data.get('detected', '') or ''
-        user        = (data.get('user', 'LUIS HERNANDEZ') or '').upper()
-        replacement = data.get('replacement', 'NEED')
+        # 2. Sanitização de todos os inputs
+        car_num     = sanitize_str(data.get('carNum', '000/26'), 20)
+        part_name   = sanitize_str(data.get('partName', ''), 200).upper()
+        part_no     = sanitize_str(data.get('partNo', ''), 100).upper()
+        model       = sanitize_str(data.get('model', ''), 100).upper()
+        order_no    = sanitize_str(data.get('orderNo', ''), 100).upper()
+        lot_no      = sanitize_str(data.get('lotNo', ''), 100).upper()
+        ng_qty      = sanitize_int(data.get('ngQty', 1))
+        defect      = sanitize_str(data.get('defect', ''), 500).upper()
+        detected    = sanitize_str(data.get('detected', ''), 500)
+        user        = sanitize_str(data.get('user', ''), 100).upper()
+        replacement = sanitize_str(data.get('replacement', 'NEED'), 20)
+        issue_date  = sanitize_str(data.get('issueDate', datetime.now().strftime('%d/%m/%Y')), 20)
+        photos_raw  = data.get('photos', [])
+
+        # 3. Validação das URLs das fotos (apenas Cloudinary)
+        if not isinstance(photos_raw, list):
+            return jsonify({'error': 'Formato de fotos inválido.'}), 400
+        photos = [p for p in photos_raw[:10] if is_valid_cloudinary_url(p)]
+
         repl_qty    = 0 if replacement == 'NO NEED' else ng_qty
-        issue_date  = data.get('issueDate', datetime.now().strftime('%d/%m/%Y'))
-        photos      = data.get('photos', [])
-
         detected_en = translate_to_english(detected)
         short_defect = part_name + (' (' + defect[:50] + ')' if defect else '')
         parts_desc = []
@@ -117,20 +178,11 @@ def generate_car():
         ws['A11'] = full_desc
         ws['V16'] = repl_qty
 
-        # Photo anchors - A16, Z22, A37, Z37, A50, Z50... for unlimited photos
-        # Starting positions for each photo
         photo_anchors = ['A16', 'Z22', 'A37', 'Z50', 'A63', 'Z63']
 
         for i, photo_url in enumerate(photos):
-            if not photo_url:
-                continue
-            # Use predefined anchor or generate one
-            if i < len(photo_anchors):
-                anchor = photo_anchors[i]
-            else:
-                anchor = f'A{16 + (i * 15)}'
-            resized_url = cloudinary_resize_url(photo_url, 0, 0)
-            tmp_path = download_and_process(resized_url, 800, 600)
+            anchor = photo_anchors[i] if i < len(photo_anchors) else f'A{16 + (i * 15)}'
+            tmp_path = download_and_process(photo_url, 800, 600)
             if tmp_path:
                 tmp_files.append(tmp_path)
                 try:
@@ -145,9 +197,9 @@ def generate_car():
         wb.save(buf)
         buf.seek(0)
 
-        part_code = (data.get('partNo', 'PART') or 'PART').replace(' ', '_')[:20]
-        car_code = car_num.replace('/', '_')
-        filename = f'CAR_No_{car_code}_{part_code}.xlsx'
+        part_code = (part_no or 'PART').replace(' ', '_')[:20]
+        car_code  = car_num.replace('/', '_')
+        filename  = f'CAR_No_{car_code}_{part_code}.xlsx'
 
         return send_file(
             buf,
@@ -157,17 +209,17 @@ def generate_car():
         )
 
     except Exception as e:
-        print(f'Error: {e}')
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        # 4. Sem stack trace em produção
+        print(f'Error in generate_car: {e}')
+        return jsonify({'error': 'Erro interno ao gerar o relatório.'}), 500
+
     finally:
         for f in tmp_files:
             try:
                 os.unlink(f)
-            except:
+            except Exception:
                 pass
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)

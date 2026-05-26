@@ -1,7 +1,15 @@
 // ── car.js ────────────────────────────────────────────────────
+import { auth } from './firebase.js';
+
 const CAR_SERVER_URL = 'https://web-production-6bff6.up.railway.app';
 
 export async function generateCAR(inc, carNum) {
+  // Obtém o token Firebase do utilizador autenticado
+  if (!auth.currentUser) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+  const token = await auth.currentUser.getIdToken(/* forceRefresh */ false);
+
   const issueDate = inc.createdAt
     ? new Date(inc.createdAt).toLocaleDateString('pt-BR')
     : new Date().toLocaleDateString('pt-BR');
@@ -24,13 +32,20 @@ export async function generateCAR(inc, carNum) {
 
   const res = await fetch(CAR_SERVER_URL + '/generate-car', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
     body: JSON.stringify(payload)
   });
 
+  if (res.status === 401) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+
   if (!res.ok) {
-    const err = await res.text().catch(() => res.status);
-    throw new Error('Erro no servidor: ' + err);
+    const err = await res.json().catch(() => ({ error: res.status }));
+    throw new Error('Erro no servidor: ' + (err.error || res.status));
   }
 
   return res.blob();
