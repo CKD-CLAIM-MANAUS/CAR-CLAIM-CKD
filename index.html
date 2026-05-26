@@ -412,6 +412,18 @@
     <!-- ── Page: Excel / Import ────────────────────────────── -->
     <div class="page" id="page-excel">
 
+      <!-- Sub-tabs: Dashboard / Relatórios -->
+      <div class="sub-tabs-row">
+        <button class="sub-tab active" id="st-dashboard" onclick="showExcelTab('dashboard')">📊 Dashboard</button>
+        <button class="sub-tab" id="st-reports" onclick="showExcelTab('reports')">📋 Relatórios</button>
+      </div>
+
+      <!-- Dashboard section -->
+      <div id="dashboardSection"></div>
+
+      <!-- Reports section (pack list + excel export) -->
+      <div id="reportsSection" style="display:none; padding:16px;">
+
       <!-- Import Pack List -->
       <div class="form-card" style="margin-bottom:12px">
         <div class="form-card-title">
@@ -493,6 +505,8 @@
           📥 Exportar Excel
         </button>
       </div>
+
+      </div><!-- /reportsSection -->
 
     </div>
 

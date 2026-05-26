@@ -1407,3 +1407,305 @@ img { display: block; max-width: 100%; }
   flex: 1;
   font-size: 13px;
 }
+
+/* ── Sub-tabs (Dashboard / Relatórios) ──────────────────── */
+.sub-tabs-row {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.07));
+  padding: 0 16px;
+  background: var(--bg-base, #060E1A);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.sub-tab {
+  padding: 12px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-300, rgba(255,255,255,0.4));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+
+.sub-tab.active {
+  color: #3B74E8;
+  border-bottom-color: #3B74E8;
+}
+
+/* ── Dashboard wrapper ───────────────────────────────────── */
+.dash-wrap {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 32px;
+}
+
+/* ── Período pills ───────────────────────────────────────── */
+.dash-period-row {
+  display: flex;
+  gap: 8px;
+}
+
+.dash-pill {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+}
+
+.dash-pill.active {
+  background: #1A56CC;
+  border-color: #1A56CC;
+  color: white;
+}
+
+/* ── KPI grid ────────────────────────────────────────────── */
+.dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .dash-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.dash-kpi {
+  background: var(--bg-card, #0D1E35);
+  border: 1px solid var(--border, rgba(255,255,255,0.07));
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.dash-kpi-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--kc, #3B74E8);
+  line-height: 1.1;
+}
+
+.dash-kpi-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+}
+
+/* ── Cards genéricos ─────────────────────────────────────── */
+.dash-card {
+  background: var(--bg-card, #0D1E35);
+  border: 1px solid var(--border, rgba(255,255,255,0.07));
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.dash-card-hd {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 14px;
+}
+
+.dash-card-sub {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: rgba(255,255,255,0.3);
+}
+
+/* ── Gráfico de barras mensais ───────────────────────────── */
+.dash-month-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 110px;
+  padding-top: 4px;
+}
+
+.dash-month-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.dash-month-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.dash-month-bar {
+  width: 100%;
+  background: linear-gradient(180deg, #3B74E8, #1A56CC);
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.4s ease;
+}
+
+.dash-month-cnt {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  margin-top: 4px;
+  min-height: 14px;
+  line-height: 1;
+}
+
+.dash-month-lbl {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  text-transform: capitalize;
+  margin-top: 2px;
+}
+
+/* ── Grid 2 colunas ──────────────────────────────────────── */
+.dash-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ── Linhas de status ────────────────────────────────────── */
+.dash-st-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.dash-st-row:last-child { border-bottom: none; }
+
+.dash-st-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dash-st-name {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+}
+
+.dash-st-cnt {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+}
+
+/* ── Linhas de barra (top peças / por modelo) ────────────── */
+.dash-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
+}
+
+.dash-bar-row:last-child { margin-bottom: 0; }
+
+.dash-bar-labels {
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.dash-bar-name {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-bar-sub {
+  display: block;
+  font-size: 9px;
+  color: rgba(255,255,255,0.25);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dash-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.dash-bar-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Cards de tempo médio ────────────────────────────────── */
+.dash-time-card {
+  text-align: center;
+  padding: 20px 12px;
+}
+
+.dash-time-ico {
+  font-size: 26px;
+  margin-bottom: 8px;
+}
+
+.dash-time-val {
+  font-size: 30px;
+  font-weight: 800;
+  color: #3B74E8;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.dash-time-lbl {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.5;
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+.dash-empty {
+  font-size: 12px;
+  color: rgba(255,255,255,0.25);
+  text-align: center;
+  padding: 16px 0;
+  margin: 0;
+}

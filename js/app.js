@@ -6,6 +6,7 @@ import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
 import { importPackList } from './packList.js';
 import { showToast, showPage, openFullscreen, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading } from './ui.js';
+import { renderDashboard, setDashPeriod } from './dashboard.js';
 
 // ── State ─────────────────────────────────────────────────────
 let currentFilter = 'all';
@@ -158,7 +159,22 @@ function setDesktopTab(tabId) {
 
 window.goToList  = () => { showPage('list');  setDesktopTab('list');  loadAndRender(); checkForDraft(); };
 window.goToForm  = () => { clearForm(); showPage('form'); setDesktopTab('form'); startDraftTimer(); attachDraftListeners(); };
-window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); updateExcelStats(); };
+window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); updateExcelStats(); renderDashboard(); };
+
+// ── Sub-tabs da página Relatório ──────────────────────────────
+window.showExcelTab = (tab) => {
+  const dash    = document.getElementById('dashboardSection');
+  const reports = document.getElementById('reportsSection');
+  if (dash)    dash.style.display    = tab === 'dashboard' ? '' : 'none';
+  if (reports) reports.style.display = tab === 'reports'   ? '' : 'none';
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  const btn = document.getElementById('st-' + tab);
+  if (btn) btn.classList.add('active');
+  if (tab === 'dashboard') renderDashboard();
+};
+
+// ── Expõe setDashPeriod ao HTML ───────────────────────────────
+window.setDashPeriod = setDashPeriod;
 
 // ── Listeners para guardar rascunho ao digitar ────────────────
 function attachDraftListeners() {

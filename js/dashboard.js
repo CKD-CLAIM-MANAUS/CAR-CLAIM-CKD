@@ -1,0 +1,257 @@
+// ── dashboard.js — KPI Dashboard ─────────────────────────────
+import { incidents } from './incidents.js';
+
+let dashPeriod = 'month'; // 'month' | '3m' | 'all'
+
+// ── Filtro por período ─────────────────────────────────────────
+function getPeriodIncs(period) {
+  if (period === 'month') {
+    const start = new Date();
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    return incidents.filter(i => i.createdAt >= start.getTime());
+  }
+  if (period === '3m') {
+    const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    return incidents.filter(i => i.createdAt >= cutoff);
+  }
+  return [...incidents];
+}
+
+// ── KPIs ──────────────────────────────────────────────────────
+function calcKPIs(incs) {
+  const total        = incs.length;
+  const pending      = incs.filter(i => (i.status || 'pending') === 'pending').length;
+  const done         = incs.filter(i => i.status === 'done').length;
+  const inProgress   = incs.filter(i => ['sent', 'awaiting', 'eta_confirmed', 'received'].includes(i.status)).length;
+  const totalDefective = incs.reduce((s, i) => s + (parseInt(i.ngQty) || 0), 0);
+
+  const doneIncs = incs.filter(i => i.status === 'done' && i.createdAt && i.completedAt);
+  const avgResolutionDays = doneIncs.length
+    ? +(doneIncs.reduce((s, i) => s + (i.completedAt - i.createdAt), 0) / doneIncs.length / 86400000).toFixed(1)
+    : null;
+
+  const sentIncs = incs.filter(i => i.sentAt && i.createdAt);
+  const avgSendDays = sentIncs.length
+    ? +(sentIncs.reduce((s, i) => s + (i.sentAt - i.createdAt), 0) / sentIncs.length / 86400000).toFixed(1)
+    : null;
+
+  return { total, pending, done, inProgress, totalDefective, avgResolutionDays, avgSendDays };
+}
+
+// ── Dados mensais (sempre histórico completo, últimos 6 meses) ─
+function calcMonthlyData() {
+  const result = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    const year  = d.getFullYear();
+    const month = d.getMonth();
+    const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    const count = incidents.filter(inc => {
+      if (!inc.createdAt) return false;
+      const dt = new Date(inc.createdAt);
+      return dt.getFullYear() === year && dt.getMonth() === month;
+    }).length;
+    result.push({ label, count });
+  }
+  return result;
+}
+
+// ── Por modelo ────────────────────────────────────────────────
+function calcByModel(incs) {
+  const map = {};
+  incs.forEach(i => {
+    const m = (i.model || 'N/D').trim();
+    map[m] = (map[m] || 0) + 1;
+  });
+  return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
+}
+
+// ── Top 5 peças com mais reclamações ─────────────────────────
+function calcTopParts(incs) {
+  const map = {};
+  incs.forEach(i => {
+    const key = (i.partNo || '').trim() || (i.partName || 'N/D').trim();
+    if (!map[key]) {
+      map[key] = {
+        name:  (i.partName || i.partNo || 'N/D').trim(),
+        code:  (i.partNo || '').trim(),
+        count: 0,
+        qty:   0
+      };
+    }
+    map[key].count++;
+    map[key].qty += parseInt(i.ngQty) || 0;
+  });
+  return Object.values(map).sort((a, b) => b.count - a.count).slice(0, 5);
+}
+
+// ── HTML de linha de barra ─────────────────────────────────────
+function barRow(name, sub, value, max, color) {
+  const pct = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 4;
+  return `
+    <div class="dash-bar-row">
+      <div class="dash-bar-labels">
+        <span class="dash-bar-name">${name}</span>
+        ${sub ? `<span class="dash-bar-sub">${sub}</span>` : ''}
+      </div>
+      <div class="dash-bar-track">
+        <div class="dash-bar-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <span class="dash-bar-val">${value}</span>
+    </div>`;
+}
+
+// ── Render principal ──────────────────────────────────────────
+export function renderDashboard() {
+  const el = document.getElementById('dashboardSection');
+  if (!el) return;
+
+  const incs     = getPeriodIncs(dashPeriod);
+  const kpis     = calcKPIs(incs);
+  const monthly  = calcMonthlyData();
+  const byModel  = calcByModel(incs);
+  const topParts = calcTopParts(incs);
+
+  const maxMonth = Math.max(...monthly.map(m => m.count), 1);
+  const maxModel = byModel.length ? byModel[0][1] : 1;
+  const maxPart  = topParts.length ? topParts[0].count : 1;
+
+  const STATUS_COLORS = {
+    pending:       '#F59E0B',
+    sent:          '#3B82F6',
+    awaiting:      '#8B5CF6',
+    eta_confirmed: '#06B6D4',
+    received:      '#84CC16',
+    done:          '#22C55E',
+  };
+  const STATUS_LABELS = {
+    pending:       'Pendente',
+    sent:          'Enviado',
+    awaiting:      'Aguardando',
+    eta_confirmed: 'ETA Conf.',
+    received:      'Recebido',
+    done:          'Encerrado',
+  };
+
+  const statusRows = Object.entries(STATUS_LABELS)
+    .map(([k, label]) => ({
+      key:   k,
+      label,
+      count: incs.filter(i => (i.status || 'pending') === k).length,
+      color: STATUS_COLORS[k],
+    }))
+    .filter(s => s.count > 0);
+
+  el.innerHTML = `
+<div class="dash-wrap">
+
+  <!-- Filtro de período -->
+  <div class="dash-period-row">
+    <button class="dash-pill ${dashPeriod === 'month' ? 'active' : ''}" onclick="setDashPeriod('month')">Este mês</button>
+    <button class="dash-pill ${dashPeriod === '3m'    ? 'active' : ''}" onclick="setDashPeriod('3m')">3 meses</button>
+    <button class="dash-pill ${dashPeriod === 'all'   ? 'active' : ''}" onclick="setDashPeriod('all')">Tudo</button>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="dash-kpi-grid">
+    <div class="dash-kpi">
+      <div class="dash-kpi-val">${kpis.total}</div>
+      <div class="dash-kpi-lbl">Total</div>
+    </div>
+    <div class="dash-kpi" style="--kc:#F59E0B">
+      <div class="dash-kpi-val">${kpis.pending}</div>
+      <div class="dash-kpi-lbl">Pendentes</div>
+    </div>
+    <div class="dash-kpi" style="--kc:#3B82F6">
+      <div class="dash-kpi-val">${kpis.inProgress}</div>
+      <div class="dash-kpi-lbl">Em Curso</div>
+    </div>
+    <div class="dash-kpi" style="--kc:#22C55E">
+      <div class="dash-kpi-val">${kpis.done}</div>
+      <div class="dash-kpi-lbl">Encerrados</div>
+    </div>
+    <div class="dash-kpi" style="--kc:#E11D48">
+      <div class="dash-kpi-val">${kpis.totalDefective}</div>
+      <div class="dash-kpi-lbl">Peças NG</div>
+    </div>
+  </div>
+
+  <!-- Gráfico de barras mensais (histórico sempre completo) -->
+  <div class="dash-card">
+    <div class="dash-card-hd">📈 Incidentes por Mês <span class="dash-card-sub">(últimos 6 meses)</span></div>
+    <div class="dash-month-chart">
+      ${monthly.map(m => `
+        <div class="dash-month-col">
+          <div class="dash-month-bar-wrap">
+            <div class="dash-month-bar" style="height:${Math.max(4, Math.round((m.count / maxMonth) * 100))}%"></div>
+          </div>
+          <div class="dash-month-cnt">${m.count > 0 ? m.count : ''}</div>
+          <div class="dash-month-lbl">${m.label}</div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+
+  <!-- Status + Top Peças (2 colunas) -->
+  <div class="dash-grid-2">
+
+    <div class="dash-card">
+      <div class="dash-card-hd">📊 Por Estado</div>
+      ${statusRows.length === 0
+        ? '<p class="dash-empty">Sem dados neste período</p>'
+        : statusRows.map(s => `
+          <div class="dash-st-row">
+            <span class="dash-st-dot" style="background:${s.color}"></span>
+            <span class="dash-st-name">${s.label}</span>
+            <span class="dash-st-cnt">${s.count}</span>
+          </div>
+        `).join('')}
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-card-hd">🏆 Top Peças</div>
+      ${topParts.length === 0
+        ? '<p class="dash-empty">Sem dados</p>'
+        : topParts.map(p => barRow(
+            p.name.length > 18 ? p.name.slice(0, 18) + '…' : p.name,
+            p.code,
+            p.count,
+            maxPart,
+            '#3B82F6'
+          )).join('')}
+    </div>
+
+  </div>
+
+  <!-- Por Modelo -->
+  ${byModel.length > 0 ? `
+  <div class="dash-card">
+    <div class="dash-card-hd">🏍️ Por Modelo</div>
+    ${byModel.map(([m, c]) => barRow(m, '', c, maxModel, '#7C3AED')).join('')}
+  </div>` : ''}
+
+  <!-- Tempos médios -->
+  <div class="dash-grid-2">
+    <div class="dash-card dash-time-card">
+      <div class="dash-time-ico">📤</div>
+      <div class="dash-time-val">${kpis.avgSendDays !== null ? kpis.avgSendDays + 'd' : '—'}</div>
+      <div class="dash-time-lbl">Tempo médio<br>até envio</div>
+    </div>
+    <div class="dash-card dash-time-card">
+      <div class="dash-time-ico">✅</div>
+      <div class="dash-time-val">${kpis.avgResolutionDays !== null ? kpis.avgResolutionDays + 'd' : '—'}</div>
+      <div class="dash-time-lbl">Tempo médio<br>de resolução</div>
+    </div>
+  </div>
+
+</div>`;
+}
+
+// ── Muda período e re-renderiza ───────────────────────────────
+export function setDashPeriod(period) {
+  dashPeriod = period;
+  renderDashboard();
+}
