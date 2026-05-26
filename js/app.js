@@ -1,6 +1,6 @@
 // ── app.js ────────────────────────────────────────────────────
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
-import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents } from './incidents.js';
+import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, updateIncidentStatus, addIncidentNote } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
@@ -246,9 +246,7 @@ function renderList() {
         </div>
         <div class="incident-footer">
           <span class="incident-meta">${inc.model || '—'} · ${fmtDate(inc.createdAt)}</span>
-          <span class="badge ${inc.status === 'done' ? 'badge-done' : 'badge-pending'}">
-            ${inc.status === 'done' ? '✓ Concluído' : '⏳ Pendente'}
-          </span>
+          ${statusBadge(inc.status)}
         </div>
       </div>
     </div>`;
@@ -269,31 +267,145 @@ function isDesktop() {
   return window.innerWidth >= 900;
 }
 
+// ── Status badge helper ───────────────────────────────────────
+function statusBadge(status) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+  return `<span class="badge ${cfg.badge}">${cfg.icon} ${cfg.label}</span>`;
+}
+
+// ── Status stepper ────────────────────────────────────────────
+function buildStepperHTML(inc) {
+  const st  = inc.status || 'pending';
+  const idx = STATUS_FLOW.indexOf(st);
+  const parts = [];
+
+  STATUS_FLOW.forEach((s, i) => {
+    const cfg      = STATUS_CONFIG[s];
+    const isPast   = i < idx;
+    const isCurrent = i === idx;
+    const cls      = isPast ? 'step-past' : isCurrent ? 'step-current' : 'step-future';
+    parts.push(`
+      <div class="stepper-step ${cls}">
+        <div class="stepper-dot">${isPast ? '✓' : ''}</div>
+        <div class="stepper-label">${cfg.label}</div>
+      </div>`);
+    if (i < STATUS_FLOW.length - 1) {
+      parts.push(`<div class="stepper-connector ${isPast ? 'connector-done' : ''}"></div>`);
+    }
+  });
+  return parts.join('');
+}
+
 // ── Build detail HTML ─────────────────────────────────────────
 function buildDetailHTML(inc) {
+  const st    = inc.status || 'pending';
+  const stIdx = STATUS_FLOW.indexOf(st);
+  const stCfg = STATUS_CONFIG[st] || STATUS_CONFIG.pending;
+
+  // ── Photos
   const photos = (inc.photos || []).map(p =>
     `<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="openFullscreen('${p.url}')"></div>`
   ).join('');
 
+  // ── CAR block
   const missing = getMissingFields(inc);
   const carBlock = missing.length === 0
     ? `<button class="btn btn-primary" onclick="doGenerateCAR('${inc.id}')">📄 Gerar CAR Excel</button>`
     : `<div class="car-warning"><strong>Para gerar o CAR falta:</strong> ${missing.join(', ')}</div>`;
 
+  // ── Next status action button
+  const nextStatus = STATUS_FLOW[stIdx + 1];
+  const BTN_LABELS = {
+    sent:          '📤 Marcar como Enviado',
+    awaiting:      '🕐 Aguardando Resposta China',
+    eta_confirmed: '📅 Confirmar ETA',
+    received:      '📦 Marcar como Recebido',
+    done:          '✓ Encerrar Claim',
+  };
+  let nextBtn = '';
+  if (nextStatus) {
+    if (nextStatus === 'eta_confirmed') {
+      nextBtn = `<button class="btn btn-primary" onclick="doOpenETAInput('${inc.id}')">📅 Confirmar ETA</button>`;
+    } else {
+      nextBtn = `<button class="btn btn-primary" onclick="doAdvanceStatus('${inc.id}','${nextStatus}')">${BTN_LABELS[nextStatus]}</button>`;
+    }
+  }
+  const reopenBtn = st !== 'pending'
+    ? `<button class="btn" onclick="doAdvanceStatus('${inc.id}','pending')">↩ Reabrir</button>`
+    : '';
+
+  // ── ETA display
+  const etaBlock = inc.eta ? `
+    <div class="eta-display">
+      <span class="eta-label">📅 ETA confirmado pela China</span>
+      <span class="eta-value">${inc.eta}</span>
+    </div>` : '';
+
+  // ── ETA input (hidden until opened)
+  const etaInput = `
+    <div class="eta-input-section" id="eta-section-${inc.id}" style="display:none">
+      <div class="field" style="margin-bottom:8px">
+        <label class="field-label">Data prevista de chegada</label>
+        <input class="field-input" type="date" id="eta-input-${inc.id}">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="doConfirmETA('${inc.id}')">✓ Confirmar</button>
+        <button class="btn" onclick="doCloseETAInput('${inc.id}')">Cancelar</button>
+      </div>
+    </div>`;
+
+  // ── History timeline
+  const history = (inc.history || []).slice().reverse();
+  const historyHTML = history.length
+    ? history.map(h => {
+        const cfg  = h.status ? STATUS_CONFIG[h.status] : null;
+        const ts   = new Date(h.timestamp);
+        const date = ts.toLocaleDateString('pt-BR') + ' ' +
+                     ts.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        return `
+          <div class="history-entry${h.isNote ? ' history-note-entry' : ''}">
+            <div class="history-dot" style="background:${cfg ? cfg.color : 'rgba(255,255,255,0.2)'}"></div>
+            <div class="history-content">
+              <div class="history-header">
+                <span class="history-status-label">
+                  ${h.isNote ? '📝 Nota' : (cfg ? cfg.icon + ' ' + cfg.label : '')}
+                </span>
+                <span class="history-time">${date}</span>
+              </div>
+              <div class="history-user">${h.user || ''}</div>
+              ${h.note && h.note !== 'Incidente registado.' ? `<div class="history-note-text">${h.note}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('')
+    : '<div class="history-empty">Sem histórico de alterações.</div>';
+
   return `
     <button class="back-btn" onclick="goToList()">
       ${svgIcon('arrow-left')} Voltar
     </button>
-    <div class="detail-header" style="border-left-color:${inc.status === 'done' ? 'var(--green-500)' : 'var(--amber-500)'}">
+
+    <div class="detail-header" style="border-left-color:${stCfg.color}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div>
           <div class="detail-title">${inc.partName || '—'}</div>
           <div class="detail-subtitle">${inc.partNo || ''} · ${fmtDate(inc.createdAt)}</div>
         </div>
-        <span class="badge ${inc.status === 'done' ? 'badge-done' : 'badge-pending'}">
-          ${inc.status === 'done' ? '✓ Concluído' : '⏳ Pendente'}
-        </span>
+        ${statusBadge(st)}
       </div>
+    </div>
+
+    <!-- Status Stepper -->
+    <div class="form-card status-stepper-card" style="margin-bottom:10px">
+      <div class="stepper-track">${buildStepperHTML(inc)}</div>
+      ${etaBlock}
+      ${etaInput}
+      <div class="detail-actions" style="margin-top:14px">
+        ${nextBtn}
+        ${reopenBtn}
+        <button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>
+        ${isAdmin ? `<button class="btn btn-danger" onclick="doDelete('${inc.id}')">🗑 Eliminar</button>` : ''}
+      </div>
+      <div style="margin-top:12px">${carBlock}</div>
     </div>
 
     <div class="form-card" style="margin-bottom:10px">
@@ -322,14 +434,15 @@ function buildDetailHTML(inc) {
       </div>
     ` : ''}
 
+    <!-- Histórico -->
     <div class="form-card" style="margin-bottom:10px">
-      <div class="detail-actions">
-        ${inc.status !== 'done' ? `<button class="btn btn-success" onclick="doMarkDone('${inc.id}')">✓ Concluído</button>` : ''}
-        ${inc.status === 'done' ? `<button class="btn" onclick="doMarkPending('${inc.id}')">↩ Reabrir</button>` : ''}
-        <button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>
-        ${isAdmin ? `<button class="btn btn-danger" onclick="doDelete('${inc.id}')">🗑 Eliminar</button>` : ''}
+      <div class="form-card-title">📋 Histórico</div>
+      <div class="history-timeline">${historyHTML}</div>
+      <div class="history-note-form">
+        <input class="field-input" type="text" id="noteInput-${inc.id}"
+               placeholder="Adicionar nota ou comunicação com a China...">
+        <button class="btn" onclick="doAddNote('${inc.id}')">+ Nota</button>
       </div>
-      <div style="margin-top:12px">${carBlock}</div>
     </div>
   `;
 }
@@ -360,13 +473,66 @@ window.showDetail = (id) => {
 };
 
 window.doMarkDone = async (id) => {
-  try { await markDone(id); showToast('✅ Marcado como concluído!'); window.showDetail(id); }
+  try { await updateIncidentStatus(id, 'done', currentUser); showToast('✅ Claim encerrado!'); window.showDetail(id); renderList(); }
   catch { showToast('Erro ao actualizar.'); }
 };
 
 window.doMarkPending = async (id) => {
-  try { await markPending(id); showToast('Reaberto como pendente'); window.showDetail(id); }
+  try { await updateIncidentStatus(id, 'pending', currentUser); showToast('↩ Reaberto como pendente'); window.showDetail(id); renderList(); }
   catch { showToast('Erro ao actualizar.'); }
+};
+
+// ── Status flow actions ───────────────────────────────────────
+window.doAdvanceStatus = async (id, newStatus) => {
+  const LABELS = {
+    sent:     '📤 Marcado como enviado!',
+    awaiting: '🕐 A aguardar resposta da China',
+    received: '📦 Peça recebida!',
+    done:     '✅ Claim encerrado!',
+    pending:  '↩ Reaberto como pendente',
+  };
+  try {
+    await updateIncidentStatus(id, newStatus, currentUser);
+    showToast(LABELS[newStatus] || 'Status actualizado');
+    window.showDetail(id);
+    renderList();
+  } catch (e) { showToast('Erro: ' + e.message); }
+};
+
+window.doOpenETAInput = (id) => {
+  const s = document.getElementById(`eta-section-${id}`);
+  if (s) s.style.display = 'block';
+};
+
+window.doCloseETAInput = (id) => {
+  const s = document.getElementById(`eta-section-${id}`);
+  if (s) s.style.display = 'none';
+};
+
+window.doConfirmETA = async (id) => {
+  const input = document.getElementById(`eta-input-${id}`);
+  if (!input || !input.value) { showToast('Seleccione uma data'); return; }
+  const d   = new Date(input.value + 'T00:00:00');
+  const eta = d.toLocaleDateString('pt-BR');
+  try {
+    await updateIncidentStatus(id, 'eta_confirmed', currentUser, `ETA confirmado: ${eta}`, eta);
+    showToast(`📅 ETA confirmado: ${eta}`);
+    window.showDetail(id);
+    renderList();
+  } catch (e) { showToast('Erro: ' + e.message); }
+};
+
+window.doAddNote = async (id) => {
+  const input = document.getElementById(`noteInput-${id}`);
+  if (!input) return;
+  const note = input.value.trim();
+  if (!note) { showToast('Escreva uma nota primeiro'); return; }
+  try {
+    await addIncidentNote(id, currentUser, note);
+    input.value = '';
+    showToast('📝 Nota adicionada!');
+    window.showDetail(id);
+  } catch (e) { showToast('Erro: ' + e.message); }
 };
 
 window.doDelete = async (id) => {
@@ -834,12 +1000,15 @@ window.exportExcel = () => {
 
   const rows = list.map((inc, i) => ({
     'Nº': i + 1, 'ID': inc.id,
-    'Status': inc.status === 'done' ? 'Concluído' : 'Pendente',
+    'Status': (STATUS_CONFIG[inc.status] || STATUS_CONFIG.pending).label,
     'Código da Peça': inc.partNo || '', 'Nome da Peça': inc.partName || '',
     'Modelo': inc.model || '', 'Nº Pedido': inc.orderNo || '', 'Lote': inc.lotNo || '',
     'Qtd. Defeituosa': inc.ngQty || '', 'Descrição do Defeito': inc.defect || '',
     'Como Detectado': inc.detected || '',
     'Registado por': inc.user || '', 'Data Registo': fmtDate(inc.createdAt),
+    'Data Envio': inc.sentAt ? fmtDate(inc.sentAt) : '',
+    'ETA Confirmado': inc.eta || '',
+    'Data Recepção': inc.receivedAt ? fmtDate(inc.receivedAt) : '',
     'Data Conclusão': inc.completedAt ? fmtDate(inc.completedAt) : '',
     'Nº Fotos': (inc.photos || []).length,
     'Links das Fotos': (inc.photos || []).map(p => p.url).join(' | '),

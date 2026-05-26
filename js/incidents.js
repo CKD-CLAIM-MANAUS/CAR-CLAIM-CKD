@@ -4,6 +4,18 @@ import { uploadPhoto } from './camera.js';
 
 export let incidents = [];
 
+// ── Status config ─────────────────────────────────────────────
+export const STATUS_CONFIG = {
+  pending:       { label: 'Pendente',      icon: '⏳', color: '#F59E0B', badge: 'badge-pending'  },
+  sent:          { label: 'Enviado',        icon: '📤', color: '#3B82F6', badge: 'badge-sent'     },
+  awaiting:      { label: 'Aguardando',     icon: '🕐', color: '#8B5CF6', badge: 'badge-awaiting' },
+  eta_confirmed: { label: 'ETA Confirmado', icon: '📅', color: '#06B6D4', badge: 'badge-eta'      },
+  received:      { label: 'Recebido',       icon: '📦', color: '#84CC16', badge: 'badge-received' },
+  done:          { label: 'Encerrado',      icon: '✓',  color: '#22C55E', badge: 'badge-done'     },
+};
+
+export const STATUS_FLOW = ['pending', 'sent', 'awaiting', 'eta_confirmed', 'received', 'done'];
+
 // ── Load all incidents ────────────────────────────────────────
 export async function loadIncidents() {
   const q = fb.query(fb.collection(db, 'incidents'), fb.orderBy('createdAt', 'desc'));
@@ -47,12 +59,18 @@ export async function saveIncident(formData, photos, editingId, user) {
   } else {
     data.status    = 'pending';
     data.createdAt = Date.now();
+    data.history   = [{
+      status: 'pending',
+      timestamp: Date.now(),
+      user: user.displayName || user.email || '',
+      note: 'Incidente registado.',
+    }];
     const docRef = await fb.addDoc(fb.collection(db, 'incidents'), data);
     return docRef.id;
   }
 }
 
-// ── Mark done / pending ───────────────────────────────────────
+// ── Mark done / pending (mantidos para compatibilidade) ───────
 export async function markDone(id) {
   await fb.updateDoc(fb.doc(db, 'incidents', id), {
     status: 'done',
@@ -66,6 +84,64 @@ export async function markPending(id) {
   await fb.updateDoc(fb.doc(db, 'incidents', id), { status: 'pending' });
   const inc = incidents.find(i => i.id === id);
   if (inc) { inc.status = 'pending'; delete inc.completedAt; }
+}
+
+// ── Avança status com registo no histórico ────────────────────
+export async function updateIncidentStatus(id, newStatus, user, note = '', eta = null) {
+  const historyEntry = {
+    status:    newStatus,
+    timestamp: Date.now(),
+    user:      user.displayName || user.email || '',
+    note:      note || '',
+  };
+
+  const updateData = {
+    status:    newStatus,
+    updatedAt: Date.now(),
+    history:   fb.arrayUnion(historyEntry),
+  };
+
+  if (newStatus === 'sent')                       updateData.sentAt      = Date.now();
+  if (newStatus === 'eta_confirmed' && eta)        updateData.eta         = eta;
+  if (newStatus === 'received')                   updateData.receivedAt  = Date.now();
+  if (newStatus === 'done')                       updateData.completedAt = Date.now();
+
+  await fb.updateDoc(fb.doc(db, 'incidents', id), updateData);
+
+  const inc = incidents.find(i => i.id === id);
+  if (inc) {
+    inc.status    = newStatus;
+    inc.updatedAt = Date.now();
+    if (!inc.history) inc.history = [];
+    inc.history.push(historyEntry);
+    if (newStatus === 'sent')                     inc.sentAt      = Date.now();
+    if (newStatus === 'eta_confirmed' && eta)      inc.eta         = eta;
+    if (newStatus === 'received')                 inc.receivedAt  = Date.now();
+    if (newStatus === 'done')                     inc.completedAt = Date.now();
+  }
+}
+
+// ── Adiciona nota sem mudar status ────────────────────────────
+export async function addIncidentNote(id, user, note) {
+  if (!note || !note.trim()) return;
+  const historyEntry = {
+    status:    null,
+    timestamp: Date.now(),
+    user:      user.displayName || user.email || '',
+    note:      note.trim(),
+    isNote:    true,
+  };
+
+  await fb.updateDoc(fb.doc(db, 'incidents', id), {
+    history:   fb.arrayUnion(historyEntry),
+    updatedAt: Date.now(),
+  });
+
+  const inc = incidents.find(i => i.id === id);
+  if (inc) {
+    if (!inc.history) inc.history = [];
+    inc.history.push(historyEntry);
+  }
 }
 
 // ── Delete ────────────────────────────────────────────────────
@@ -104,10 +180,16 @@ export async function lookupPart(partNo, lotNo) {
 }
 
 // ── Filter & search ───────────────────────────────────────────
+const IN_PROGRESS_STATUSES = ['sent', 'awaiting', 'eta_confirmed', 'received'];
+
 export function filterIncidents(incidents, { filter = 'all', search = '' }) {
   const q = search.toLowerCase();
   return incidents.filter(inc => {
-    const matchFilter = filter === 'all' || inc.status === filter;
+    const st = inc.status || 'pending';
+    const matchFilter =
+      filter === 'all'
+      || filter === st
+      || (filter === 'inprogress' && IN_PROGRESS_STATUSES.includes(st));
     const matchSearch = !q
       || (inc.partNo   || '').toLowerCase().includes(q)
       || (inc.partName || '').toLowerCase().includes(q)
