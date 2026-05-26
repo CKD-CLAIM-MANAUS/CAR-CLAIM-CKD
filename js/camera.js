@@ -1,5 +1,16 @@
 // ── camera.js ─────────────────────────────────────────────────
 
+const MAX_FILE_SIZE  = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_TYPES  = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+
+function showFileError(msg) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 4000);
+}
+
 let cameraStream = null;
 
 // ── Compress image ────────────────────────────────────────────
@@ -103,6 +114,17 @@ export async function processFiles(files, onPhoto) {
 }
 
 async function processOneFile(file, onPhoto) {
+  // Validação de tipo
+  if (!ALLOWED_TYPES.includes(file.type.toLowerCase())) {
+    showFileError(`❌ Formato não suportado: ${file.type || 'desconhecido'}. Use JPG, PNG ou WebP.`);
+    return;
+  }
+  // Validação de tamanho (10 MB)
+  if (file.size > MAX_FILE_SIZE) {
+    showFileError(`❌ Foto demasiado grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Máximo: 10 MB.`);
+    return;
+  }
+
   try {
     const { dataUrl, compFile } = await compressImage(file);
 
