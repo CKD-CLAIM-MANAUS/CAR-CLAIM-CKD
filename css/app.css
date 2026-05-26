@@ -1709,3 +1709,50 @@ img { display: block; max-width: 100%; }
   padding: 16px 0;
   margin: 0;
 }
+
+/* ── Tracking ────────────────────────────────────────────── */
+.tracking-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-wrap: wrap;
+}
+
+.tracking-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 600;
+}
+
+.tracking-num {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  flex: 1;
+  letter-spacing: 0.05em;
+}
+
+.btn-tracking {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(59,116,232,0.15);
+  border: 1.5px solid rgba(59,116,232,0.4);
+  color: #3B74E8;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s;
+}
+
+.btn-tracking:hover {
+  background: rgba(59,116,232,0.25);
+}

@@ -87,7 +87,7 @@ export async function markPending(id) {
 }
 
 // ── Avança status com registo no histórico ────────────────────
-export async function updateIncidentStatus(id, newStatus, user, note = '', eta = null) {
+export async function updateIncidentStatus(id, newStatus, user, note = '', eta = null, tracking = '') {
   const historyEntry = {
     status:    newStatus,
     timestamp: Date.now(),
@@ -101,10 +101,11 @@ export async function updateIncidentStatus(id, newStatus, user, note = '', eta =
     history:   fb.arrayUnion(historyEntry),
   };
 
-  if (newStatus === 'sent')                       updateData.sentAt      = Date.now();
-  if (newStatus === 'eta_confirmed' && eta)        updateData.eta         = eta;
-  if (newStatus === 'received')                   updateData.receivedAt  = Date.now();
-  if (newStatus === 'done')                       updateData.completedAt = Date.now();
+  if (newStatus === 'sent')                        updateData.sentAt      = Date.now();
+  if (newStatus === 'eta_confirmed' && eta)         updateData.eta         = eta;
+  if (newStatus === 'eta_confirmed' && tracking)    updateData.tracking    = tracking;
+  if (newStatus === 'received')                    updateData.receivedAt  = Date.now();
+  if (newStatus === 'done')                        updateData.completedAt = Date.now();
 
   await fb.updateDoc(fb.doc(db, 'incidents', id), updateData);
 
@@ -114,10 +115,11 @@ export async function updateIncidentStatus(id, newStatus, user, note = '', eta =
     inc.updatedAt = Date.now();
     if (!inc.history) inc.history = [];
     inc.history.push(historyEntry);
-    if (newStatus === 'sent')                     inc.sentAt      = Date.now();
-    if (newStatus === 'eta_confirmed' && eta)      inc.eta         = eta;
-    if (newStatus === 'received')                 inc.receivedAt  = Date.now();
-    if (newStatus === 'done')                     inc.completedAt = Date.now();
+    if (newStatus === 'sent')                      inc.sentAt      = Date.now();
+    if (newStatus === 'eta_confirmed' && eta)       inc.eta         = eta;
+    if (newStatus === 'eta_confirmed' && tracking)  inc.tracking    = tracking;
+    if (newStatus === 'received')                  inc.receivedAt  = Date.now();
+    if (newStatus === 'done')                      inc.completedAt = Date.now();
   }
 }
 

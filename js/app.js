@@ -351,10 +351,22 @@ function buildDetailHTML(inc) {
     : '';
 
   // ── ETA display
+  const trackingBtn = inc.tracking
+    ? `<a href="https://t.17track.net/en#nums=${encodeURIComponent(inc.tracking)}" target="_blank" rel="noopener"
+          class="btn btn-tracking">🔍 Rastrear</a>`
+    : '';
   const etaBlock = inc.eta ? `
     <div class="eta-display">
-      <span class="eta-label">📅 ETA confirmado pela China</span>
-      <span class="eta-value">${inc.eta}</span>
+      <div>
+        <span class="eta-label">📅 ETA confirmado pela China</span>
+        <span class="eta-value">${inc.eta}</span>
+      </div>
+      ${inc.tracking ? `
+      <div class="tracking-row">
+        <span class="tracking-label">📦 Tracking</span>
+        <span class="tracking-num">${inc.tracking}</span>
+        ${trackingBtn}
+      </div>` : ''}
     </div>` : '';
 
   // ── ETA input (hidden until opened)
@@ -364,8 +376,13 @@ function buildDetailHTML(inc) {
         <label class="field-label">Data prevista de chegada</label>
         <input class="field-input" type="date" id="eta-input-${inc.id}">
       </div>
+      <div class="field" style="margin-bottom:8px">
+        <label class="field-label">Nº Tracking (FedEx / DHL) <span class="field-optional">opcional</span></label>
+        <input class="field-input" type="text" id="tracking-input-${inc.id}"
+               placeholder="ex: 748926481935" style="font-family:var(--font-mono)">
+      </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="doConfirmETA('${inc.id}')">✓ Confirmar</button>
+        <button class="btn btn-primary" onclick="doConfirmETA('${inc.id}')">✓ Confirmar ETA</button>
         <button class="btn" onclick="doCloseETAInput('${inc.id}')">Cancelar</button>
       </div>
     </div>`;
@@ -526,13 +543,16 @@ window.doCloseETAInput = (id) => {
 };
 
 window.doConfirmETA = async (id) => {
-  const input = document.getElementById(`eta-input-${id}`);
+  const input    = document.getElementById(`eta-input-${id}`);
+  const trackingEl = document.getElementById(`tracking-input-${id}`);
   if (!input || !input.value) { showToast('Seleccione uma data'); return; }
-  const d   = new Date(input.value + 'T00:00:00');
-  const eta = d.toLocaleDateString('pt-BR');
+  const d        = new Date(input.value + 'T00:00:00');
+  const eta      = d.toLocaleDateString('pt-BR');
+  const tracking = trackingEl ? trackingEl.value.trim().replace(/\s+/g, '') : '';
+  const note     = tracking ? `ETA confirmado: ${eta} · Tracking: ${tracking}` : `ETA confirmado: ${eta}`;
   try {
-    await updateIncidentStatus(id, 'eta_confirmed', currentUser, `ETA confirmado: ${eta}`, eta);
-    showToast(`📅 ETA confirmado: ${eta}`);
+    await updateIncidentStatus(id, 'eta_confirmed', currentUser, note, eta, tracking);
+    showToast(`📅 ETA confirmado: ${eta}${tracking ? ' · ' + tracking : ''}`);
     window.showDetail(id);
     renderList();
   } catch (e) { showToast('Erro: ' + e.message); }
