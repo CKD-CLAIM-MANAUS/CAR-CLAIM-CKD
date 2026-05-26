@@ -220,7 +220,7 @@ export function renderDashboard() {
             p.code,
             p.count,
             maxPart,
-            '#3B82F6'
+            '#FF6600'
           )).join('')}
     </div>
 
@@ -230,7 +230,7 @@ export function renderDashboard() {
   ${byModel.length > 0 ? `
   <div class="dash-card">
     <div class="dash-card-hd">🏍️ Por Modelo</div>
-    ${byModel.map(([m, c]) => barRow(m, '', c, maxModel, '#7C3AED')).join('')}
+    ${byModel.map(([m, c]) => barRow(m, '', c, maxModel, '#FF8533')).join('')}
   </div>` : ''}
 
   <!-- Tempos médios -->

@@ -93,7 +93,7 @@ async function renderUsersList() {
     }
     el.innerHTML = users.map(u => `
       <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-card,#0D1E35);border-radius:10px;margin-bottom:8px;border:1px solid var(--border,rgba(255,255,255,0.07));">
-        <div style="width:36px;height:36px;background:var(--blue-500,#1A56CC);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;flex-shrink:0;">
+        <div style="width:36px;height:36px;background:var(--blue-500,#FF6600);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;flex-shrink:0;">
           ${(u.name || u.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2)}
         </div>
         <div style="flex:1;min-width:0;">
@@ -841,7 +841,7 @@ function showDraftBanner(draft, timeAgo) {
     position: fixed; bottom: calc(var(--bottom-h) + 12px); left: 50%;
     transform: translateX(-50%);
     background: var(--bg-card, #0D1E35);
-    border: 1.5px solid var(--blue-500, #1A56CC);
+    border: 1.5px solid var(--blue-500, #FF6600);
     border-radius: 12px; padding: 12px 16px;
     display: flex; align-items: center; gap: 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
@@ -857,7 +857,7 @@ function showDraftBanner(draft, timeAgo) {
       </div>
     </div>
     <button onclick="recoverDraft()" style="
-      padding:7px 14px; background:var(--blue-500,#1A56CC); color:white;
+      padding:7px 14px; background:var(--blue-500,#FF6600); color:white;
       border:none; border-radius:8px; font-size:12px; font-weight:700;
       cursor:pointer; white-space:nowrap; font-family:var(--font-sans);">
       Recuperar
