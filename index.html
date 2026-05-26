@@ -63,7 +63,7 @@
       banner.id = 'updateBanner';
       banner.style.cssText = `
         position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
-        background: #1A56CC; color: white;
+        background: #FF6600; color: white;
         border-radius: 10px; padding: 12px 16px;
         display: flex; align-items: center; gap: 12px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.4);
@@ -74,7 +74,7 @@
       banner.innerHTML = `
         <span style="font-size:13px;font-weight:600;">🚀 Nova versão disponível</span>
         <button onclick="applyUpdate()" style="
-          padding:6px 14px; background:white; color:#1A56CC;
+          padding:6px 14px; background:white; color:#FF6600;
           border:none; border-radius:7px; font-size:12px; font-weight:700;
           cursor:pointer; white-space:nowrap;">
           Actualizar
@@ -229,11 +229,37 @@
         <!-- RIGHT: detail panel (desktop only) -->
         <div class="desktop-detail-panel" id="desktopDetailPanel">
           <div class="desktop-detail-empty" id="desktopDetailEmpty">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2" style="width:48px;height:48px;opacity:0.12;margin-bottom:12px;">
-              <path d="M9 5H7a2 2 0 00-2 2v34a2 2 0 002 2h34a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h26a2 2 0 002-2M9 5a2 2 0 012-2h26a2 2 0 012 2M16 17h16M16 25h16M16 33h8"/>
-            </svg>
-            <div style="font-size:14px;font-weight:600;color:var(--ink-300,rgba(255,255,255,0.4));">Selecciona um incidente</div>
-            <div style="font-size:12px;color:var(--ink-400,rgba(255,255,255,0.25));margin-top:4px;">O detalhe aparece aqui</div>
+
+            <!-- Logo + brand -->
+            <img src="logo.png" alt="CFMOTO" class="empty-logo">
+            <div class="empty-brand-name">CAR · Garantia</div>
+            <div class="empty-brand-sub">CFMOTO da Amazônia</div>
+
+            <!-- Separador laranja -->
+            <div class="empty-divider"></div>
+
+            <!-- KPIs live -->
+            <div class="empty-kpi-grid">
+              <div class="empty-kpi">
+                <div class="empty-kpi-val orange" id="emptyTotal">—</div>
+                <div class="empty-kpi-lbl">Total</div>
+              </div>
+              <div class="empty-kpi">
+                <div class="empty-kpi-val amber" id="emptyPending">—</div>
+                <div class="empty-kpi-lbl">Activos</div>
+              </div>
+              <div class="empty-kpi">
+                <div class="empty-kpi-val green" id="emptyDone">—</div>
+                <div class="empty-kpi-lbl">Encerrados</div>
+              </div>
+            </div>
+
+            <!-- Hint -->
+            <div class="empty-hint">
+              <span class="empty-hint-arrow">←</span>
+              Selecciona um incidente para ver os detalhes
+            </div>
+
           </div>
           <div id="desktopDetailContent" style="display:none;height:100%;overflow-y:auto;padding:20px;"></div>
         </div>

@@ -224,6 +224,14 @@ function renderList() {
   document.getElementById('statPending').textContent = stats.pending;
   document.getElementById('statDone').textContent    = stats.done;
 
+  // Empty state KPIs (desktop detail panel)
+  const emT = document.getElementById('emptyTotal');
+  const emP = document.getElementById('emptyPending');
+  const emD = document.getElementById('emptyDone');
+  if (emT) emT.textContent = stats.total;
+  if (emP) emP.textContent = stats.pending;
+  if (emD) emD.textContent = stats.done;
+
   // Adiciona tendência ao card total
   const trendEl = document.getElementById('statTrend');
   if (trendEl) trendEl.innerHTML = trendHTML;
