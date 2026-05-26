@@ -14,10 +14,21 @@ from PIL import Image as PILImage
 
 # ── Firebase Admin SDK ────────────────────────────────────────
 # Credenciais definidas como variável de ambiente no Railway
+_firebase_initialized = False
+_firebase_init_error  = None
 _cred_json = os.environ.get('FIREBASE_ADMIN_CREDENTIALS')
 if _cred_json:
-    _cred = credentials.Certificate(json.loads(_cred_json))
-    firebase_admin.initialize_app(_cred)
+    try:
+        _cred = credentials.Certificate(json.loads(_cred_json))
+        firebase_admin.initialize_app(_cred)
+        _firebase_initialized = True
+        print('Firebase Admin: inicializado com sucesso')
+    except Exception as _e:
+        _firebase_init_error = str(_e)
+        print(f'Firebase Admin ERRO: {_e}')
+else:
+    _firebase_init_error = 'FIREBASE_ADMIN_CREDENTIALS nao definido'
+    print('Firebase Admin: variavel FIREBASE_ADMIN_CREDENTIALS em falta')
 
 # ── App & CORS ────────────────────────────────────────────────
 ALLOWED_ORIGIN  = os.environ.get('ALLOWED_ORIGIN', 'https://ckd-claim-manaus.github.io')
@@ -33,13 +44,18 @@ CORS(app,
 # ── Auth ──────────────────────────────────────────────────────
 def verify_token():
     """Verifica o Firebase ID token no header Authorization: Bearer <token>"""
+    if not _firebase_initialized:
+        print(f'verify_token: Firebase nao inicializado — {_firebase_init_error}')
+        return None
     header = request.headers.get('Authorization', '')
     if not header.startswith('Bearer '):
+        print('verify_token: header Authorization ausente ou mal formado')
         return None
     token = header.split('Bearer ', 1)[1].strip()
     try:
         return fb_auth.verify_id_token(token)
-    except Exception:
+    except Exception as e:
+        print(f'verify_token: token invalido — {e}')
         return None
 
 # ── Validação ─────────────────────────────────────────────────
@@ -113,7 +129,12 @@ def download_and_process(url, width, height):
 # ── Rotas ─────────────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'ok', 'pillow': PILImage.__version__})
+    return jsonify({
+        'status': 'ok',
+        'pillow': PILImage.__version__,
+        'firebase_initialized': _firebase_initialized,
+        'firebase_error': _firebase_init_error
+    })
 
 @app.route('/generate-car', methods=['POST'])
 def generate_car():
