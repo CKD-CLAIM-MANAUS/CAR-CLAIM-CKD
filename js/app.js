@@ -8,6 +8,7 @@ import { importPackList } from './packList.js';
 import { showToast, showPage, openFullscreen, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading } from './ui.js';
 import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
+import { fetchTrackInfo, getApiKey, saveApiKey, clearApiKey } from './tracking.js';
 
 // ── State ─────────────────────────────────────────────────────
 let currentPhotos = [];
@@ -608,10 +609,6 @@ function buildDetailHTML(inc) {
     : '';
 
   // ── ETA display
-  const trackingBtn = inc.tracking
-    ? `<a href="https://t.17track.net/en#nums=${encodeURIComponent(inc.tracking)}" target="_blank" rel="noopener"
-          class="btn btn-tracking">🔍 Rastrear</a>`
-    : '';
   const etaBlock = inc.eta ? `
     <div class="eta-display">
       <div>
@@ -622,8 +619,9 @@ function buildDetailHTML(inc) {
       <div class="tracking-row">
         <span class="tracking-label">📦 Tracking</span>
         <span class="tracking-num">${inc.tracking}</span>
-        ${trackingBtn}
-      </div>` : ''}
+        <button class="btn btn-tracking" onclick="loadTrackingInfo('${inc.id}','${inc.tracking}')">🔍 Ver Tracking</button>
+      </div>
+      <div class="track-panel" id="track-panel-${inc.id}"></div>` : ''}
     </div>` : '';
 
   // ── ETA input (hidden until opened)
@@ -736,6 +734,84 @@ function buildDetailHTML(inc) {
     </div>
   `;
 }
+
+// ── In-app tracking via 17track ───────────────────────────────
+window.loadTrackingInfo = async (incId, trackNum) => {
+  const panel = document.getElementById(`track-panel-${incId}`);
+  if (!panel) return;
+
+  // Verificar / pedir API key
+  let apiKey = getApiKey();
+  if (!apiKey) {
+    const entered = window.prompt(
+      '🔑 Introduza a sua 17track API key:\n' +
+      '(Obtenha grátis em https://api.17track.net → My Account → API)'
+    );
+    if (!entered || !entered.trim()) {
+      panel.innerHTML = `<div class="track-error">API key necessária para rastrear envios.</div>`;
+      return;
+    }
+    saveApiKey(entered.trim());
+    apiKey = entered.trim();
+  }
+
+  // Mostrar spinner
+  panel.innerHTML = `
+    <div class="track-loading">
+      <div class="track-spinner"></div>
+      <span>A consultar tracking…</span>
+    </div>`;
+
+  try {
+    const info = await fetchTrackInfo(trackNum, apiKey);
+
+    const eventsHTML = info.events.length
+      ? info.events.slice(0, 10).map((ev, i) => `
+          <div class="track-event${i === 0 ? ' track-event-latest' : ''}">
+            <div class="track-event-dot" style="background:${i === 0 ? info.statusColor : 'rgba(255,255,255,0.15)'}"></div>
+            <div class="track-event-body">
+              <div class="track-event-desc">${ev.desc || '—'}</div>
+              ${ev.location ? `<div class="track-event-loc">📍 ${ev.location}</div>` : ''}
+              <div class="track-event-date">${ev.date || ''}</div>
+            </div>
+          </div>`).join('')
+      : `<div class="track-empty">Sem eventos de tracking disponíveis ainda.</div>`;
+
+    panel.innerHTML = `
+      <div class="track-result">
+        <div class="track-status-bar" style="border-left-color:${info.statusColor}">
+          <span class="track-status-icon">${info.statusIcon}</span>
+          <div class="track-status-text">
+            <div class="track-status-label" style="color:${info.statusColor}">${info.statusLabel}</div>
+            ${info.carrier ? `<div class="track-carrier">${info.carrier}</div>` : ''}
+            ${info.etaDate ? `<div class="track-eta-line">📅 Previsão de entrega: <strong>${info.etaDate}</strong></div>` : ''}
+          </div>
+          <button class="track-refresh-btn" onclick="loadTrackingInfo('${incId}','${trackNum}')" title="Actualizar">↻</button>
+        </div>
+        <div class="track-timeline">${eventsHTML}</div>
+        <div class="track-footer">
+          <a href="https://t.17track.net/en#nums=${encodeURIComponent(trackNum)}" target="_blank" rel="noopener" class="track-ext-link">
+            🔗 Ver em 17track.net
+          </a>
+          <button class="track-key-reset" onclick="clearTrackingKey()">🔑 Mudar API key</button>
+        </div>
+      </div>`;
+  } catch (err) {
+    const msg = err.message || 'Erro desconhecido';
+    const isKeyError = msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('401') || msg.includes('code -1');
+    panel.innerHTML = `
+      <div class="track-error">
+        ⚠️ ${msg}
+        ${isKeyError ? `<br><button class="track-key-reset" style="margin-top:8px" onclick="clearTrackingKey();loadTrackingInfo('${incId}','${trackNum}')">🔑 Reintroduzir API key</button>` : ''}
+        <br><button class="track-key-reset" style="margin-top:8px" onclick="loadTrackingInfo('${incId}','${trackNum}')">↻ Tentar novamente</button>
+      </div>`;
+  }
+};
+
+window.clearTrackingKey = () => {
+  clearApiKey();
+  showToast('🔑 API key removida.');
+};
 
 // ── Detail view ───────────────────────────────────────────────
 window.showDetail = (id) => {
