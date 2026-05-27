@@ -16,12 +16,34 @@ export const STATUS_CONFIG = {
 
 export const STATUS_FLOW = ['pending', 'sent', 'awaiting', 'eta_confirmed', 'received', 'done'];
 
-// ── Load all incidents ────────────────────────────────────────
+// ── Load all incidents (one-shot, mantido para compatibilidade) ─
 export async function loadIncidents() {
   const q = fb.query(fb.collection(db, 'incidents'), fb.orderBy('createdAt', 'desc'));
   const snap = await fb.getDocs(q);
   incidents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   return incidents;
+}
+
+// ── Listener em tempo real ────────────────────────────────────
+let _unsubscribeIncidents = null;
+
+export function subscribeToIncidents(onUpdate) {
+  // Cancela subscrição anterior se existir
+  if (_unsubscribeIncidents) { _unsubscribeIncidents(); _unsubscribeIncidents = null; }
+
+  const q = fb.query(fb.collection(db, 'incidents'), fb.orderBy('createdAt', 'desc'));
+  _unsubscribeIncidents = fb.onSnapshot(q,
+    (snap) => {
+      incidents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      onUpdate(incidents);
+    },
+    (err) => console.error('Snapshot error:', err)
+  );
+  return _unsubscribeIncidents;
+}
+
+export function unsubscribeFromIncidents() {
+  if (_unsubscribeIncidents) { _unsubscribeIncidents(); _unsubscribeIncidents = null; }
 }
 
 // ── Save (create or update) ───────────────────────────────────

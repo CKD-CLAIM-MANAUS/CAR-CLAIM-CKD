@@ -1,6 +1,6 @@
 // ── app.js ────────────────────────────────────────────────────
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
-import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, updateIncidentStatus, addIncidentNote } from './incidents.js';
+import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
@@ -24,6 +24,44 @@ let tabState = {
   paint:  { search: '', filter: 'all' },
 };
 
+// ── Splash screen ─────────────────────────────────────────────
+function hideSplash() {
+  const splash = document.getElementById('splashScreen');
+  if (!splash) return;
+  splash.classList.add('splash-out');
+  setTimeout(() => splash.remove(), 350);
+}
+
+// ── Realtime sync ─────────────────────────────────────────────
+let _realtimeStarted = false;
+
+function startRealtimeSync() {
+  if (_realtimeStarted) {
+    // Já subscrito — apenas re-renderiza
+    renderList();
+    return;
+  }
+  _realtimeStarted = true;
+
+  const el = document.getElementById('incidentList');
+  if (el) el.innerHTML = '<div class="loading-state"><div class="spinner"></div> A carregar...</div>';
+
+  subscribeToIncidents(() => {
+    renderList();
+    // Atualiza dashboard se estiver visível
+    const dashSection = document.getElementById('dashboardSection');
+    const dashPage    = document.querySelector('.page#dashboard');
+    if (dashSection && dashPage && dashPage.classList.contains('active')) {
+      renderDashboard();
+    }
+  });
+}
+
+function stopRealtimeSync() {
+  _realtimeStarted = false;
+  unsubscribeFromIncidents();
+}
+
 // ── Auth ──────────────────────────────────────────────────────
 initAuth(
   (user, admin) => {
@@ -44,14 +82,17 @@ initAuth(
     const adminBtn = document.getElementById('adminUserBtn');
     if (adminBtn) adminBtn.style.display = admin ? 'block' : 'none';
 
+    hideSplash();
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('appScreen').classList.add('visible');
     showPage('list');
-    loadAndRender();
+    startRealtimeSync();
     // Verifica rascunho após login — pequeno delay para garantir que a UI carregou
     setTimeout(checkForDraft, 1000);
   },
   () => {
+    stopRealtimeSync();
+    hideSplash();
     document.getElementById('authScreen').style.display = 'flex';
     document.getElementById('appScreen').classList.remove('visible');
   }
@@ -72,6 +113,7 @@ window.doLogin = async () => {
 };
 
 window.doLogout = async () => {
+  stopRealtimeSync();
   await logout();
   closeModal('userModal');
 };
@@ -168,7 +210,7 @@ function setDesktopTab(tabId) {
   if (tab) tab.classList.add('active');
 }
 
-window.goToList  = () => { showPage('list');  setDesktopTab('list');  loadAndRender(); checkForDraft(); };
+window.goToList  = () => { showPage('list');  setDesktopTab('list');  renderList(); checkForDraft(); };
 window.goToForm  = () => {
   clearForm();
   showPage('form');

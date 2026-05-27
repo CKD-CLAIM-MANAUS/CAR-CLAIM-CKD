@@ -3,7 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getFirestore, collection, addDoc, getDocs, doc,
   updateDoc, deleteDoc, query, orderBy, getDoc, setDoc,
-  arrayUnion, where
+  arrayUnion, where, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, createUserWithEmailAndPassword,
@@ -28,7 +28,7 @@ export const auth = getAuth(app);
 export const fb = {
   collection, addDoc, getDocs, doc,
   updateDoc, deleteDoc, query, orderBy,
-  getDoc, setDoc, arrayUnion, where
+  getDoc, setDoc, arrayUnion, where, onSnapshot
 };
 
 // Auth helpers

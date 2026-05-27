@@ -95,9 +95,20 @@
 <body>
 
 <!-- ══════════════════════════════════════════════════════════
+     SPLASH SCREEN — visível durante resolução do token Firebase
+═══════════════════════════════════════════════════════════ -->
+<div id="splashScreen">
+  <div class="splash-inner">
+    <img src="logo.png" alt="CFMOTO" class="splash-logo">
+    <div class="splash-spinner"></div>
+    <div class="splash-label">CAR · Garantia</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
      AUTH SCREEN
 ═══════════════════════════════════════════════════════════ -->
-<div id="authScreen" style="display:flex; min-height:100vh; align-items:center; justify-content:center; background:var(--bg-base, #060E1A); background-image:radial-gradient(ellipse at 30% 40%, rgba(26,86,204,0.15) 0%, transparent 60%);">
+<div id="authScreen" style="display:none; min-height:100vh; align-items:center; justify-content:center; background:var(--bg-base, #060E1A); background-image:radial-gradient(ellipse at 30% 40%, rgba(26,86,204,0.15) 0%, transparent 60%);">
   <div style="width:100%; max-width:400px; padding:20px;">
     <div class="auth-card">
 
