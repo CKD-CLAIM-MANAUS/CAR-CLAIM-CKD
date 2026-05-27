@@ -184,7 +184,7 @@ export async function lookupPart(partNo, lotNo) {
 // ── Filter & search ───────────────────────────────────────────
 const IN_PROGRESS_STATUSES = ['sent', 'awaiting', 'eta_confirmed', 'received'];
 
-export function filterIncidents(incidents, { filter = 'all', search = '' }) {
+export function filterIncidents(incidents, { filter = 'all', search = '', incidentType = null }) {
   const q = search.toLowerCase();
   return incidents.filter(inc => {
     const st = inc.status || 'pending';
@@ -197,7 +197,8 @@ export function filterIncidents(incidents, { filter = 'all', search = '' }) {
       || (inc.partName || '').toLowerCase().includes(q)
       || (inc.model    || '').toLowerCase().includes(q)
       || (inc.orderNo  || '').toLowerCase().includes(q);
-    return matchFilter && matchSearch;
+    const matchType = !incidentType || (inc.incidentType || 'normal') === incidentType;
+    return matchFilter && matchSearch && matchType;
   });
 }
 

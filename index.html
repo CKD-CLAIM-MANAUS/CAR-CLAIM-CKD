@@ -191,6 +191,19 @@
 
         <!-- LEFT: list panel -->
         <div class="desktop-list-panel">
+
+          <!-- Tabs de tipo de incidente -->
+          <div class="type-tab-row">
+            <button class="type-tab active" id="tab-normal" onclick="setTypeTab('normal')">
+              🔩 Peças
+              <span class="type-tab-count" id="tabCountNormal">—</span>
+            </button>
+            <button class="type-tab" id="tab-paint" onclick="setTypeTab('paint')">
+              🎨 Pintura
+              <span class="type-tab-count" id="tabCountPaint">—</span>
+            </button>
+          </div>
+
           <div class="stats-row">
             <div class="stat-card">
               <div class="stat-value blue" id="statTotal">—</div>
@@ -216,10 +229,10 @@
           </div>
 
           <div class="filter-chips">
-            <div class="chip active" onclick="setFilter('all', this)">Todos</div>
-            <div class="chip" onclick="setFilter('pending', this)">⏳ Pendentes</div>
-            <div class="chip" onclick="setFilter('inprogress', this)">📤 Em Curso</div>
-            <div class="chip" onclick="setFilter('done', this)">✅ Encerrados</div>
+            <div class="chip active" data-filter="all" onclick="setFilter('all', this)">Todos</div>
+            <div class="chip" data-filter="pending" onclick="setFilter('pending', this)">⏳ Pendentes</div>
+            <div class="chip" data-filter="inprogress" onclick="setFilter('inprogress', this)">📤 Em Curso</div>
+            <div class="chip" data-filter="done" onclick="setFilter('done', this)">✅ Encerrados</div>
           </div>
           <button class="btn-batch-eta-trigger" onclick="openBatchETA()">
             📦 Confirmar envio da China (lote)
@@ -832,6 +845,9 @@
   </div>
 </div>
 
+
+<!-- Chart.js (UMD — disponível como window.Chart) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <!-- App entry point (ES module) -->
 <script type="module" src="js/app.js"></script>

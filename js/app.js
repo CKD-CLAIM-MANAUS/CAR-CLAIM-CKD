@@ -10,11 +10,18 @@ import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 
 // ── State ─────────────────────────────────────────────────────
-let currentFilter = 'all';
 let currentPhotos = [];
 let editingId     = null;
 let stockItems    = [];
 let stockDetailPartNo = null;
+
+// ── Tabs de tipo (Peças / Pintura) ────────────────────────────
+let currentTypeTab = 'normal'; // 'normal' | 'paint'
+// Estado independente por tab: pesquisa + filtro de status
+let tabState = {
+  normal: { search: '', filter: 'all' },
+  paint:  { search: '', filter: 'all' },
+};
 
 // ── Auth ──────────────────────────────────────────────────────
 initAuth(
@@ -161,7 +168,15 @@ function setDesktopTab(tabId) {
 }
 
 window.goToList  = () => { showPage('list');  setDesktopTab('list');  loadAndRender(); checkForDraft(); };
-window.goToForm  = () => { clearForm(); showPage('form'); setDesktopTab('form'); startDraftTimer(); attachDraftListeners(); };
+window.goToForm  = () => {
+  clearForm();
+  showPage('form');
+  setDesktopTab('form');
+  // Pré-selecciona o tipo de acordo com a tab activa
+  setIncidentType(currentTypeTab);
+  startDraftTimer();
+  attachDraftListeners();
+};
 window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); updateExcelStats(); renderDashboard(); };
 window.goToStock = () => { showPage('stock'); setDesktopTab('stock'); renderStockPage(); };
 
@@ -390,15 +405,33 @@ async function loadAndRender() {
 }
 
 function renderList() {
-  const search = document.getElementById('searchInput')?.value || '';
-  const list   = filterIncidents(incidents, { filter: currentFilter, search });
-  const stats  = getStats(incidents);
+  // ── Estado da tab activa ──────────────────────────────────
+  const state  = tabState[currentTypeTab];
+  const search = state.search;
+  const filter = state.filter;
 
-  // Calcula tendência — compara com há 30 dias
+  // Incidentes do tipo actual (para stats e empty state)
+  const typeIncs = incidents.filter(i => (i.incidentType || 'normal') === currentTypeTab);
+
+  // Lista filtrada por tipo + status + pesquisa
+  const list = filterIncidents(incidents, { filter, search, incidentType: currentTypeTab });
+
+  // Stats da tab activa
+  const stats = getStats(typeIncs);
+
+  // Contadores nos botões de tab
+  const normalCount = incidents.filter(i => (i.incidentType || 'normal') === 'normal').length;
+  const paintCount  = incidents.filter(i => (i.incidentType || 'normal') === 'paint').length;
+  const tabCntN = document.getElementById('tabCountNormal');
+  const tabCntP = document.getElementById('tabCountPaint');
+  if (tabCntN) tabCntN.textContent = normalCount || '0';
+  if (tabCntP) tabCntP.textContent = paintCount  || '0';
+
+  // Calcula tendência para o tipo activo
   const now = Date.now();
   const month = 30 * 24 * 60 * 60 * 1000;
-  const thisMonth  = incidents.filter(i => now - (i.createdAt || 0) < month).length;
-  const lastMonth  = incidents.filter(i => {
+  const thisMonth = typeIncs.filter(i => now - (i.createdAt || 0) < month).length;
+  const lastMonth = typeIncs.filter(i => {
     const age = now - (i.createdAt || 0);
     return age >= month && age < month * 2;
   }).length;
@@ -413,7 +446,7 @@ function renderList() {
   document.getElementById('statPending').textContent = stats.pending;
   document.getElementById('statDone').textContent    = stats.done;
 
-  // Empty state KPIs (desktop detail panel) — 4 grupos
+  // Empty state KPIs (desktop detail panel) — sempre todos os incidentes
   const IN_TRANSIT = ['sent', 'awaiting', 'eta_confirmed', 'received'];
   const emT  = document.getElementById('emptyTotal');
   const emP  = document.getElementById('emptyPending');
@@ -424,16 +457,17 @@ function renderList() {
   if (emTr) emTr.textContent = incidents.filter(i => IN_TRANSIT.includes(i.status)).length;
   if (emD)  emD.textContent  = incidents.filter(i => i.status === 'done').length;
 
-  // Adiciona tendência ao card total
+  // Tendência no card total
   const trendEl = document.getElementById('statTrend');
   if (trendEl) trendEl.innerHTML = trendHTML;
 
   const el = document.getElementById('incidentList');
 
   if (!list.length) {
-    const empty = incidents.length
+    const isPaint = currentTypeTab === 'paint';
+    const empty = typeIncs.length || search
       ? '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">Sem resultados</div><div class="empty-state-desc">Tente outros termos de pesquisa</div></div>'
-      : '<div class="empty-state"><div class="empty-state-icon">📂</div><div class="empty-state-title">Sem incidentes</div><div class="empty-state-desc">Toque em <strong>+</strong> para registar</div></div>';
+      : `<div class="empty-state"><div class="empty-state-icon">${isPaint ? '🎨' : '📦'}</div><div class="empty-state-title">Sem incidentes de ${isPaint ? 'pintura' : 'peças'}</div><div class="empty-state-desc">Toque em <strong>+</strong> para registar</div></div>`;
     el.innerHTML = empty;
     return;
   }
@@ -469,14 +503,37 @@ function renderList() {
   }).join('');
 }
 
+// ── Muda tab de tipo ──────────────────────────────────────────
+window.setTypeTab = (type) => {
+  currentTypeTab = type;
+
+  // Actualiza aparência dos botões de tab
+  document.getElementById('tab-normal')?.classList.toggle('active', type === 'normal');
+  document.getElementById('tab-paint')?.classList.toggle('active', type === 'paint');
+
+  // Restaura pesquisa e filtro de status independentes desta tab
+  const state = tabState[type];
+  const searchEl = document.getElementById('searchInput');
+  if (searchEl) searchEl.value = state.search;
+
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  const activeChip = document.querySelector(`.chip[data-filter="${state.filter}"]`);
+  if (activeChip) activeChip.classList.add('active');
+
+  renderList();
+};
+
 window.setFilter = (f, el) => {
-  currentFilter = f;
+  tabState[currentTypeTab].filter = f;
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderList();
 };
 
-window.onSearch = () => renderList();
+window.onSearch = () => {
+  tabState[currentTypeTab].search = document.getElementById('searchInput')?.value || '';
+  renderList();
+};
 
 // ── Helper: is desktop? ───────────────────────────────────────
 function isDesktop() {

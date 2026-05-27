@@ -2172,3 +2172,138 @@ img { display: block; max-width: 100%; }
     padding-bottom: 24px;
   }
 }
+
+/* ════════════════════════════════════════════════════════════
+   TABS DE TIPO — Peças / Pintura
+════════════════════════════════════════════════════════════ */
+.type-tab-row {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.type-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-300);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -2px; /* sobrepõe border-bottom do pai */
+  white-space: nowrap;
+}
+
+.type-tab:hover:not(.active) {
+  color: var(--ink-200);
+}
+
+/* Peças — laranja (brand) */
+#tab-normal.active {
+  color: var(--blue-400);
+  border-bottom-color: var(--blue-500);
+}
+
+/* Pintura — amber */
+#tab-paint.active {
+  color: var(--amber-400);
+  border-bottom-color: var(--amber-500);
+}
+
+/* Contador de incidentes no botão */
+.type-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink-300);
+  transition: background 0.15s, color 0.15s;
+}
+
+#tab-normal.active .type-tab-count {
+  background: rgba(255,102,0,0.18);
+  color: var(--blue-400);
+}
+
+#tab-paint.active .type-tab-count {
+  background: rgba(245,158,11,0.18);
+  color: var(--amber-400);
+}
+
+/* ════════════════════════════════════════════════════════════
+   CHART.JS — wrapper do gráfico mensal
+════════════════════════════════════════════════════════════ */
+.dash-month-chart-wrap {
+  position: relative;
+  height: 120px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   MICRO-ANIMAÇÕES
+════════════════════════════════════════════════════════════ */
+
+/* ── Transição de página ────────────────────────────────── */
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+/* Sobrescreve o display:block existente adicionando fade */
+.page.active {
+  animation: pageFadeIn 0.18s ease both;
+}
+
+/* ── Entrada dos cards de incidente (stagger) ───────────── */
+.incident-card {
+  animation: fadeInUp 0.2s ease both;
+}
+.incident-card:nth-child(2)   { animation-delay: 35ms;  }
+.incident-card:nth-child(3)   { animation-delay: 70ms;  }
+.incident-card:nth-child(4)   { animation-delay: 105ms; }
+.incident-card:nth-child(5)   { animation-delay: 140ms; }
+.incident-card:nth-child(n+6) { animation-delay: 170ms; }
+
+/* ── Entrada dos cards de stock (stagger) ───────────────── */
+.stock-card {
+  animation: fadeInUp 0.2s ease both;
+}
+.stock-card:nth-child(2)   { animation-delay: 35ms;  }
+.stock-card:nth-child(3)   { animation-delay: 70ms;  }
+.stock-card:nth-child(4)   { animation-delay: 105ms; }
+.stock-card:nth-child(5)   { animation-delay: 140ms; }
+.stock-card:nth-child(n+6) { animation-delay: 170ms; }
+
+/* ── Entrada dos KPI cards do dashboard (stagger) ───────── */
+.dash-kpi {
+  animation: fadeInUp 0.22s ease both;
+}
+.dash-kpi:nth-child(2) { animation-delay: 50ms;  }
+.dash-kpi:nth-child(3) { animation-delay: 100ms; }
+.dash-kpi:nth-child(4) { animation-delay: 150ms; }
+.dash-kpi:nth-child(5) { animation-delay: 200ms; }
+
+/* ── Botão: press feedback já existe (scale 0.97) ─────────
+   Reforçamos o botão primário com glow momentâneo */
+.btn-primary:active {
+  box-shadow: 0 0 0 3px rgba(255,102,0,0.25), 0 2px 8px rgba(255,102,0,0.3);
+}
+
+/* ── Animação das barras: transição já existe (0.5s ease) ─
+   Garantimos que a transição seja suave */
+.dash-bar-fill {
+  transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
