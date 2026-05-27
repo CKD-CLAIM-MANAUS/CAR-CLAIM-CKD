@@ -46,6 +46,53 @@ export function unsubscribeFromIncidents() {
   if (_unsubscribeIncidents) { _unsubscribeIncidents(); _unsubscribeIncidents = null; }
 }
 
+// ── Batch: avança direto para eta_confirmed (qualquer status) ─
+export async function batchAdvanceToETA(id, user, eta, tracking) {
+  const inc      = incidents.find(i => i.id === id);
+  if (!inc) return;
+
+  const now      = Date.now();
+  const userName = user.displayName || user.email || '';
+  const curSt    = inc.status || 'pending';
+  const FLOW     = ['pending', 'sent', 'awaiting', 'eta_confirmed'];
+  const curIdx   = FLOW.indexOf(curSt);
+  const etaIdx   = FLOW.indexOf('eta_confirmed');
+
+  // Cria entradas de histórico para cada passo saltado
+  const newEntries = [];
+  for (let i = Math.max(0, curIdx + 1); i <= etaIdx; i++) {
+    const step = FLOW[i];
+    newEntries.push({
+      status:    step,
+      timestamp: now + i,       // offset mínimo para manter ordem
+      user:      userName,
+      note:      step === 'eta_confirmed'
+        ? `ETA confirmado em lote · ${eta} · Tracking: ${tracking}`
+        : `Avançado automaticamente via envio em lote`,
+    });
+  }
+
+  const updateData = {
+    status:    'eta_confirmed',
+    eta,
+    tracking,
+    updatedAt: now,
+  };
+  if (!inc.sentAt) updateData.sentAt = now;
+  if (newEntries.length) updateData.history = fb.arrayUnion(...newEntries);
+
+  await fb.updateDoc(fb.doc(db, 'incidents', id), updateData);
+
+  // Actualiza estado local imediatamente
+  inc.status    = 'eta_confirmed';
+  inc.eta       = eta;
+  inc.tracking  = tracking;
+  inc.updatedAt = now;
+  if (!inc.sentAt) inc.sentAt = now;
+  if (!inc.history) inc.history = [];
+  newEntries.forEach(h => inc.history.push(h));
+}
+
 // ── Save (create or update) ───────────────────────────────────
 export async function saveIncident(formData, photos, editingId, user) {
   // Upload new photos

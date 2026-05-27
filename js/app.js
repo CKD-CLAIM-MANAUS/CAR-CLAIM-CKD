@@ -1,6 +1,6 @@
 // ── app.js ────────────────────────────────────────────────────
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
-import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents } from './incidents.js';
+import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
@@ -900,38 +900,78 @@ window.doConfirmETA = async (id) => {
 };
 
 // ── Batch ETA / Tracking ──────────────────────────────────────
-const BATCH_ELIGIBLE = ['sent', 'awaiting', 'eta_confirmed'];
+// Todos os incidentes em aberto (excluindo "done")
+function getBatchEligible() {
+  return incidents.filter(i => (i.status || 'pending') !== 'done');
+}
 
-window.openBatchETA = () => {
-  const eligible = incidents.filter(i => BATCH_ELIGIBLE.includes(i.status || ''));
-  const listEl   = document.getElementById('batchIncidentList');
+function renderBatchList(incs, search = '') {
+  const listEl = document.getElementById('batchIncidentList');
+  if (!listEl) return;
 
-  if (!eligible.length) {
-    listEl.innerHTML = `
-      <div style="text-align:center;padding:24px;color:rgba(255,255,255,0.3);font-size:13px;">
-        Não há incidentes enviados ou em aguardo.<br>
-        Muda o status de um incidente para "Enviado" primeiro.
-      </div>`;
-  } else {
-    listEl.innerHTML = eligible.map(i => {
-      const stCfg = STATUS_CONFIG[i.status] || STATUS_CONFIG.pending;
-      const hasTracking = i.tracking ? `<span class="batch-tracking-badge">📦 ${i.tracking}</span>` : '';
-      return `
-        <label class="batch-item">
-          <input type="checkbox" class="batch-cb" value="${i.id}" checked
-                 onchange="updateBatchCount()">
-          <div class="batch-item-info">
-            <span class="batch-item-name">${i.partName || '—'}</span>
-            <span class="batch-item-meta">
-              ${i.partNo ? i.partNo + ' · ' : ''}${i.model || ''} · ${i.ngQty || '—'} un
-              <span style="color:${stCfg.color}">${stCfg.icon} ${stCfg.label}</span>
-              ${hasTracking}
-            </span>
-          </div>
-        </label>`;
-    }).join('');
+  const q        = (search || '').toLowerCase().trim();
+  const filtered = q
+    ? incs.filter(i =>
+        (i.partName || '').toLowerCase().includes(q) ||
+        (i.partNo   || '').toLowerCase().includes(q) ||
+        (i.model    || '').toLowerCase().includes(q) ||
+        (i.orderNo  || '').toLowerCase().includes(q))
+    : incs;
+
+  if (!filtered.length) {
+    listEl.innerHTML = `<div class="batch-empty">Nenhum incidente encontrado${q ? ` para "${q}"` : ''}.</div>`;
+    return;
   }
 
+  // Ordena: pendentes primeiro, depois por nome
+  const sorted = [...filtered].sort((a, b) => {
+    const stA = a.status || 'pending';
+    const stB = b.status || 'pending';
+    if (stA === 'pending' && stB !== 'pending') return -1;
+    if (stB === 'pending' && stA !== 'pending') return  1;
+    return (a.partName || '').localeCompare(b.partName || '');
+  });
+
+  listEl.innerHTML = sorted.map(i => {
+    const st      = i.status || 'pending';
+    const stCfg   = STATUS_CONFIG[st] || STATUS_CONFIG.pending;
+    const isPend  = st === 'pending';
+    const trackBadge  = i.tracking
+      ? `<span class="batch-tracking-badge">📦 ${i.tracking}</span>` : '';
+    const advBadge = isPend
+      ? `<span class="batch-advance-badge">⚡ auto-avançado</span>` : '';
+    return `
+      <label class="batch-item${isPend ? ' batch-item-pending' : ''}">
+        <input type="checkbox" class="batch-cb" value="${i.id}" checked
+               onchange="updateBatchCount()">
+        <div class="batch-item-info">
+          <div class="batch-item-name-row">
+            <span class="batch-item-name">${i.partName || '—'}</span>
+            <span class="batch-status-pill" style="background:${stCfg.color}20;color:${stCfg.color};border-color:${stCfg.color}40">
+              ${stCfg.icon} ${stCfg.label}
+            </span>
+          </div>
+          <span class="batch-item-meta">
+            ${[i.partNo, i.model, i.ngQty ? i.ngQty + ' un' : ''].filter(Boolean).join(' · ')}
+            ${trackBadge}${advBadge}
+          </span>
+        </div>
+      </label>`;
+  }).join('');
+}
+
+window.openBatchETA = () => {
+  const eligible = getBatchEligible();
+  const searchEl = document.getElementById('batchSearch');
+  if (searchEl) searchEl.value = '';
+
+  if (!eligible.length) {
+    const listEl = document.getElementById('batchIncidentList');
+    listEl.innerHTML = `
+      <div class="batch-empty">Não há incidentes em aberto.</div>`;
+  } else {
+    renderBatchList(eligible);
+  }
   updateBatchCount();
   openModal('batchETAModal');
 };
@@ -940,19 +980,36 @@ window.closeBatchETA = (e) => {
   if (!e || e.target === document.getElementById('batchETAModal')) closeModal('batchETAModal');
 };
 
+window.batchSearch = () => {
+  const q = document.getElementById('batchSearch')?.value || '';
+  renderBatchList(getBatchEligible(), q);
+  updateBatchCount();
+};
+
 window.batchSelectAll = (checked) => {
   document.querySelectorAll('.batch-cb').forEach(cb => { cb.checked = checked; });
   updateBatchCount();
 };
 
 window.updateBatchCount = () => {
-  const total    = document.querySelectorAll('.batch-cb').length;
-  const selected = document.querySelectorAll('.batch-cb:checked').length;
+  const allCbs     = document.querySelectorAll('.batch-cb');
+  const checkedCbs = [...document.querySelectorAll('.batch-cb:checked')];
+  const total      = allCbs.length;
+  const selected   = checkedCbs.length;
+
+  const pendingCnt = checkedCbs.filter(cb => {
+    const inc = incidents.find(i => i.id === cb.value);
+    return inc && (inc.status || 'pending') === 'pending';
+  }).length;
+
   const el = document.getElementById('batchSelectedCount');
-  if (el) el.textContent = `${selected} de ${total} incidentes selecionados`;
+  if (el) {
+    el.textContent = `${selected} de ${total} selecionados`;
+    if (pendingCnt) el.textContent += ` · ${pendingCnt} serão auto-avançados ⚡`;
+  }
   const btn = document.getElementById('batchConfirmBtn');
   if (btn) btn.textContent = selected > 0
-    ? `✓ Confirmar ETA nos ${selected} incidente${selected > 1 ? 's' : ''}`
+    ? `✓ Confirmar ETA em ${selected} incidente${selected > 1 ? 's' : ''}`
     : '✓ Confirmar ETA';
 };
 
@@ -962,25 +1019,25 @@ window.doBatchConfirmETA = async () => {
   const tracking   = (trackingEl?.value || '').trim().replace(/\s+/g, '');
   const etaRaw     = etaEl?.value || '';
 
-  if (!tracking)  { showToast('⚠️ Insere o número de tracking'); return; }
-  if (!etaRaw)    { showToast('⚠️ Selecciona a data ETA');       return; }
+  if (!tracking) { showToast('⚠️ Insere o número de tracking'); return; }
+  if (!etaRaw)   { showToast('⚠️ Selecciona a data ETA');       return; }
 
   const selected = [...document.querySelectorAll('.batch-cb:checked')].map(cb => cb.value);
   if (!selected.length) { showToast('⚠️ Selecciona pelo menos 1 incidente'); return; }
 
   const d   = new Date(etaRaw + 'T00:00:00');
   const eta = d.toLocaleDateString('pt-BR');
-  const note = `ETA confirmado: ${eta} · Tracking: ${tracking}`;
 
   const btn = document.getElementById('batchConfirmBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ A actualizar...'; }
+  if (btn) { btn.disabled = true; btn.textContent = `⏳ A actualizar ${selected.length}...`; }
 
   try {
+    // batchAdvanceToETA avança de qualquer status → eta_confirmed num único write
     await Promise.all(
-      selected.map(id => updateIncidentStatus(id, 'eta_confirmed', currentUser, note, eta, tracking))
+      selected.map(id => batchAdvanceToETA(id, currentUser, eta, tracking))
     );
     closeModal('batchETAModal');
-    showToast(`✅ ${selected.length} incidente${selected.length > 1 ? 's' : ''} actualizados · ${tracking}`);
+    showToast(`✅ ${selected.length} incidente${selected.length > 1 ? 's' : ''} confirmados · ${tracking}`);
     if (trackingEl) trackingEl.value = '';
     if (etaEl)      etaEl.value      = '';
     renderList();

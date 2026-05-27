@@ -833,36 +833,52 @@
 
 <!-- ── Batch ETA / Tracking Modal ──────────────────────────── -->
 <div class="modal-overlay" id="batchETAModal" onclick="closeBatchETA(event)">
-  <div class="modal" style="max-height:90vh;overflow-y:auto;">
+  <div class="modal" style="max-height:92vh;display:flex;flex-direction:column;">
     <div class="modal-handle"></div>
     <div class="modal-title">📦 Confirmar Envio da China</div>
-    <div class="modal-sub">Aplica tracking e ETA a múltiplos incidentes de uma vez</div>
+    <div class="modal-sub">Um tracking + uma data → aplica a todos os incidentes selecionados, independentemente do status atual</div>
 
-    <div class="field">
-      <label class="field-label">Nº Tracking (FedEx / DHL / UPS)</label>
-      <input class="field-input" type="text" id="batchTracking"
-             placeholder="ex: 748926481935" style="font-family:var(--font-mono,monospace);letter-spacing:0.05em">
-    </div>
-    <div class="field">
-      <label class="field-label">Data prevista de chegada (ETA)</label>
-      <input class="field-input" type="date" id="batchETA">
+    <!-- Tracking + ETA -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="field" style="margin-bottom:0">
+        <label class="field-label">Nº Tracking</label>
+        <input class="field-input" type="text" id="batchTracking"
+               placeholder="870680856420"
+               style="font-family:var(--font-mono,monospace);letter-spacing:0.04em;font-size:13px">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label class="field-label">Data de chegada (ETA)</label>
+        <input class="field-input" type="date" id="batchETA">
+      </div>
     </div>
 
-    <div class="batch-list-header">
-      <span id="batchSelectedCount" style="font-size:12px;color:rgba(255,255,255,0.5);">A carregar...</span>
-      <div style="display:flex;gap:8px;">
+    <!-- Pesquisa + controles -->
+    <div class="batch-list-header" style="margin-top:14px;">
+      <input class="field-input batch-search-input" type="text" id="batchSearch"
+             placeholder="🔍 Pesquisar peça, código, modelo…"
+             oninput="batchSearch()">
+      <div class="batch-sel-row">
+        <span id="batchSelectedCount" class="batch-count-label">A carregar...</span>
         <button class="batch-sel-btn" onclick="batchSelectAll(true)">Todos</button>
         <button class="batch-sel-btn" onclick="batchSelectAll(false)">Nenhum</button>
       </div>
     </div>
 
-    <div id="batchIncidentList" style="max-height:300px;overflow-y:auto;"></div>
+    <!-- Lista scrollável -->
+    <div id="batchIncidentList" class="batch-scroll-list"></div>
 
-    <div style="display:flex;gap:8px;margin-top:16px;">
-      <button class="btn" onclick="closeBatchETA()">Cancelar</button>
-      <button class="btn btn-primary" id="batchConfirmBtn" style="flex:1" onclick="doBatchConfirmETA()">
-        ✓ Confirmar ETA
-      </button>
+    <!-- Legenda + ações -->
+    <div class="batch-footer">
+      <div class="batch-legend">
+        <span class="batch-advance-badge">⚡ auto-avançado</span>
+        <span style="font-size:11px;color:rgba(255,255,255,0.3)">= incidentes pendentes avançam direto para ETA Confirmado</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn" onclick="closeBatchETA()">Cancelar</button>
+        <button class="btn btn-primary" id="batchConfirmBtn" style="flex:1" onclick="doBatchConfirmETA()">
+          ✓ Confirmar ETA
+        </button>
+      </div>
     </div>
   </div>
 </div>
