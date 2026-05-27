@@ -192,55 +192,66 @@
         <!-- LEFT: list panel -->
         <div class="desktop-list-panel">
 
-          <!-- Tabs de tipo de incidente -->
-          <div class="type-tab-row">
-            <button class="type-tab active" id="tab-normal" onclick="setTypeTab('normal')">
-              🔩 Peças
-              <span class="type-tab-count" id="tabCountNormal">—</span>
+          <!-- Cabeçalho fixo: tabs + stats + pesquisa + filtros -->
+          <div class="list-panel-header">
+
+            <div class="type-tab-row">
+              <button class="type-tab active" id="tab-normal" onclick="setTypeTab('normal')">
+                🔩 Peças
+                <span class="type-tab-count" id="tabCountNormal">—</span>
+              </button>
+              <button class="type-tab" id="tab-paint" onclick="setTypeTab('paint')">
+                🎨 Pintura
+                <span class="type-tab-count" id="tabCountPaint">—</span>
+              </button>
+            </div>
+
+            <div class="stats-row">
+              <div class="stat-card">
+                <div class="stat-value blue" id="statTotal">—</div>
+                <div class="stat-label">Total</div>
+                <div id="statTrend"></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value amber" id="statPending">—</div>
+                <div class="stat-label">Pendentes</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value green" id="statDone">—</div>
+                <div class="stat-label">Concluídos</div>
+              </div>
+            </div>
+
+            <div class="search-bar">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="9" cy="9" r="6"/><path d="M14 14l3 3"/>
+              </svg>
+              <input type="search" id="searchInput" placeholder="Pesquisar peça, código, modelo..."
+                oninput="onSearch()" autocomplete="off">
+            </div>
+
+            <div class="filter-chips">
+              <div class="chip active" data-filter="all" onclick="setFilter('all', this)">Todos</div>
+              <div class="chip" data-filter="pending" onclick="setFilter('pending', this)">⏳ Pendentes</div>
+              <div class="chip" data-filter="inprogress" onclick="setFilter('inprogress', this)">📤 Em Curso</div>
+              <div class="chip" data-filter="done" onclick="setFilter('done', this)">✅ Encerrados</div>
+            </div>
+
+          </div><!-- /list-panel-header -->
+
+          <!-- Área scrollável: botão de lote + lista de incidentes -->
+          <div class="list-panel-body">
+
+            <button class="btn-batch-eta-trigger" onclick="openBatchETA()">
+              📦 Confirmar envio da China (lote)
             </button>
-            <button class="type-tab" id="tab-paint" onclick="setTypeTab('paint')">
-              🎨 Pintura
-              <span class="type-tab-count" id="tabCountPaint">—</span>
-            </button>
-          </div>
 
-          <div class="stats-row">
-            <div class="stat-card">
-              <div class="stat-value blue" id="statTotal">—</div>
-              <div class="stat-label">Total</div>
-              <div id="statTrend"></div>
+            <div class="incident-list" id="incidentList">
+              <div class="loading-state"><div class="spinner"></div> A carregar...</div>
             </div>
-            <div class="stat-card">
-              <div class="stat-value amber" id="statPending">—</div>
-              <div class="stat-label">Pendentes</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value green" id="statDone">—</div>
-              <div class="stat-label">Concluídos</div>
-            </div>
-          </div>
 
-          <div class="search-bar">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-              <circle cx="9" cy="9" r="6"/><path d="M14 14l3 3"/>
-            </svg>
-            <input type="search" id="searchInput" placeholder="Pesquisar peça, código, modelo..."
-              oninput="onSearch()" autocomplete="off">
-          </div>
+          </div><!-- /list-panel-body -->
 
-          <div class="filter-chips">
-            <div class="chip active" data-filter="all" onclick="setFilter('all', this)">Todos</div>
-            <div class="chip" data-filter="pending" onclick="setFilter('pending', this)">⏳ Pendentes</div>
-            <div class="chip" data-filter="inprogress" onclick="setFilter('inprogress', this)">📤 Em Curso</div>
-            <div class="chip" data-filter="done" onclick="setFilter('done', this)">✅ Encerrados</div>
-          </div>
-          <button class="btn-batch-eta-trigger" onclick="openBatchETA()">
-            📦 Confirmar envio da China (lote)
-          </button>
-
-          <div class="incident-list" id="incidentList">
-            <div class="loading-state"><div class="spinner"></div> A carregar...</div>
-          </div>
         </div>
 
         <!-- RIGHT: detail panel (desktop only) -->
