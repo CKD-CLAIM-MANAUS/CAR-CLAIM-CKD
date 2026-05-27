@@ -2267,6 +2267,10 @@ img { display: block; max-width: 100%; }
   animation: pageFadeIn 0.18s ease both;
 }
 
+/* ── Chips compactos dentro do painel lateral (360 px) ─── */
+.desktop-list-panel .filter-chips { gap: 4px; }
+.desktop-list-panel .chip { padding: 5px 9px; font-size: 11px; }
+
 /* ── Entrada dos cards de incidente (stagger) ───────────── */
 .incident-card {
   animation: fadeInUp 0.2s ease both;
