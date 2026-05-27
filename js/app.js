@@ -10,6 +10,20 @@ import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 import { getTrackingUrl, getCarrierLabel } from './tracking.js';
 
+// ── Paint URL detection — executa antes do auth ───────────────
+// QR das etiquetas de pintura codifica: APP_URL?paint=INCIDENT_ID
+// Ao abrir o URL num telemóvel, o app detecta e trata o retorno da peça.
+let _pendingPaintId = null;
+(function () {
+  const params  = new URLSearchParams(window.location.search);
+  const paintId = params.get('paint');
+  if (paintId) {
+    _pendingPaintId = paintId;
+    // Limpa o ?paint= da URL sem recarregar a página
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+})();
+
 // ── State ─────────────────────────────────────────────────────
 let currentPhotos = [];
 let editingId     = null;
@@ -89,6 +103,8 @@ initAuth(
     startRealtimeSync();
     // Verifica rascunho após login — pequeno delay para garantir que a UI carregou
     setTimeout(checkForDraft, 1000);
+    // Trata QR de pintura se a app foi aberta por scan
+    if (_pendingPaintId) setTimeout(handlePendingPaint, 2000);
   },
   () => {
     stopRealtimeSync();
@@ -644,17 +660,18 @@ function buildDetailHTML(inc) {
     : `<div class="car-warning"><strong>Para gerar o CAR falta:</strong> ${missing.join(', ')}</div>`;
 
   // ── Next status action button
+  const isPaint    = (inc.incidentType || 'normal') === 'paint';
   const nextStatus = STATUS_FLOW[stIdx + 1];
   const BTN_LABELS = {
-    sent:          '📤 Marcar como Enviado',
-    awaiting:      '🕐 Aguardando Resposta China',
+    sent:          isPaint ? '🎨 Enviar para Pintoria'          : '📤 Marcar como Enviado',
+    awaiting:      isPaint ? '🕐 Aguardar (intermédio)'         : '🕐 Aguardando Resposta China',
     eta_confirmed: '📅 Confirmar ETA',
-    received:      '📦 Marcar como Recebido',
-    done:          '✓ Encerrar Claim',
+    received:      isPaint ? '🎨 Confirmar Retorno da Pintoria' : '📦 Marcar como Recebido',
+    done:          isPaint ? '✅ Encerrar Retrabalho'           : '✓ Encerrar Claim',
   };
   let nextBtn = '';
   if (nextStatus) {
-    if (nextStatus === 'eta_confirmed') {
+    if (nextStatus === 'eta_confirmed' && !isPaint) {
       nextBtn = `<button class="btn btn-primary" onclick="doOpenETAInput('${inc.id}')">📅 Confirmar ETA</button>`;
     } else {
       nextBtn = `<button class="btn btn-primary" onclick="doAdvanceStatus('${inc.id}','${nextStatus}')">${BTN_LABELS[nextStatus]}</button>`;
@@ -662,6 +679,11 @@ function buildDetailHTML(inc) {
   }
   const reopenBtn = st !== 'pending'
     ? `<button class="btn" onclick="doAdvanceStatus('${inc.id}','pending')">↩ Reabrir</button>`
+    : '';
+
+  // Botão de etiqueta — só para incidentes de pintura
+  const paintLabelBtn = isPaint
+    ? `<button class="btn btn-paint-label" onclick="printPaintLabel('${inc.id}')">🖨 Etiqueta</button>`
     : '';
 
   // ── ETA display
@@ -749,6 +771,7 @@ function buildDetailHTML(inc) {
       <div class="detail-actions" style="margin-top:14px">
         ${nextBtn}
         ${reopenBtn}
+        ${paintLabelBtn}
         <button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>
         ${isAdmin ? `<button class="btn btn-danger" onclick="doDelete('${inc.id}')">🗑 Eliminar</button>` : ''}
       </div>
@@ -1081,6 +1104,141 @@ window.doDelete = async (id) => {
   try { await deleteIncident(id); showToast('🗑 Eliminado'); goToList(); }
   catch { showToast('Erro ao eliminar.'); }
 };
+
+// ══════════════════════════════════════════════════════════════
+// PAINT REWORK TRACKING
+// QR codifica: APP_URL?paint=INCIDENT_ID
+// Etiqueta mostra: QR + nº CAR + nome da peça + data
+// Ao escanear o QR → app abre → regista retorno automaticamente
+// ══════════════════════════════════════════════════════════════
+
+const PAINT_APP_URL = 'https://ckd-claim-manaus.github.io/CAR-CLAIM-CKD/';
+
+// ── Trata ?paint= pendente após login + incidents carregados ──
+function handlePendingPaint() {
+  if (!_pendingPaintId) return;
+  const id = _pendingPaintId;
+  _pendingPaintId = null;
+
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) { showToast('⚠️ Incidente de pintura não encontrado'); return; }
+
+  // Navega para o incidente
+  if (!isDesktop()) goToList();
+  setTimeout(() => {
+    window.showDetail(id);
+    const st = inc.status || 'pending';
+    if (st === 'done') { showToast('✅ Este incidente já está encerrado.'); return; }
+    _showPaintReturnBanner(id, inc);
+  }, isDesktop() ? 0 : 120);
+}
+
+// ── Banner amarelo de confirmação de retorno ──────────────────
+function _showPaintReturnBanner(id, inc) {
+  document.getElementById('paintReturnBanner')?.remove();
+
+  const st         = inc.status || 'pending';
+  const nextStatus = st === 'received' ? 'done' : 'received';
+  const btnLabel   = nextStatus === 'done' ? '✅ Encerrar' : '📦 Confirmar Retorno';
+
+  const banner = document.createElement('div');
+  banner.id        = 'paintReturnBanner';
+  banner.className = 'paint-return-banner';
+  banner.innerHTML = `
+    <div class="paint-return-banner-info">
+      <div class="paint-return-banner-title">🎨 Retorno da Pintoria detectado</div>
+      <div class="paint-return-banner-name">${inc.partName || '—'}</div>
+    </div>
+    <button class="paint-return-btn" onclick="doPaintReturn('${id}')">${btnLabel}</button>
+    <button class="paint-return-close"
+      onclick="document.getElementById('paintReturnBanner')?.remove()">✕</button>
+  `;
+
+  document.body.appendChild(banner);
+  // Remove automaticamente após 45 s
+  setTimeout(() => document.getElementById('paintReturnBanner')?.remove(), 45000);
+}
+
+// ── Confirma retorno via banner ou botão manual ───────────────
+window.doPaintReturn = async (id) => {
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) return;
+
+  document.getElementById('paintReturnBanner')?.remove();
+
+  const st         = inc.status || 'pending';
+  const nextStatus = st === 'received' ? 'done' : 'received';
+  const note       = nextStatus === 'done'
+    ? 'Retrabalho de pintura encerrado via leitura de QR.'
+    : 'Peça retornou da pintoria — confirmado por leitura de QR.';
+
+  try {
+    await updateIncidentStatus(id, nextStatus, currentUser, note);
+    showToast(nextStatus === 'done'
+      ? '✅ Retrabalho de pintura encerrado!'
+      : '🎨 Retorno da pintoria confirmado!');
+    window.showDetail(id);
+    renderList();
+  } catch (e) { showToast('Erro: ' + e.message); }
+};
+
+// ── Gera QR + abre modal de impressão ────────────────────────
+window.printPaintLabel = async (id) => {
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) return;
+
+  const qrUrl   = `${PAINT_APP_URL}?paint=${encodeURIComponent(id)}`;
+  const carNum  = inc.carNum ? `CAR ${inc.carNum}` : id.slice(0, 8).toUpperCase();
+  const partName = (inc.partName || '—').toUpperCase().slice(0, 32);
+  const dateStr  = new Date(inc.createdAt || Date.now()).toLocaleDateString('pt-BR');
+
+  // Gera QR como data URL
+  let qrSrc = '';
+  try {
+    if (typeof QRCode !== 'undefined') {
+      qrSrc = await QRCode.toDataURL(qrUrl, {
+        width: 220, margin: 1,
+        color: { dark: '#000000', light: '#FFFFFF' }
+      });
+    } else {
+      // Fallback: Google Charts (requer internet)
+      qrSrc = `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(qrUrl)}&choe=UTF-8`;
+    }
+  } catch (e) {
+    console.warn('QR gen error:', e);
+    qrSrc = `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(qrUrl)}&choe=UTF-8`;
+  }
+
+  const labelHTML = `
+    <div class="paint-label-print-area">
+      <div class="label-qr-col">
+        <img class="label-qr-img" src="${qrSrc}" alt="QR">
+      </div>
+      <div class="label-text-col">
+        <div class="label-car-num">${carNum}</div>
+        <div class="label-part-name">${partName}</div>
+        <div class="label-paint-badge">🎨 PINTURA</div>
+        <div class="label-date">${dateStr}</div>
+      </div>
+    </div>`;
+
+  // Preenche prévia no modal
+  const previewEl = document.getElementById('paintLabelPrintArea');
+  if (previewEl) previewEl.innerHTML = labelHTML;
+
+  // Preenche área de impressão (fora do modal, limpa para @media print)
+  const printEl = document.getElementById('paintPrintArea');
+  if (printEl) printEl.innerHTML = labelHTML;
+
+  openModal('paintLabelModal');
+};
+
+window.closePaintLabel = (e) => {
+  if (!e || e.target === document.getElementById('paintLabelModal'))
+    closeModal('paintLabelModal');
+};
+
+window.doPrintLabel = () => window.print();
 
 // ── Incident type ─────────────────────────────────────────────
 let currentIncidentType = 'normal'; // 'normal' | 'paint'
@@ -1464,6 +1622,25 @@ document.addEventListener('paste', (e) => {
 window.openQRScanner = () => {
   openQR(
     async (data) => {
+      // ── Detecta QR de retorno de pintura ──────────────────
+      try {
+        const url     = new URL(data);
+        const paintId = url.searchParams.get('paint');
+        if (paintId) {
+          const inc = incidents.find(i => i.id === paintId);
+          if (!inc) { showToast('⚠️ Incidente de pintura não encontrado'); return; }
+          const st = inc.status || 'pending';
+          if (st === 'done') { showToast('✅ Incidente já encerrado.'); window.showDetail(paintId); return; }
+          if (!isDesktop()) goToList();
+          setTimeout(() => {
+            window.showDetail(paintId);
+            _showPaintReturnBanner(paintId, inc);
+          }, isDesktop() ? 0 : 120);
+          return;
+        }
+      } catch { /* URL inválido — continua para pack list */ }
+
+      // ── Pack list QR (formato: orderNo&partNo&qty&lotNo) ──
       const parsed = parseQRData(data);
       if (!parsed) { showToast('Formato QR não reconhecido'); return; }
 

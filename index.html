@@ -893,11 +893,44 @@
 </div>
 
 
+<!-- QR Code generator (para etiquetas de pintura) -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
 <!-- Chart.js (UMD — disponível como window.Chart) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <!-- App entry point (ES module) -->
 <script type="module" src="js/app.js"></script>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAINT LABEL MODAL
+═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="paintLabelModal" onclick="closePaintLabel(event)">
+  <div class="modal paint-label-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🖨 Etiqueta de Pintura</div>
+    <div class="modal-sub">Imprima e cole na peça antes de enviar para a pintoria</div>
+
+    <!-- Prévia da etiqueta -->
+    <div class="paint-label-preview-wrap">
+      <div id="paintLabelPrintArea">
+        <!-- preenchido por JS -->
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;margin:10px 0 0;line-height:1.5;">
+      Ao escanear o QR, o retorno da peça é registado automaticamente
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn" onclick="closePaintLabel()">Fechar</button>
+      <button class="btn btn-primary" style="flex:1" onclick="doPrintLabel()">🖨 Imprimir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Área de impressão — só visível no @media print -->
+<div id="paintPrintArea"></div>
 
 </body>
 </html>
