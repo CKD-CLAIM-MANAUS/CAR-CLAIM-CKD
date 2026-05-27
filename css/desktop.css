@@ -1,0 +1,189 @@
+/* ════════════════════════════════════════════════════════════
+   desktop.css — Estilos EXCLUSIVOS para ecrã ≥ 900px
+   ────────────────────────────────────────────────────────────
+   REGRA: Nada aqui afecta mobile. Toda a activação é feita
+   via html.is-desktop (class definida por JS antes do paint).
+   NÃO usar @media neste ficheiro.
+════════════════════════════════════════════════════════════ */
+
+/* ── Header ──────────────────────────────────────────────── */
+html.is-desktop .app-header { padding: 0 28px; }
+
+/* ── Navegação desktop ───────────────────────────────────── */
+html.is-desktop .desktop-nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  padding: 0 16px;
+}
+
+/* ── Layout geral ────────────────────────────────────────── */
+html.is-desktop .main {
+  max-width: 100%;
+  padding: 0;
+  padding-bottom: 0;
+}
+html.is-desktop .bottom-nav { display: none; }
+
+/* ── Grid de dois painéis ────────────────────────────────── */
+html.is-desktop .desktop-layout {
+  display: grid;
+  grid-template-columns: clamp(360px, 32vw, 440px) 1fr;
+  grid-template-areas: "list detail";
+  height: calc(100vh - var(--header-h));
+  overflow: hidden;
+}
+
+/* ── Painel esquerdo — flex coluna, só a lista faz scroll ── */
+html.is-desktop .desktop-list-panel {
+  grid-area: list;
+  border-right: 1px solid var(--border-md);
+  overflow: hidden;
+  padding: 0;
+  background: var(--bg-base);
+  display: flex;
+  flex-direction: column;
+}
+
+html.is-desktop .list-panel-header {
+  flex-shrink: 0;
+  padding: 14px 14px 0;
+  background: var(--bg-base);
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+}
+
+html.is-desktop .list-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-md) transparent;
+}
+html.is-desktop .list-panel-body::-webkit-scrollbar       { width: 3px; }
+html.is-desktop .list-panel-body::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 2px; }
+
+html.is-desktop .list-panel-body .btn-batch-eta-trigger { margin-top: 0; margin-bottom: 8px; }
+
+/* Stats compactos no cabeçalho lateral */
+html.is-desktop .list-panel-header .stat-card    { padding: 10px 8px 8px; }
+html.is-desktop .list-panel-header .stat-value   { font-size: 1.45rem; }
+html.is-desktop .list-panel-header .stat-label   { font-size: 9px; margin-top: 3px; }
+html.is-desktop .list-panel-header .stats-row    { margin-bottom: 10px; }
+html.is-desktop .list-panel-header .search-bar   { margin-bottom: 8px; }
+html.is-desktop .list-panel-header .filter-chips { gap: 5px; margin-bottom: 12px; }
+html.is-desktop .list-panel-header .chip         { padding: 5px 10px; font-size: 11.5px; }
+
+/* ── Painel direito ──────────────────────────────────────── */
+html.is-desktop .desktop-detail-panel {
+  display: flex;
+  flex-direction: column;
+  grid-area: detail;
+  background: var(--bg-deep);
+  background-image: radial-gradient(ellipse at 72% 8%, rgba(255,102,0,0.06) 0%, transparent 52%);
+  overflow: hidden;
+  position: relative;
+}
+
+html.is-desktop .desktop-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Watermark logo CFMOTO */
+html.is-desktop .desktop-detail-empty::before {
+  content: '';
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  background: url('../logo.png') center / contain no-repeat;
+  filter: invert(1) saturate(0);
+  opacity: 0.035;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -62%);
+  pointer-events: none;
+}
+
+html.is-desktop #desktopDetailContent { flex: 1; }
+html.is-desktop #desktopDetailContent .back-btn { display: none; }
+
+html.is-desktop .incident-card.selected {
+  border-color: rgba(255,102,0,0.4);
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px rgba(255,102,0,0.2);
+}
+
+/* ── KPIs do estado vazio (só desktop) ──────────────────── */
+html.is-desktop .empty-kpi-grid {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+html.is-desktop .empty-kpi {
+  text-align: center;
+  padding: 22px 26px;
+}
+
+html.is-desktop .empty-kpi-sep {
+  width: 1px;
+  height: 44px;
+  background: rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+
+html.is-desktop .empty-kpi-val {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+html.is-desktop .empty-kpi-val.orange { color: var(--blue-500);  }
+html.is-desktop .empty-kpi-val.amber  { color: var(--amber-500); }
+html.is-desktop .empty-kpi-val.cyan   { color: #06B6D4;          }
+html.is-desktop .empty-kpi-val.green  { color: var(--green-500); }
+
+html.is-desktop .empty-kpi-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.3);
+  margin-top: 8px;
+}
+
+html.is-desktop .empty-hint {
+  display: flex;
+  font-size: 13px;
+  color: rgba(255,255,255,0.22);
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+html.is-desktop .empty-hint-arrow {
+  display: inline-block;
+  animation: hintArrow 1.8s ease-in-out infinite;
+}
+
+/* ── Stock page ──────────────────────────────────────────── */
+html.is-desktop .stock-wrap {
+  max-width: 720px;
+  padding-bottom: 24px;
+}

@@ -578,9 +578,23 @@ window.onSearch = () => {
   renderList();
 };
 
+// ── Layout mode — sincroniza html.is-desktop / html.is-mobile ─
+function setLayoutMode() {
+  const desktop = window.innerWidth >= 900;
+  document.documentElement.classList.toggle('is-desktop',  desktop);
+  document.documentElement.classList.toggle('is-mobile',  !desktop);
+}
+
+// Debounce no resize para não disparar a cada pixel
+let _layoutTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_layoutTimer);
+  _layoutTimer = setTimeout(setLayoutMode, 120);
+});
+
 // ── Helper: is desktop? ───────────────────────────────────────
 function isDesktop() {
-  return window.innerWidth >= 900;
+  return document.documentElement.classList.contains('is-desktop');
 }
 
 // ── Status badge helper ───────────────────────────────────────

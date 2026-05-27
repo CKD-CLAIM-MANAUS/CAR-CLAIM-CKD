@@ -10,7 +10,16 @@
   <title>CAR · Garantia — CFMOTO</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo.png">
+  <!-- Anti-FOUC: define html.is-desktop antes do primeiro paint -->
+  <script>
+    (function() {
+      document.documentElement.classList.add(
+        window.innerWidth >= 900 ? 'is-desktop' : 'is-mobile'
+      );
+    })();
+  </script>
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/desktop.css">
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
