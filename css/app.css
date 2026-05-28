@@ -2474,6 +2474,82 @@ img { display: block; max-width: 100%; }
   line-height: 1;
 }
 
+/* ── Badge pintura — "Na Pintoria" ──────────────────────── */
+.badge-paint-sent {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8B5CF6;
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* ── Botão scan pintura ──────────────────────────────────── */
+.btn-paint-scan {
+  background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%);
+  color: #FFFFFF;
+  border-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-paint-scan:active { opacity: 0.85; }
+
+/* ── Botão admin bypass (sem QR) ─────────────────────────── */
+.btn-admin-override {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--amber-500, #F59E0B);
+  border-color: rgba(245, 158, 11, 0.3);
+  font-size: 11px;
+  padding: 6px 10px;
+}
+.btn-admin-override:active { opacity: 0.8; }
+
+/* ── Overlay de confirmação de pintura ───────────────────── */
+.paint-action-confirm {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  padding: 16px;
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.paint-action-confirm-box {
+  background: var(--bg-card, #0D1E35);
+  border: 1.5px solid rgba(139, 92, 246, 0.4);
+  border-radius: 16px;
+  padding: 24px 20px 20px;
+  max-width: 340px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  animation: scaleIn 0.2s ease;
+}
+@keyframes scaleIn {
+  from { transform: scale(0.94); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.paint-action-confirm-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-100, rgba(255,255,255,0.88));
+  margin-bottom: 6px;
+}
+.paint-action-confirm-subtitle {
+  font-size: 13px;
+  color: var(--ink-300, rgba(255,255,255,0.45));
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+.paint-action-confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+.paint-action-confirm-btns .btn { flex: 1; justify-content: center; }
+
 /* ── Área de impressão — só activa em @media print ──────── */
 #paintPrintArea { display: none; }
 

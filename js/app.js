@@ -1,6 +1,6 @@
 // ── app.js ────────────────────────────────────────────────────
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
-import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA } from './incidents.js';
+import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
@@ -555,7 +555,7 @@ function renderList() {
         </div>
         <div class="incident-footer">
           <span class="incident-meta">${inc.model || '—'} · ${fmtDate(inc.createdAt)}</span>
-          ${statusBadge(inc.status)}
+          ${statusBadge(inc.status, inc)}
         </div>
       </div>
     </div>`;
@@ -613,29 +613,45 @@ function isDesktop() {
   return document.documentElement.classList.contains('is-desktop');
 }
 
+// ── Helpers de config por tipo ────────────────────────────────
+function _isPaintInc(inc) { return (inc?.incidentType || 'normal') === 'paint'; }
+function _flowFor(inc)    { return _isPaintInc(inc) ? PAINT_STATUS_FLOW   : STATUS_FLOW;   }
+function _configFor(inc)  { return _isPaintInc(inc) ? PAINT_STATUS_CONFIG : STATUS_CONFIG; }
+
+// Pintura usa só 3 estados; 'received' herdado é tratado como 'done'
+function _normalisePaintStatus(st) {
+  return (st === 'received' || st === 'awaiting' || st === 'eta_confirmed') ? 'done' : st;
+}
+
 // ── Status badge helper ───────────────────────────────────────
-function statusBadge(status) {
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+function statusBadge(status, inc) {
+  const config = _configFor(inc);
+  const st     = _isPaintInc(inc) ? _normalisePaintStatus(status) : status;
+  const cfg    = config[st] || STATUS_CONFIG.pending;
   return `<span class="badge ${cfg.badge}">${cfg.icon} ${cfg.label}</span>`;
 }
 
 // ── Status stepper ────────────────────────────────────────────
 function buildStepperHTML(inc) {
-  const st  = inc.status || 'pending';
-  const idx = STATUS_FLOW.indexOf(st);
-  const parts = [];
+  const isPaint = _isPaintInc(inc);
+  const flow    = _flowFor(inc);
+  const config  = _configFor(inc);
+  const rawSt   = inc.status || 'pending';
+  const st      = isPaint ? _normalisePaintStatus(rawSt) : rawSt;
+  const idx     = flow.indexOf(st);
+  const parts   = [];
 
-  STATUS_FLOW.forEach((s, i) => {
-    const cfg      = STATUS_CONFIG[s];
-    const isPast   = i < idx;
+  flow.forEach((s, i) => {
+    const cfg       = config[s] || STATUS_CONFIG[s];
+    const isPast    = i < idx;
     const isCurrent = i === idx;
-    const cls      = isPast ? 'step-past' : isCurrent ? 'step-current' : 'step-future';
+    const cls       = isPast ? 'step-past' : isCurrent ? 'step-current' : 'step-future';
     parts.push(`
       <div class="stepper-step ${cls}">
         <div class="stepper-dot">${isPast ? '✓' : ''}</div>
         <div class="stepper-label">${cfg.label}</div>
       </div>`);
-    if (i < STATUS_FLOW.length - 1) {
+    if (i < flow.length - 1) {
       parts.push(`<div class="stepper-connector ${isPast ? 'connector-done' : ''}"></div>`);
     }
   });
@@ -644,9 +660,11 @@ function buildStepperHTML(inc) {
 
 // ── Build detail HTML ─────────────────────────────────────────
 function buildDetailHTML(inc) {
-  const st    = inc.status || 'pending';
-  const stIdx = STATUS_FLOW.indexOf(st);
-  const stCfg = STATUS_CONFIG[st] || STATUS_CONFIG.pending;
+  const isPaint = _isPaintInc(inc);
+  const rawSt   = inc.status || 'pending';
+  const st      = isPaint ? _normalisePaintStatus(rawSt) : rawSt;
+  const stIdx   = (isPaint ? PAINT_STATUS_FLOW : STATUS_FLOW).indexOf(st);
+  const stCfg   = _configFor(inc)[st] || STATUS_CONFIG.pending;
 
   // ── Photos
   const photos = (inc.photos || []).map(p =>
@@ -659,29 +677,43 @@ function buildDetailHTML(inc) {
     ? `<button class="btn btn-primary" onclick="doGenerateCAR('${inc.id}')">📄 Gerar CAR Excel</button>`
     : `<div class="car-warning"><strong>Para gerar o CAR falta:</strong> ${missing.join(', ')}</div>`;
 
-  // ── Next status action button
-  const isPaint    = (inc.incidentType || 'normal') === 'paint';
-  const nextStatus = STATUS_FLOW[stIdx + 1];
-  const BTN_LABELS = {
-    sent:          isPaint ? '🎨 Enviar para Pintoria'          : '📤 Marcar como Enviado',
-    awaiting:      isPaint ? '🕐 Aguardar (intermédio)'         : '🕐 Aguardando Resposta China',
-    eta_confirmed: '📅 Confirmar ETA',
-    received:      isPaint ? '🎨 Confirmar Retorno da Pintoria' : '📦 Marcar como Recebido',
-    done:          isPaint ? '✅ Encerrar Retrabalho'           : '✓ Encerrar Claim',
-  };
-  let nextBtn = '';
-  if (nextStatus) {
-    if (nextStatus === 'eta_confirmed' && !isPaint) {
-      nextBtn = `<button class="btn btn-primary" onclick="doOpenETAInput('${inc.id}')">📅 Confirmar ETA</button>`;
-    } else {
-      nextBtn = `<button class="btn btn-primary" onclick="doAdvanceStatus('${inc.id}','${nextStatus}')">${BTN_LABELS[nextStatus]}</button>`;
-    }
-  }
+  // ── Botões de ação — lógica completamente diferente para pintura
+  let nextBtn  = '';
+  let adminBtn = '';
   const reopenBtn = st !== 'pending'
     ? `<button class="btn" onclick="doAdvanceStatus('${inc.id}','pending')">↩ Reabrir</button>`
     : '';
 
-  // Botão de etiqueta — só para incidentes de pintura
+  if (isPaint) {
+    // ── Pintura: transições exigem scan de QR ─────────────────
+    if (st === 'pending') {
+      nextBtn  = `<button class="btn btn-primary btn-paint-scan" onclick="doScanPaintSend('${inc.id}')">📷 Escanear para Enviar</button>`;
+      if (isAdmin) adminBtn = `<button class="btn btn-admin-override" onclick="doAdminPaintAdvance('${inc.id}','sent')" title="Avançar sem QR — só admin">⚠️ Sem QR</button>`;
+    } else if (st === 'sent') {
+      nextBtn  = `<button class="btn btn-primary btn-paint-scan" onclick="doScanPaintReturn('${inc.id}')">📷 Escanear para Receber</button>`;
+      if (isAdmin) adminBtn = `<button class="btn btn-admin-override" onclick="doAdminPaintAdvance('${inc.id}','done')" title="Encerrar sem QR — só admin">⚠️ Sem QR</button>`;
+    }
+    // done: nenhum botão de avanço
+  } else {
+    // ── Peças: fluxo normal ───────────────────────────────────
+    const nextStatus = STATUS_FLOW[stIdx + 1];
+    const BTN_LABELS = {
+      sent:          '📤 Marcar como Enviado',
+      awaiting:      '🕐 Aguardando Resposta China',
+      eta_confirmed: '📅 Confirmar ETA',
+      received:      '📦 Marcar como Recebido',
+      done:          '✓ Encerrar Claim',
+    };
+    if (nextStatus) {
+      if (nextStatus === 'eta_confirmed') {
+        nextBtn = `<button class="btn btn-primary" onclick="doOpenETAInput('${inc.id}')">📅 Confirmar ETA</button>`;
+      } else {
+        nextBtn = `<button class="btn btn-primary" onclick="doAdvanceStatus('${inc.id}','${nextStatus}')">${BTN_LABELS[nextStatus]}</button>`;
+      }
+    }
+  }
+
+  // Botão de etiqueta — só para pintura
   const paintLabelBtn = isPaint
     ? `<button class="btn btn-paint-label" onclick="printPaintLabel('${inc.id}')">🖨 Etiqueta</button>`
     : '';
@@ -759,17 +791,18 @@ function buildDetailHTML(inc) {
           <div class="detail-title">${inc.partName || '—'}</div>
           <div class="detail-subtitle">${inc.partNo || ''} · ${fmtDate(inc.createdAt)}</div>
         </div>
-        ${statusBadge(st)}
+        ${statusBadge(st, inc)}
       </div>
     </div>
 
     <!-- Status Stepper -->
     <div class="form-card status-stepper-card" style="margin-bottom:10px">
       <div class="stepper-track">${buildStepperHTML(inc)}</div>
-      ${etaBlock}
-      ${etaInput}
+      ${isPaint ? '' : etaBlock}
+      ${isPaint ? '' : etaInput}
       <div class="detail-actions" style="margin-top:14px">
         ${nextBtn}
+        ${adminBtn}
         ${reopenBtn}
         ${paintLabelBtn}
         <button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>
@@ -1114,6 +1147,104 @@ window.doDelete = async (id) => {
 
 const PAINT_APP_URL = 'https://ckd-claim-manaus.github.io/CAR-CLAIM-CKD/';
 
+// ── Valida QR: retorna true se o URL codifica este incidente ──
+function _validatePaintQR(data, expectedId) {
+  try {
+    return new URL(data).searchParams.get('paint') === expectedId;
+  } catch { return false; }
+}
+
+// ── Overlay de confirmação com UI personalizada ───────────────
+function _showPaintActionConfirm(title, subtitle, confirmLabel, onConfirm) {
+  document.getElementById('paintActionConfirm')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'paintActionConfirm';
+  overlay.className = 'paint-action-confirm';
+  overlay.innerHTML = `
+    <div class="paint-action-confirm-box">
+      <div class="paint-action-confirm-title">${title}</div>
+      <div class="paint-action-confirm-subtitle">${subtitle}</div>
+      <div class="paint-action-confirm-btns">
+        <button class="btn btn-primary" id="paintConfirmOk">${confirmLabel}</button>
+        <button class="btn" id="paintConfirmCancel">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById('paintConfirmOk').onclick     = () => { overlay.remove(); onConfirm(); };
+  document.getElementById('paintConfirmCancel').onclick = () => overlay.remove();
+}
+
+// ── Scan para enviar para pintoria (pending → sent) ───────────
+window.doScanPaintSend = (id) => {
+  openQR(
+    (data) => {
+      if (!_validatePaintQR(data, id)) { showToast('⚠️ QR não corresponde a este incidente'); return; }
+      const inc = incidents.find(i => i.id === id);
+      closeQR();
+      _showPaintActionConfirm(
+        '🎨 Enviar para Pintoria',
+        `${inc?.partName || '—'} · ${inc?.carNum ? 'CAR ' + inc.carNum : 'SEM CAR'}`,
+        '✅ Confirmar Envio',
+        async () => {
+          try {
+            await updateIncidentStatus(id, 'sent', currentUser, 'Enviado para pintoria via leitura de QR.');
+            showToast('🎨 Enviado para pintoria!');
+            window.showDetail(id); renderList();
+          } catch (e) { showToast('Erro: ' + e.message); }
+        }
+      );
+    },
+    (err) => showToast('Erro ao aceder à câmera: ' + err.message)
+  );
+};
+
+// ── Scan para confirmar retorno e encerrar (sent → done) ──────
+window.doScanPaintReturn = (id) => {
+  openQR(
+    (data) => {
+      if (!_validatePaintQR(data, id)) { showToast('⚠️ QR não corresponde a este incidente'); return; }
+      const inc = incidents.find(i => i.id === id);
+      closeQR();
+      _showPaintActionConfirm(
+        '✅ Confirmar Retorno da Pintoria',
+        `${inc?.partName || '—'} · Retrabalho concluído?`,
+        '✅ Confirmar e Encerrar',
+        async () => {
+          try {
+            await updateIncidentStatus(id, 'done', currentUser, 'Peça retornou da pintoria — confirmado por leitura de QR.');
+            showToast('✅ Retrabalho de pintura encerrado!');
+            window.showDetail(id); renderList();
+          } catch (e) { showToast('Erro: ' + e.message); }
+        }
+      );
+    },
+    (err) => showToast('Erro ao aceder à câmera: ' + err.message)
+  );
+};
+
+// ── Admin bypass — avança sem QR (só admin) ───────────────────
+window.doAdminPaintAdvance = (id, targetStatus) => {
+  if (!isAdmin) { showToast('⛔ Só o admin pode avançar sem QR.'); return; }
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) return;
+  const labels = { sent: 'Enviar para Pintoria', done: 'Encerrar' };
+  const notes  = { sent: 'Enviado para pintoria (admin, sem QR).', done: 'Encerrado pelo admin sem leitura de QR.' };
+  _showPaintActionConfirm(
+    `⚠️ ${labels[targetStatus] || 'Avançar'} sem QR`,
+    `Admin · ${inc.partName || '—'} · sem leitura de etiqueta`,
+    `⚠️ ${labels[targetStatus] || 'Avançar'}`,
+    async () => {
+      try {
+        await updateIncidentStatus(id, targetStatus, currentUser, notes[targetStatus] || '');
+        showToast(targetStatus === 'sent' ? '🎨 Enviado para pintoria!' : '✅ Encerrado!');
+        window.showDetail(id); renderList();
+      } catch (e) { showToast('Erro: ' + e.message); }
+    }
+  );
+};
+
 // ── Trata ?paint= pendente após login + incidents carregados ──
 function handlePendingPaint() {
   if (!_pendingPaintId) return;
@@ -1123,13 +1254,38 @@ function handlePendingPaint() {
   const inc = incidents.find(i => i.id === id);
   if (!inc) { showToast('⚠️ Incidente de pintura não encontrado'); return; }
 
-  // Navega para o incidente
   if (!isDesktop()) goToList();
   setTimeout(() => {
     window.showDetail(id);
     const st = inc.status || 'pending';
     if (st === 'done') { showToast('✅ Este incidente já está encerrado.'); return; }
-    _showPaintReturnBanner(id, inc);
+    if (st === 'pending') {
+      _showPaintActionConfirm(
+        '🎨 Enviar para Pintoria',
+        `${inc.partName || '—'} · QR lido — confirmar envio?`,
+        '✅ Confirmar Envio',
+        async () => {
+          try {
+            await updateIncidentStatus(id, 'sent', currentUser, 'Enviado para pintoria via leitura de QR.');
+            showToast('🎨 Enviado para pintoria!');
+            window.showDetail(id); renderList();
+          } catch (e) { showToast('Erro: ' + e.message); }
+        }
+      );
+    } else {
+      _showPaintActionConfirm(
+        '✅ Confirmar Retorno da Pintoria',
+        `${inc.partName || '—'} · Retrabalho concluído?`,
+        '✅ Confirmar e Encerrar',
+        async () => {
+          try {
+            await updateIncidentStatus(id, 'done', currentUser, 'Peça retornou da pintoria — confirmado por leitura de QR.');
+            showToast('✅ Retrabalho de pintura encerrado!');
+            window.showDetail(id); renderList();
+          } catch (e) { showToast('Erro: ' + e.message); }
+        }
+      );
+    }
   }, isDesktop() ? 0 : 120);
 }
 
@@ -1163,20 +1319,10 @@ function _showPaintReturnBanner(id, inc) {
 window.doPaintReturn = async (id) => {
   const inc = incidents.find(i => i.id === id);
   if (!inc) return;
-
   document.getElementById('paintReturnBanner')?.remove();
-
-  const st         = inc.status || 'pending';
-  const nextStatus = st === 'received' ? 'done' : 'received';
-  const note       = nextStatus === 'done'
-    ? 'Retrabalho de pintura encerrado via leitura de QR.'
-    : 'Peça retornou da pintoria — confirmado por leitura de QR.';
-
   try {
-    await updateIncidentStatus(id, nextStatus, currentUser, note);
-    showToast(nextStatus === 'done'
-      ? '✅ Retrabalho de pintura encerrado!'
-      : '🎨 Retorno da pintoria confirmado!');
+    await updateIncidentStatus(id, 'done', currentUser, 'Retrabalho de pintura encerrado via leitura de QR.');
+    showToast('✅ Retrabalho de pintura encerrado!');
     window.showDetail(id);
     renderList();
   } catch (e) { showToast('Erro: ' + e.message); }
@@ -1673,7 +1819,7 @@ document.addEventListener('paste', (e) => {
 window.openQRScanner = () => {
   openQR(
     async (data) => {
-      // ── Detecta QR de retorno de pintura ──────────────────
+      // ── Detecta QR de etiqueta de pintura ─────────────────
       try {
         const url     = new URL(data);
         const paintId = url.searchParams.get('paint');
@@ -1685,7 +1831,33 @@ window.openQRScanner = () => {
           if (!isDesktop()) goToList();
           setTimeout(() => {
             window.showDetail(paintId);
-            _showPaintReturnBanner(paintId, inc);
+            if (st === 'pending') {
+              _showPaintActionConfirm(
+                '🎨 Enviar para Pintoria',
+                `${inc.partName || '—'} · ${inc.carNum ? 'CAR ' + inc.carNum : 'SEM CAR'}`,
+                '✅ Confirmar Envio',
+                async () => {
+                  try {
+                    await updateIncidentStatus(paintId, 'sent', currentUser, 'Enviado para pintoria via leitura de QR.');
+                    showToast('🎨 Enviado para pintoria!');
+                    window.showDetail(paintId); renderList();
+                  } catch (e) { showToast('Erro: ' + e.message); }
+                }
+              );
+            } else {
+              _showPaintActionConfirm(
+                '✅ Confirmar Retorno da Pintoria',
+                `${inc.partName || '—'} · Retrabalho concluído?`,
+                '✅ Confirmar e Encerrar',
+                async () => {
+                  try {
+                    await updateIncidentStatus(paintId, 'done', currentUser, 'Peça retornou da pintoria — confirmado por leitura de QR.');
+                    showToast('✅ Retrabalho de pintura encerrado!');
+                    window.showDetail(paintId); renderList();
+                  } catch (e) { showToast('Erro: ' + e.message); }
+                }
+              );
+            }
           }, isDesktop() ? 0 : 120);
           return;
         }

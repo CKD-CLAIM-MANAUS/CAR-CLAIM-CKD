@@ -16,6 +16,16 @@ export const STATUS_CONFIG = {
 
 export const STATUS_FLOW = ['pending', 'sent', 'awaiting', 'eta_confirmed', 'received', 'done'];
 
+// ── Status de pintura (fluxo independente: 3 passos) ──────────
+// pending → sent (na pintoria) → done (retornou + encerrado)
+export const PAINT_STATUS_FLOW = ['pending', 'sent', 'done'];
+
+export const PAINT_STATUS_CONFIG = {
+  pending: { label: 'Aguardando Envio', icon: '⏳', color: '#F59E0B', badge: 'badge-pending'    },
+  sent:    { label: 'Na Pintoria',      icon: '🎨', color: '#8B5CF6', badge: 'badge-paint-sent' },
+  done:    { label: 'Encerrado',        icon: '✓',  color: '#22C55E', badge: 'badge-done'       },
+};
+
 // ── Load all incidents (one-shot, mantido para compatibilidade) ─
 export async function loadIncidents() {
   const q = fb.query(fb.collection(db, 'incidents'), fb.orderBy('createdAt', 'desc'));
