@@ -2376,8 +2376,8 @@ img { display: block; max-width: 100%; }
 .label-qr-col { flex-shrink: 0; }
 /* aplica a canvas E img — ambos usados para QR */
 .label-qr-img {
-  width: 72px;
-  height: 72px;
+  width: 54px;
+  height: 54px;
   display: block;
   image-rendering: pixelated; /* evita blur ao redimensionar o canvas */
 }
@@ -3460,8 +3460,8 @@ body {
   }
 
   .label-qr-img {
-    width: 34mm !important;
-    height: 34mm !important;
+    width: 22mm !important;
+    height: 22mm !important;
   }
 
   .label-car-num  { font-size: 14pt !important; color: #000 !important; }

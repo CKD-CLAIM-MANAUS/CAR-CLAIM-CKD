@@ -1445,7 +1445,6 @@ window.printPaintLabel = (id) => {
         <div class="label-text-col">
           <div class="label-car-num">${carLabel}</div>
           <div class="label-part-name">${partName}</div>
-          <div class="label-paint-badge">🎨 PINTURA</div>
           <div class="label-date">${dateStr}</div>
         </div>
       </div>`;
@@ -1475,8 +1474,9 @@ function _drawQRToCanvas(canvas, text) {
   }
 
   try {
-    // Tipo 10 suporta até ~114 bytes em modo M — suficiente para o URL do app
-    const qr = qrcode(10, 'M');
+    // Tipo 4 (33 módulos) suporta ~78 chars em modo M — suficiente para o URL
+    // Módulos maiores = QR mais pequeno e mais fácil de escanear
+    const qr = qrcode(4, 'M');
     qr.addData(text, 'Byte');
     qr.make();
 
