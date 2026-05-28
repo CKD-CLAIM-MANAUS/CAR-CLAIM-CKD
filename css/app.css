@@ -2657,6 +2657,147 @@ img { display: block; max-width: 100%; }
 /* ── Área de impressão — só activa em @media print ──────── */
 #paintPrintArea { display: none; }
 
+/* ════════════════════════════════════════════════════════════
+   REFINAMENTO VISUAL v2
+   ─────────────────────────────────────────────────────────
+   Melhorias estéticas aplicadas globalmente: timeline,
+   glassmorphism, stepper, badges, cards, botões, chips
+════════════════════════════════════════════════════════════ */
+
+/* ── 1. History timeline — linha vertical de ligação ──────── */
+.history-entry { position: relative; }
+
+.history-entry:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 4px;          /* centro do dot de 10px (5px − 1px da linha) */
+  top: 22px;          /* padding-top(9) + margin-top(3) + dot-height(10) */
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.09) 0%,
+    rgba(255,255,255,0.02) 100%
+  );
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* ── 2. Header & Bottom nav — glassmorphism ───────────────── */
+.app-header {
+  background: rgba(12,12,12,0.90) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid rgba(255,102,0,0.18) !important;
+}
+
+.bottom-nav {
+  background: rgba(12,12,12,0.90) !important;
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-top-color: rgba(255,255,255,0.07) !important;
+}
+
+/* ── 3. Stepper — pulse no step atual + label mais legível ── */
+@keyframes stepperPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255,102,0,0.22); }
+  50%       { box-shadow: 0 0 0 8px rgba(255,102,0,0.06); }
+}
+.stepper-step.step-current .stepper-dot {
+  animation: stepperPulse 2.2s ease-in-out infinite;
+}
+.stepper-label { font-size: 9.5px; }
+
+/* ── 4. Badges — tracking e padding ligeiramente refinados ── */
+.badge {
+  padding: 3px 9px;
+  letter-spacing: 0.04em;
+}
+
+/* ── 5. Stat cards — highlight sutil no topo ──────────────── */
+.stat-card {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* ── 6. Detail header — glow lateral + border mais forte ──── */
+.detail-header {
+  border-left-width: 4px;
+  box-shadow: -3px 0 20px rgba(255,102,0,0.10), var(--shadow-sm);
+}
+
+/* ── 7. Form cards — profundidade com gradiente subtil ───── */
+.form-card {
+  background: linear-gradient(180deg, #1A1A1A 0%, #151515 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* ── 8. Chips activos — semi-transparente tintado ─────────── */
+.chip.active {
+  background: rgba(255,102,0,0.16);
+  color: var(--blue-300);
+  border-color: rgba(255,102,0,0.48);
+  box-shadow: inset 0 0 0 1px rgba(255,102,0,0.08);
+}
+.chip:hover:not(.active) {
+  color: var(--ink-200);
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.05);
+}
+
+/* ── 9. Botões — hover com sombra + transição suave ─────────  */
+.btn {
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.18s, transform 0.1s, color 0.15s;
+}
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: rgba(255,255,255,0.18);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.35);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 4px 22px rgba(255,102,0,0.52);
+}
+
+/* ── 10. Search bar — anel de foco mais suave ─────────────── */
+.search-bar:focus-within {
+  border-color: rgba(255,102,0,0.65);
+  box-shadow: 0 0 0 2px rgba(255,102,0,0.10);
+}
+
+/* ── 11. Modal overlay — blur de fundo ────────────────────── */
+.modal-overlay {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ── 12. Dash KPI & card — highlight no topo ──────────────── */
+.dash-kpi {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.dash-card {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* ── 13. Incident card press — sombra interna ─────────────── */
+.incident-card:active {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* ── 14. Sub-tab activo — glow subtil ─────────────────────── */
+.sub-tab.active {
+  color: #FF6600;
+  border-bottom-color: #FF6600;
+  text-shadow: 0 0 16px rgba(255,102,0,0.35);
+}
+
+/* ── 15. Nav QR — pulse leve no idle ──────────────────────── */
+@keyframes navQrGlow {
+  0%, 100% { box-shadow: 0 4px 16px rgba(255,102,0,0.5), 0 0 0 1px rgba(255,133,51,0.3); }
+  50%       { box-shadow: 0 6px 24px rgba(255,102,0,0.7), 0 0 0 3px rgba(255,133,51,0.15); }
+}
+.nav-qr {
+  animation: navQrGlow 3s ease-in-out infinite !important;
+}
+
 /* ── Print ───────────────────────────────────────────────── */
 @media print {
   /* Esconde tudo excepto a área de impressão */
