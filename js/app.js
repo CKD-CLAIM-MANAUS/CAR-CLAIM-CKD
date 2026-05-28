@@ -426,14 +426,17 @@ window.doStockAdjust = async () => {
 
 // ── Sub-tabs da página Relatório ──────────────────────────────
 window.showExcelTab = (tab) => {
-  const dash    = document.getElementById('dashboardSection');
-  const reports = document.getElementById('reportsSection');
-  if (dash)    dash.style.display    = tab === 'dashboard' ? '' : 'none';
-  if (reports) reports.style.display = tab === 'reports'   ? '' : 'none';
+  const dash  = document.getElementById('dashboardSection');
+  const rpts  = document.getElementById('reportsSection');
+  const paint = document.getElementById('paintReportSection');
+  if (dash)  dash.style.display  = tab === 'dashboard' ? '' : 'none';
+  if (rpts)  rpts.style.display  = tab === 'reports'   ? '' : 'none';
+  if (paint) paint.style.display = tab === 'paint'     ? '' : 'none';
   document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
   const btn = document.getElementById('st-' + tab);
   if (btn) btn.classList.add('active');
   if (tab === 'dashboard') renderDashboard();
+  if (tab === 'paint')     renderPaintReport();
 };
 
 // ── Expõe setDashPeriod ao HTML ───────────────────────────────
@@ -1915,6 +1918,161 @@ window.doGenerateCAR = async (id) => {
   } catch (e) {
     showToast('Erro: ' + e.message);
   }
+};
+
+// ══════════════════════════════════════════════════════════════
+// RELATÓRIO PINTORIA
+// ══════════════════════════════════════════════════════════════
+
+let _paintReportFilter = 'all'; // 'all' | 'pending' | 'sent'
+
+function renderPaintReport() {
+  const el = document.getElementById('paintReportSection');
+  if (!el) return;
+
+  // Peças de pintura em aberto
+  const paintIncs = incidents.filter(i =>
+    (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
+  );
+
+  const totalOpen    = paintIncs.length;
+  const countPending = paintIncs.filter(i => (i.status || 'pending') === 'pending').length;
+  const countSent    = paintIncs.filter(i => i.status === 'sent').length;
+
+  const filtered = _paintReportFilter === 'all'     ? paintIncs
+                 : _paintReportFilter === 'pending'  ? paintIncs.filter(i => (i.status || 'pending') === 'pending')
+                 : paintIncs.filter(i => i.status === 'sent');
+
+  // Ordena: na pintoria primeiro, depois aguardando, depois por data
+  const sorted = [...filtered].sort((a, b) => {
+    const order = { sent: 0, pending: 1 };
+    const oa = order[a.status] ?? 2;
+    const ob = order[b.status] ?? 2;
+    if (oa !== ob) return oa - ob;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  const rows = sorted.map((inc, i) => {
+    const st      = inc.status || 'pending';
+    const cfg     = PAINT_STATUS_CONFIG[st] || PAINT_STATUS_CONFIG.pending;
+    const dateReg = fmtDate(inc.createdAt);
+    const dateSent = inc.sentAt ? fmtDate(inc.sentAt) : '—';
+    return `
+      <tr class="pr-row" onclick="window.showDetail('${inc.id}'); goToList();">
+        <td class="pr-td pr-num">${i + 1}</td>
+        <td class="pr-td pr-car">${inc.carNum ? inc.carNum : '—'}</td>
+        <td class="pr-td pr-name">${inc.partName || '—'}</td>
+        <td class="pr-td pr-partno">${inc.partNo || '—'}</td>
+        <td class="pr-td pr-qty">${inc.ngQty || '—'}</td>
+        <td class="pr-td pr-status">
+          <span class="badge ${cfg.badge}" style="white-space:nowrap">${cfg.icon} ${cfg.label}</span>
+        </td>
+        <td class="pr-td pr-date">${dateReg}</td>
+        <td class="pr-td pr-date">${dateSent}</td>
+      </tr>`;
+  }).join('');
+
+  const emptyRow = `
+    <tr><td colspan="8" class="pr-empty">
+      ${_paintReportFilter === 'all'
+        ? 'Nenhuma peça de pintura em aberto.'
+        : 'Nenhuma peça neste filtro.'}
+    </td></tr>`;
+
+  el.innerHTML = `
+    <div class="pr-wrap">
+      <!-- Totalizadores -->
+      <div class="pr-stats">
+        <div class="pr-stat-card">
+          <div class="pr-stat-value">${totalOpen}</div>
+          <div class="pr-stat-label">Em aberto</div>
+        </div>
+        <div class="pr-stat-card pr-stat-paint">
+          <div class="pr-stat-value">${countSent}</div>
+          <div class="pr-stat-label">Na Pintoria</div>
+        </div>
+        <div class="pr-stat-card pr-stat-pending">
+          <div class="pr-stat-value">${countPending}</div>
+          <div class="pr-stat-label">Aguardando Envio</div>
+        </div>
+      </div>
+
+      <!-- Filtros + export -->
+      <div class="pr-toolbar">
+        <div class="pr-chips">
+          <button class="chip${_paintReportFilter === 'all'     ? ' active' : ''}" onclick="setPaintReportFilter('all')">Todos (${totalOpen})</button>
+          <button class="chip${_paintReportFilter === 'sent'    ? ' active' : ''}" onclick="setPaintReportFilter('sent')">Na Pintoria (${countSent})</button>
+          <button class="chip${_paintReportFilter === 'pending' ? ' active' : ''}" onclick="setPaintReportFilter('pending')">Aguardando (${countPending})</button>
+        </div>
+        <button class="btn btn-success pr-export-btn" onclick="exportPaintExcel()" ${totalOpen === 0 ? 'disabled' : ''}>
+          📥 Exportar Excel
+        </button>
+      </div>
+
+      <!-- Tabela -->
+      <div class="pr-table-wrap">
+        <table class="pr-table">
+          <thead>
+            <tr>
+              <th class="pr-th pr-num">#</th>
+              <th class="pr-th pr-car">CAR</th>
+              <th class="pr-th pr-name">Peça</th>
+              <th class="pr-th pr-partno">Código</th>
+              <th class="pr-th pr-qty">Qtd</th>
+              <th class="pr-th pr-status">Status</th>
+              <th class="pr-th pr-date">Registado</th>
+              <th class="pr-th pr-date">Enviado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.length ? rows : emptyRow}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="pr-hint">Toque numa linha para ver o detalhe do incidente.</p>
+    </div>`;
+}
+
+window.setPaintReportFilter = (f) => {
+  _paintReportFilter = f;
+  renderPaintReport();
+};
+
+window.exportPaintExcel = () => {
+  const paintIncs = incidents.filter(i =>
+    (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
+  );
+  if (!paintIncs.length) { showToast('Nenhuma peça de pintura em aberto.'); return; }
+
+  const rows = paintIncs
+    .sort((a, b) => {
+      const order = { sent: 0, pending: 1 };
+      return (order[a.status] ?? 2) - (order[b.status] ?? 2);
+    })
+    .map((inc, i) => {
+      const cfg = PAINT_STATUS_CONFIG[inc.status || 'pending'] || PAINT_STATUS_CONFIG.pending;
+      return {
+        'Nº':              i + 1,
+        'Nº CAR':          inc.carNum || '—',
+        'Nome da Peça':    inc.partName || '—',
+        'Código da Peça':  inc.partNo  || '—',
+        'Qtd Defeituosa':  inc.ngQty   || '—',
+        'Status':          cfg.label,
+        'Registado por':   inc.user    || '—',
+        'Data Registo':    fmtDate(inc.createdAt),
+        'Data Envio Pintoria': inc.sentAt ? fmtDate(inc.sentAt) : '—',
+        'Observações':     inc.defect  || '—',
+      };
+    });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [5, 12, 28, 20, 8, 20, 20, 14, 18, 40].map(w => ({ wch: w }));
+  const wb   = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pintoria em Aberto');
+  const date = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `Pintoria-Aberto-${date}.xlsx`);
+  showToast('📥 Excel exportado!');
 };
 
 // ── Excel export ──────────────────────────────────────────────

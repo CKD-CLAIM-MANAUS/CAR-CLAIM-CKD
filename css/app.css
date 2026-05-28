@@ -2474,6 +2474,110 @@ img { display: block; max-width: 100%; }
   line-height: 1;
 }
 
+/* ══════════════════════════════════════════════════════════
+   RELATÓRIO PINTORIA
+   ══════════════════════════════════════════════════════════ */
+.pr-wrap {
+  padding: 12px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Totalizadores ───────────────────────────────────────── */
+.pr-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pr-stat-card {
+  background: var(--bg-card, #0D1E35);
+  border: 1px solid var(--border, rgba(255,255,255,0.07));
+  border-radius: 12px;
+  padding: 12px 10px;
+  text-align: center;
+}
+.pr-stat-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--ink-100, rgba(255,255,255,0.88));
+  line-height: 1.1;
+}
+.pr-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-400, rgba(255,255,255,0.3));
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: 3px;
+}
+.pr-stat-paint   .pr-stat-value { color: #8B5CF6; }
+.pr-stat-pending .pr-stat-value { color: var(--amber-500, #F59E0B); }
+
+/* ── Toolbar (chips + botão export) ─────────────────────── */
+.pr-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pr-chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.pr-export-btn { white-space: nowrap; flex-shrink: 0; }
+
+/* ── Tabela ──────────────────────────────────────────────── */
+.pr-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255,255,255,0.07));
+  background: var(--bg-card, #0D1E35);
+}
+.pr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.pr-th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-400, rgba(255,255,255,0.3));
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.07));
+  white-space: nowrap;
+}
+.pr-td {
+  padding: 10px 12px;
+  color: var(--ink-100, rgba(255,255,255,0.88));
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  vertical-align: middle;
+}
+.pr-row { cursor: pointer; transition: background 0.15s; }
+.pr-row:hover { background: rgba(255,255,255,0.04); }
+.pr-row:last-child td { border-bottom: none; }
+
+.pr-num    { width: 32px; color: var(--ink-400, rgba(255,255,255,0.3)); text-align: center; }
+.pr-car    { font-family: var(--font-mono); font-size: 11px; color: var(--blue-300, #6B9BF0); }
+.pr-name   { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.pr-partno { font-family: var(--font-mono); font-size: 11px; color: var(--ink-300, rgba(255,255,255,0.45)); }
+.pr-qty    { text-align: center; font-weight: 700; }
+.pr-date   { font-size: 11px; color: var(--ink-300, rgba(255,255,255,0.45)); }
+
+.pr-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--ink-400, rgba(255,255,255,0.3));
+  font-size: 13px;
+}
+.pr-hint {
+  font-size: 11px;
+  color: var(--ink-400, rgba(255,255,255,0.3));
+  text-align: center;
+  margin: 0;
+}
+
 /* ── Badge pintura — "Na Pintoria" ──────────────────────── */
 .badge-paint-sent {
   background: rgba(139, 92, 246, 0.15);
