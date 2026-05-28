@@ -917,12 +917,41 @@ window.showDetail = (id) => {
     const content = document.getElementById('desktopDetailContent');
     if (empty)   empty.style.display   = 'none';
     if (content) { content.style.display = 'block'; content.innerHTML = html; content.scrollTop = 0; }
+    _initHeroParallax(content);
   } else {
     // Mobile: navega para página de detalhe como antes
     document.getElementById('detailContent').innerHTML = html;
     showPage('detail');
+    _initHeroParallax(document.getElementById('detailContent'));
   }
 };
+
+// ── Parallax subtil na hero image do detalhe (Stitch spec) ───
+function _initHeroParallax(container) {
+  if (!container) return;
+  const img = container.querySelector('.detail-hero-img');
+  if (!img) return;
+  const scrollParent = isDesktop()
+    ? document.getElementById('desktopDetailContent')
+    : window;
+  let ticking = false;
+  const onScroll = () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        const scrollY = scrollParent === window
+          ? window.scrollY
+          : scrollParent.scrollTop;
+        img.style.transform = `translateY(${scrollY * 0.28}px)`;
+        img.style.opacity   = String(Math.max(0.25, 0.62 - scrollY / 500));
+        ticking = false;
+      });
+      ticking = true;
+    }
+  };
+  scrollParent.addEventListener('scroll', onScroll, { passive: true });
+  // Remove listener quando o detalhe é abandonado
+  img.addEventListener('remove', () => scrollParent.removeEventListener('scroll', onScroll), { once: true });
+}
 
 window.doMarkDone = async (id) => {
   try {

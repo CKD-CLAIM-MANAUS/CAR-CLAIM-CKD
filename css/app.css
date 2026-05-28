@@ -475,13 +475,13 @@ img { display: block; max-width: 100%; }
 .btn:hover:not(:disabled) { background: var(--bg-hover); }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--blue-500), var(--blue-400));
-  color: white;
-  border-color: transparent;
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-400)) !important;
+  color: white !important;
+  border-color: transparent !important;
   box-shadow: 0 2px 10px rgba(255,102,0,0.3);
 }
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--blue-600), var(--blue-500));
+  background: linear-gradient(135deg, var(--blue-600), var(--blue-500)) !important;
   box-shadow: 0 4px 14px rgba(255,102,0,0.45);
 }
 
@@ -1253,8 +1253,8 @@ img { display: block; max-width: 100%; }
 }
 
 .stepper-dot {
-  width: 20px;
-  height: 20px;
+  width: 24px;        /* Stitch: w-6 h-6 = 24px */
+  height: 24px;
   border-radius: 50%;
   background: rgba(255,255,255,0.06);
   border: 2px solid rgba(255,255,255,0.1);
@@ -1268,13 +1268,26 @@ img { display: block; max-width: 100%; }
   position: relative;
   z-index: 1;
 }
+/* Inner dot para steps past/future (Stitch inner circle) */
+.stepper-dot::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  transition: background 0.2s;
+}
+.stepper-step.step-past .stepper-dot::after,
+.stepper-step.step-current .stepper-dot::after {
+  background: white;
+}
 
 .stepper-connector {
   flex: 1;
   height: 2px;
   min-width: 6px;
-  background: rgba(255,255,255,0.08);
-  margin-top: 9px;
+  background: rgba(255,255,255,0.06); /* Stitch: bg-white/5 */
+  margin-top: 11px;   /* (24px dot / 2) − 1px = centro do dot de 24px */
   align-self: flex-start;
   flex-shrink: 0;
   transition: background 0.2s;
@@ -1426,7 +1439,7 @@ img { display: block; max-width: 100%; }
   gap: 0;
   border-bottom: 1px solid var(--border, rgba(255,255,255,0.07));
   padding: 0 16px;
-  background: var(--bg-base, #060E1A);
+  background: var(--bg-base, #0C0C0C);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -1498,7 +1511,7 @@ img { display: block; max-width: 100%; }
 }
 
 .dash-kpi {
-  background: var(--bg-card, #0D1E35);
+  background: var(--bg-card, #1A1A1A);
   border: 1px solid var(--border, rgba(255,255,255,0.07));
   border-radius: 12px;
   padding: 12px 8px;
@@ -1523,7 +1536,7 @@ img { display: block; max-width: 100%; }
 
 /* ── Cards genéricos ─────────────────────────────────────── */
 .dash-card {
-  background: var(--bg-card, #0D1E35);
+  background: var(--bg-card, #1A1A1A);
   border: 1px solid var(--border, rgba(255,255,255,0.07));
   border-radius: 14px;
   padding: 16px;
@@ -2495,7 +2508,7 @@ img { display: block; max-width: 100%; }
   gap: 8px;
 }
 .pr-stat-card {
-  background: var(--bg-card, #0D1E35);
+  background: var(--bg-card, #1A1A1A);
   border: 1px solid var(--border, rgba(255,255,255,0.07));
   border-radius: 12px;
   padding: 12px 10px;
@@ -2533,7 +2546,7 @@ img { display: block; max-width: 100%; }
   overflow-x: auto;
   border-radius: 12px;
   border: 1px solid var(--border, rgba(255,255,255,0.07));
-  background: var(--bg-card, #0D1E35);
+  background: var(--bg-card, #1A1A1A);
 }
 .pr-table {
   width: 100%;
@@ -2627,7 +2640,7 @@ img { display: block; max-width: 100%; }
   to   { opacity: 1; }
 }
 .paint-action-confirm-box {
-  background: var(--bg-card, #0D1E35);
+  background: var(--bg-card, #1A1A1A);
   border: 1.5px solid rgba(139, 92, 246, 0.4);
   border-radius: 16px;
   padding: 24px 20px 20px;
@@ -2694,16 +2707,21 @@ body {
   padding: 4px 8px;
 }
 .nav-item.active {
-  background: rgba(74,73,73,0.35) !important;
+  background: rgba(255,102,0,0.18) !important;
   padding: 6px 10px !important;
+}
+.nav-item:not(.active):not(.nav-qr) {
+  opacity: 0.55;
+}
+.nav-item:not(.active):not(.nav-qr):hover {
+  opacity: 1;
 }
 
 /* ── 4. Stat cards — left color bar + mono numbers ─────────
    Stitch: absolute w-1 h-full na cor do KPI               */
 .stat-card {
   overflow: hidden;
-  background: rgba(32,32,32,0.7) !important;
-  border-left: 3px solid rgba(255,255,255,0.1) !important;
+  border-left: 3px solid rgba(255,255,255,0.1);
 }
 .stat-card:has(.stat-value.blue)  { border-left-color: var(--blue-500)  !important; }
 .stat-card:has(.stat-value.amber) { border-left-color: var(--amber-500) !important; }
@@ -2755,17 +2773,13 @@ body {
   color: var(--blue-400);
   transition: color 0.15s;
 }
-/* Fundo do card semi-transparente para o dot-grid aparecer */
+/* Fundo do card — sólido, cobre o dot-grid */
 .incident-card {
-  background: rgba(17,17,17,0.75) !important;
+  background: var(--bg-deep);
 }
 
 /* ── 7. History timeline — linha 1px white/5 ───────────────
-   Stitch: absolute left-4 top-2 bottom-2 w-[1px] bg-white/5 */
-.history-entry:not(:last-child)::after {
-  width: 1px !important;
-  background: rgba(255,255,255,0.05) !important;
-}
+   Stitch: w-[1px] bg-white/5 — regra completa mais abaixo  */
 
 /* Status label na history — tipo rectangular badge ────────── */
 .history-status-label {
@@ -3003,15 +3017,17 @@ body {
   opacity: 0.6;
 }
 
-/* Gradiente de baixo para cima — fundo escuro sobre a imagem */
+/* Gradiente de baixo para cima — fundo escuro + tint de cor do status */
 .detail-hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
+  /* --bg-c definido inline via JS com a cor do status (e.g. #FF660015) */
+  background-color: var(--bg-c, transparent);
+  background-image: linear-gradient(
     to top,
     #0C0C0C 0%,
-    rgba(12,12,12,0.7) 40%,
-    transparent 75%
+    rgba(12,12,12,0.65) 38%,
+    transparent 72%
   );
 }
 
@@ -3035,8 +3051,10 @@ body {
   padding: 3px 10px;
   border-radius: 2px;
   background: rgba(0,0,0,0.5);
-  border: 1px solid rgba(var(--tag-c-rgb, 255,102,0), 0.3);
-  border-color: color-mix(in srgb, var(--tag-c, #FF6600) 40%, transparent);
+  /* Fallback para browsers sem color-mix (Safari <16.2) */
+  border: 1px solid rgba(255,102,0,0.35);
+  /* Modern: borda com a cor exacta do status */
+  border-color: color-mix(in srgb, var(--tag-c, #FF6600) 45%, transparent);
   font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 700;
@@ -3215,16 +3233,12 @@ body {
 .history-entry:not(:last-child)::after {
   content: '';
   position: absolute;
-  left: 4px;          /* centro do dot de 10px (5px − 1px da linha) */
-  top: 22px;          /* padding-top(9) + margin-top(3) + dot-height(10) */
+  /* Centrado no history-dot-lg (28px wide → centro = 14px − 0.5px) */
+  left: 13px;
+  top: 32px;          /* abaixo do dot-lg (28px + 2px margin-top + 2px gap) */
   bottom: 0;
-  width: 2px;
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.09) 0%,
-    rgba(255,255,255,0.02) 100%
-  );
-  border-radius: 1px;
+  width: 1px;         /* Stitch: w-[1px] */
+  background: rgba(255,255,255,0.05); /* Stitch: bg-white/5 */
   pointer-events: none;
 }
 
@@ -3395,13 +3409,14 @@ body {
   position: relative;
   isolation: isolate;
 }
-/* Cards têm fundo sólido para cobrir o dot-pattern por baixo */
-.form-card     { background: linear-gradient(180deg, #1A1A1A 0%, #151515 100%); }
-.stat-card     { background: var(--bg-deep); }
-.dash-card     { background: var(--bg-card); }
-.dash-kpi      { background: var(--bg-card); }
-.incident-card { background: var(--bg-deep); }
-.stock-card    { background: var(--bg-card); }
+/* Cards com fundo sólido para cobrir o dot-pattern — !important
+   para vencer qualquer regra semi-transparente anterior          */
+.form-card     { background: linear-gradient(180deg, #1A1A1A 0%, #151515 100%) !important; }
+.stat-card     { background: var(--bg-deep) !important; }
+.dash-card     { background: var(--bg-card) !important; }
+.dash-kpi      { background: var(--bg-card) !important; }
+.incident-card { background: var(--bg-deep) !important; }
+.stock-card    { background: var(--bg-card) !important; }
 
 /* ── 15. Nav QR — pulse leve no idle ──────────────────────── */
 @keyframes navQrGlow {
