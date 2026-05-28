@@ -553,11 +553,11 @@ function renderList() {
       ${thumb}
       <div class="incident-info">
         <div>
-          <div class="incident-name">${inc.partName || '—'}</div>
-          <div class="incident-code">${inc.partNo || ''}</div>
+          <div class="incident-name">${escHtml(inc.partName) || '—'}</div>
+          <div class="incident-code">${escHtml(inc.partNo)}</div>
         </div>
         <div class="incident-footer">
-          <span class="incident-meta">${inc.model || '—'} · ${fmtDate(inc.createdAt)}</span>
+          <span class="incident-meta">${escHtml(inc.model) || '—'} · ${fmtDate(inc.createdAt)}</span>
           ${statusBadge(inc.status, inc)}
         </div>
       </div>
@@ -620,6 +620,17 @@ function isDesktop() {
 function _isPaintInc(inc) { return (inc?.incidentType || 'normal') === 'paint'; }
 function _flowFor(inc)    { return _isPaintInc(inc) ? PAINT_STATUS_FLOW   : STATUS_FLOW;   }
 function _configFor(inc)  { return _isPaintInc(inc) ? PAINT_STATUS_CONFIG : STATUS_CONFIG; }
+
+// ── Escape HTML — previne XSS em campos de utilizador ─────────
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
 
 // Pintura usa só 3 estados; 'received' herdado é tratado como 'done'
 function _normalisePaintStatus(st) {
@@ -760,9 +771,15 @@ function buildDetailHTML(inc) {
 
   // ── History timeline
   const history = (inc.history || []).slice().reverse();
+  const _histCfgFor = (h) => {
+    if (!h.status) return null;
+    // Usa config correta consoante o tipo de incidente
+    const cfgMap = _configFor(inc);
+    return cfgMap[h.status] || STATUS_CONFIG[h.status] || null;
+  };
   const historyHTML = history.length
     ? history.map(h => {
-        const cfg  = h.status ? STATUS_CONFIG[h.status] : null;
+        const cfg  = _histCfgFor(h);
         const ts   = new Date(h.timestamp);
         const date = ts.toLocaleDateString('pt-BR') + ' ' +
                      ts.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -776,8 +793,8 @@ function buildDetailHTML(inc) {
                 </span>
                 <span class="history-time">${date}</span>
               </div>
-              <div class="history-user">${h.user || ''}</div>
-              ${h.note && h.note !== 'Incidente registado.' ? `<div class="history-note-text">${h.note}</div>` : ''}
+              <div class="history-user">${escHtml(h.user) || ''}</div>
+              ${h.note && h.note !== 'Incidente registado.' ? `<div class="history-note-text">${escHtml(h.note)}</div>` : ''}
             </div>
           </div>`;
       }).join('')
@@ -791,8 +808,8 @@ function buildDetailHTML(inc) {
     <div class="detail-header" style="border-left-color:${stCfg.color}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div>
-          <div class="detail-title">${inc.partName || '—'}</div>
-          <div class="detail-subtitle">${inc.partNo || ''} · ${fmtDate(inc.createdAt)}</div>
+          <div class="detail-title">${escHtml(inc.partName) || '—'}</div>
+          <div class="detail-subtitle">${escHtml(inc.partNo)} · ${fmtDate(inc.createdAt)}</div>
         </div>
         ${statusBadge(st, inc)}
       </div>
@@ -826,10 +843,10 @@ function buildDetailHTML(inc) {
 
     <div class="form-card" style="margin-bottom:10px">
       <div class="form-card-title">${svgIcon('file-text')} Descrição</div>
-      <div class="detail-text">${inc.defect || '—'}</div>
+      <div class="detail-text">${escHtml(inc.defect) || '—'}</div>
       ${inc.detected ? `
         <div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--ink-300);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Como detectado</div>
-        <div class="detail-text">${inc.detected}</div>
+        <div class="detail-text">${escHtml(inc.detected)}</div>
       ` : ''}
     </div>
 
@@ -1958,7 +1975,7 @@ function renderPaintReport() {
     const dateReg = fmtDate(inc.createdAt);
     const dateSent = inc.sentAt ? fmtDate(inc.sentAt) : '—';
     return `
-      <tr class="pr-row" onclick="window.showDetail('${inc.id}'); goToList();">
+      <tr class="pr-row" onclick="goToList(); window.showDetail('${inc.id}');">
         <td class="pr-td pr-num">${i + 1}</td>
         <td class="pr-td pr-car">${inc.carNum ? inc.carNum : '—'}</td>
         <td class="pr-td pr-name">${inc.partName || '—'}</td>
@@ -2150,6 +2167,10 @@ window.doImportPackList = async () => {
 // ── Fullscreen ────────────────────────────────────────────────
 window.openFullscreen  = openFullscreen;
 window.closeFullscreen = closeFullscreen;
+window.closeModal      = closeModal;       // expõe ao HTML (botões Cancelar/Fechar nos modals)
+
+// ── Helper: abre ajuste de stock a partir do modal de detalhe ──
+window.doOpenStockAdjustFromDetail = () => openStockAdjust(stockDetailPartNo);
 
 // ── SVG Icons (inline) ────────────────────────────────────────
 function svgIcon(name) {
