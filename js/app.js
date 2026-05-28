@@ -769,11 +769,10 @@ function buildDetailHTML(inc) {
       </div>
     </div>`;
 
-  // ── History timeline
+  // ── History timeline — Stitch style
   const history = (inc.history || []).slice().reverse();
   const _histCfgFor = (h) => {
     if (!h.status) return null;
-    // Usa config correta consoante o tipo de incidente
     const cfgMap = _configFor(inc);
     return cfgMap[h.status] || STATUS_CONFIG[h.status] || null;
   };
@@ -781,18 +780,24 @@ function buildDetailHTML(inc) {
     ? history.map(h => {
         const cfg  = _histCfgFor(h);
         const ts   = new Date(h.timestamp);
-        const date = ts.toLocaleDateString('pt-BR') + ' ' +
+        const date = ts.toLocaleDateString('pt-BR') + ' · ' +
                      ts.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const dotColor   = cfg ? cfg.color : 'rgba(255,255,255,0.2)';
+        const typeTag    = h.isNote ? 'NOTA'
+                         : !h.status ? 'SISTEMA'
+                         : (cfg ? cfg.label.toUpperCase().substring(0, 12) : 'UPDATE');
+        const timeColor  = cfg ? cfg.color : 'rgba(255,255,255,0.35)';
+        const icon       = h.isNote ? '✎' : (cfg ? cfg.icon : '·');
+        const titleLabel = h.isNote ? 'Nota adicionada' : (cfg ? cfg.label : '');
         return `
           <div class="history-entry${h.isNote ? ' history-note-entry' : ''}">
-            <div class="history-dot" style="background:${cfg ? cfg.color : 'rgba(255,255,255,0.2)'}"></div>
+            <div class="history-dot-lg" style="border-color:${dotColor};color:${dotColor}">${icon}</div>
             <div class="history-content">
               <div class="history-header">
-                <span class="history-status-label">
-                  ${h.isNote ? '📝 Nota' : (cfg ? cfg.icon + ' ' + cfg.label : '')}
-                </span>
-                <span class="history-time">${date}</span>
+                <span class="history-time" style="color:${timeColor}">${date}</span>
+                <span class="history-type-tag">${typeTag}</span>
               </div>
+              <div class="history-status-label">${titleLabel}</div>
               <div class="history-user">${escHtml(h.user) || ''}</div>
               ${h.note && h.note !== 'Incidente registado.' ? `<div class="history-note-text">${escHtml(h.note)}</div>` : ''}
             </div>
@@ -800,66 +805,90 @@ function buildDetailHTML(inc) {
       }).join('')
     : '<div class="history-empty">Sem histórico de alterações.</div>';
 
+  // ── Hero: usa a primeira foto ou placeholder colorido
+  const heroPhoto = inc.photos && inc.photos.length > 0 ? inc.photos[0].url : null;
+
   return `
-    <button class="back-btn" onclick="goToList()">
-      ${svgIcon('arrow-left')} Voltar
+    <button class="back-btn detail-back-btn" onclick="goToList()">
+      ${svgIcon('arrow-left')} VOLTAR
     </button>
 
-    <div class="detail-header" style="border-left-color:${stCfg.color}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div>
-          <div class="detail-title">${escHtml(inc.partName) || '—'}</div>
-          <div class="detail-subtitle">${escHtml(inc.partNo)} · ${fmtDate(inc.createdAt)}</div>
+    <!-- ── HERO SECTION (Stitch Tactical Precision) ─────────── -->
+    <section class="detail-hero">
+      ${heroPhoto
+        ? `<img class="detail-hero-img" src="${heroPhoto}" loading="lazy" onclick="openFullscreen('${heroPhoto}')">`
+        : `<div class="detail-hero-placeholder" style="--hero-c:${stCfg.color}"></div>`
+      }
+      <div class="detail-hero-overlay" style="--bg-c:${stCfg.color}15"></div>
+      <div class="detail-hero-content">
+        <span class="detail-hero-tag" style="--tag-c:${stCfg.color}">${stCfg.icon} ${stCfg.label.toUpperCase()}</span>
+        <h1 class="detail-hero-title">${escHtml(inc.partName) || '—'}</h1>
+        <p class="detail-hero-code">${escHtml(inc.partNo) || ''}</p>
+      </div>
+    </section>
+
+    <!-- ── METADATA CARD — sobrepõe o hero (Stitch: -mt-4) ─── -->
+    <div class="detail-metadata-wrap">
+      <div class="detail-metadata-card">
+        <div class="detail-metadata-grid">
+          ${inc.partNo  ? `<div class="detail-metadata-item"><p class="detail-metadata-label">PART NO</p><p class="detail-metadata-value">${escHtml(inc.partNo)}</p></div>` : ''}
+          ${inc.model   ? `<div class="detail-metadata-item"><p class="detail-metadata-label">MODELO</p><p class="detail-metadata-value">${escHtml(inc.model)}</p></div>` : ''}
+          ${inc.orderNo ? `<div class="detail-metadata-item"><p class="detail-metadata-label">Nº PEDIDO</p><p class="detail-metadata-value">${escHtml(inc.orderNo)}</p></div>` : ''}
+          ${inc.lotNo   ? `<div class="detail-metadata-item"><p class="detail-metadata-label">LOTE</p><p class="detail-metadata-value">${escHtml(inc.lotNo)}</p></div>` : ''}
+          ${inc.ngQty   ? `<div class="detail-metadata-item"><p class="detail-metadata-label">QTD NG</p><p class="detail-metadata-value">${escHtml(String(inc.ngQty))}</p></div>` : ''}
+          ${inc.user    ? `<div class="detail-metadata-item"><p class="detail-metadata-label">REGISTADO POR</p><p class="detail-metadata-value">${escHtml(inc.user)}</p></div>` : ''}
         </div>
-        ${statusBadge(st, inc)}
+        <div class="detail-metadata-footer">
+          <div>
+            <p class="detail-metadata-label">DATA DE REGISTO</p>
+            <p class="detail-metadata-value">${fmtDate(inc.createdAt)}</p>
+          </div>
+          <div style="text-align:right">
+            ${statusBadge(st, inc)}
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Status Stepper -->
-    <div class="form-card status-stepper-card" style="margin-bottom:10px">
+    <!-- ── STATUS STEPPER + ACÇÕES ──────────────────────────── -->
+    <div class="form-card" style="margin:0 12px 10px">
+      <div class="detail-section-label">FLUXO DO CICLO DE VIDA</div>
       <div class="stepper-track">${buildStepperHTML(inc)}</div>
       ${isPaint ? '' : etaBlock}
       ${isPaint ? '' : etaInput}
-      <div class="detail-actions" style="margin-top:14px">
+      <div class="detail-action-btns">
         ${nextBtn}
         ${adminBtn}
-        ${reopenBtn}
         ${paintLabelBtn}
+      </div>
+      <div class="detail-action-btns" style="margin-top:8px">
+        ${reopenBtn}
         <button class="btn" onclick="editIncident('${inc.id}')">✏️ Editar</button>
         ${isAdmin ? `<button class="btn btn-danger" onclick="doDelete('${inc.id}')">🗑 Eliminar</button>` : ''}
       </div>
       <div style="margin-top:12px">${carBlock}</div>
     </div>
 
-    <div class="form-card" style="margin-bottom:10px">
-      <div class="form-card-title">${svgIcon('package')} Dados da Peça</div>
-      ${renderDetailRow('Código', inc.partNo)}
-      ${renderDetailRow('Modelo', inc.model)}
-      ${renderDetailRow('Nº Pedido', inc.orderNo)}
-      ${renderDetailRow('Lote', inc.lotNo)}
-      ${renderDetailRow('Qtd. Defeituosa', inc.ngQty)}
-      ${renderDetailRow('Registado por', inc.user)}
-    </div>
-
-    <div class="form-card" style="margin-bottom:10px">
+    <!-- ── DESCRIÇÃO ─────────────────────────────────────────── -->
+    <div class="form-card" style="margin:0 12px 10px">
       <div class="form-card-title">${svgIcon('file-text')} Descrição</div>
       <div class="detail-text">${escHtml(inc.defect) || '—'}</div>
       ${inc.detected ? `
-        <div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--ink-300);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Como detectado</div>
+        <p class="detail-metadata-label" style="margin-top:14px;margin-bottom:6px">COMO DETECTADO</p>
         <div class="detail-text">${escHtml(inc.detected)}</div>
       ` : ''}
     </div>
 
     ${photos ? `
-      <div class="form-card" style="margin-bottom:10px">
-        <div class="form-card-title">${svgIcon('camera')} Fotos (${inc.photos.length})</div>
-        <div class="photo-grid">${photos}</div>
-      </div>
+    <div class="form-card" style="margin:0 12px 10px">
+      <div class="form-card-title">${svgIcon('camera')} Fotos (${inc.photos.length})</div>
+      <div class="photo-grid">${photos}</div>
+    </div>
     ` : ''}
 
-    <!-- Histórico -->
-    <div class="form-card" style="margin-bottom:10px">
-      <div class="form-card-title">📋 Histórico</div>
+    <!-- ── HISTÓRICO DE ACTIVIDADE ───────────────────────────── -->
+    <div class="form-card" style="margin:0 12px 10px">
+      <div class="detail-section-label">REGISTOS DE ACTIVIDADE</div>
       <div class="history-timeline">${historyHTML}</div>
       <div class="history-note-form">
         <input class="field-input" type="text" id="noteInput-${inc.id}"
