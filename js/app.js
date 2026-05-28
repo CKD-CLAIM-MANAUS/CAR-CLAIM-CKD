@@ -1183,7 +1183,7 @@ window.doPaintReturn = async (id) => {
 };
 
 // ── Gera QR + abre modal de impressão ────────────────────────
-window.printPaintLabel = async (id) => {
+window.printPaintLabel = (id) => {
   const inc = incidents.find(i => i.id === id);
   if (!inc) return;
 
@@ -1203,23 +1203,10 @@ window.printPaintLabel = async (id) => {
   let qrDataUrl = '';
 
   if (canvas) {
-    canvas.width  = 200;
-    canvas.height = 200;
-
-    if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
-      try {
-        await QRCode.toCanvas(canvas, qrUrl, {
-          width: 200, margin: 1,
-          color: { dark: '#000000', light: '#FFFFFF' },
-        });
-        qrDataUrl = canvas.toDataURL('image/png');
-      } catch (e) {
-        console.warn('QR canvas error:', e);
-        _drawQRFallback(canvas, qrUrl);
-      }
-    } else {
-      _drawQRFallback(canvas, qrUrl);
-    }
+    canvas.width  = 280;
+    canvas.height = 280;
+    const ok = _drawQRToCanvas(canvas, qrUrl);
+    if (ok) qrDataUrl = canvas.toDataURL('image/png');
   }
 
   // Preenche área de impressão com img (canvas não migra via innerHTML)
@@ -1243,18 +1230,58 @@ window.printPaintLabel = async (id) => {
   openModal('paintLabelModal');
 };
 
-// Desenha placeholder quando QRCode library não está disponível
-function _drawQRFallback(canvas, url) {
+// Gera QR no canvas usando qrcode-generator (global: qrcode fn, síncrono)
+// Retorna true se OK, false se falhou (mostra placeholder).
+function _drawQRToCanvas(canvas, text) {
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#F0F0F0';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#888';
-  ctx.font = 'bold 13px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('QR indisponível', canvas.width / 2, canvas.height / 2 - 8);
-  ctx.font = '10px sans-serif';
-  ctx.fillStyle = '#AAA';
-  ctx.fillText('Recarregue a página', canvas.width / 2, canvas.height / 2 + 10);
+  const W   = canvas.width;
+
+  // Verifica se a biblioteca está disponível (global "qrcode", minúsculas)
+  if (typeof qrcode !== 'function') {
+    ctx.fillStyle = '#F0F0F0';
+    ctx.fillRect(0, 0, W, W);
+    ctx.fillStyle = '#888';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('QR indisponível', W / 2, W / 2 - 6);
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#AAA';
+    ctx.fillText('Recarregue a página', W / 2, W / 2 + 10);
+    return false;
+  }
+
+  try {
+    // Tipo 10 suporta até ~114 bytes em modo M — suficiente para o URL do app
+    const qr = qrcode(10, 'M');
+    qr.addData(text, 'Byte');
+    qr.make();
+
+    const modules  = qr.getModuleCount(); // 57 para tipo 10
+    const cellSize = Math.floor(W / (modules + 4)); // 2 módulos de margem
+    const offset   = Math.floor((W - modules * cellSize) / 2);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, W, W);
+    ctx.fillStyle = '#000000';
+
+    for (let r = 0; r < modules; r++) {
+      for (let c = 0; c < modules; c++) {
+        if (qr.isDark(r, c)) {
+          ctx.fillRect(offset + c * cellSize, offset + r * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+    return true;
+  } catch (e) {
+    console.warn('QR generation error:', e);
+    ctx.fillStyle = '#F0F0F0';
+    ctx.fillRect(0, 0, W, W);
+    ctx.fillStyle = '#888';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Erro ao gerar QR', W / 2, W / 2);
+    return false;
+  }
 }
 
 window.closePaintLabel = (e) => {
