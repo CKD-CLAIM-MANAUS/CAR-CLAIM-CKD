@@ -2357,10 +2357,12 @@ img { display: block; max-width: 100%; }
 }
 
 .label-qr-col { flex-shrink: 0; }
+/* aplica a canvas E img — ambos usados para QR */
 .label-qr-img {
   width: 72px;
   height: 72px;
   display: block;
+  image-rendering: pixelated; /* evita blur ao redimensionar o canvas */
 }
 
 .label-text-col {
@@ -2374,6 +2376,9 @@ img { display: block; max-width: 100%; }
   color: #000000;
   line-height: 1;
   font-family: var(--font-sans, sans-serif);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .label-part-name {

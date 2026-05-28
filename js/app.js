@@ -1187,51 +1187,75 @@ window.printPaintLabel = async (id) => {
   const inc = incidents.find(i => i.id === id);
   if (!inc) return;
 
-  const qrUrl   = `${PAINT_APP_URL}?paint=${encodeURIComponent(id)}`;
-  const carNum  = inc.carNum ? `CAR ${inc.carNum}` : id.slice(0, 8).toUpperCase();
+  const qrUrl    = `${PAINT_APP_URL}?paint=${encodeURIComponent(id)}`;
+  const carLabel = inc.carNum ? `CAR ${inc.carNum}` : 'SEM CAR';
   const partName = (inc.partName || '—').toUpperCase().slice(0, 32);
   const dateStr  = new Date(inc.createdAt || Date.now()).toLocaleDateString('pt-BR');
 
-  // Gera QR como data URL
-  let qrSrc = '';
-  try {
-    if (typeof QRCode !== 'undefined') {
-      qrSrc = await QRCode.toDataURL(qrUrl, {
-        width: 220, margin: 1,
-        color: { dark: '#000000', light: '#FFFFFF' }
-      });
+  // Preenche campos de texto (elementos já existem no DOM — sem innerHTML)
+  const byId = (i) => document.getElementById(i);
+  if (byId('labelCarNum'))  byId('labelCarNum').textContent  = carLabel;
+  if (byId('labelPartName')) byId('labelPartName').textContent = partName;
+  if (byId('labelDate'))    byId('labelDate').textContent    = dateStr;
+
+  // Gera QR directamente no canvas que já está no DOM
+  const canvas = byId('paintLabelQR');
+  let qrDataUrl = '';
+
+  if (canvas) {
+    canvas.width  = 200;
+    canvas.height = 200;
+
+    if (typeof QRCode !== 'undefined' && typeof QRCode.toCanvas === 'function') {
+      try {
+        await QRCode.toCanvas(canvas, qrUrl, {
+          width: 200, margin: 1,
+          color: { dark: '#000000', light: '#FFFFFF' },
+        });
+        qrDataUrl = canvas.toDataURL('image/png');
+      } catch (e) {
+        console.warn('QR canvas error:', e);
+        _drawQRFallback(canvas, qrUrl);
+      }
     } else {
-      // Fallback: Google Charts (requer internet)
-      qrSrc = `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(qrUrl)}&choe=UTF-8`;
+      _drawQRFallback(canvas, qrUrl);
     }
-  } catch (e) {
-    console.warn('QR gen error:', e);
-    qrSrc = `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(qrUrl)}&choe=UTF-8`;
   }
 
-  const labelHTML = `
-    <div class="paint-label-print-area">
-      <div class="label-qr-col">
-        <img class="label-qr-img" src="${qrSrc}" alt="QR">
-      </div>
-      <div class="label-text-col">
-        <div class="label-car-num">${carNum}</div>
-        <div class="label-part-name">${partName}</div>
-        <div class="label-paint-badge">🎨 PINTURA</div>
-        <div class="label-date">${dateStr}</div>
-      </div>
-    </div>`;
-
-  // Preenche prévia no modal
-  const previewEl = document.getElementById('paintLabelPrintArea');
-  if (previewEl) previewEl.innerHTML = labelHTML;
-
-  // Preenche área de impressão (fora do modal, limpa para @media print)
-  const printEl = document.getElementById('paintPrintArea');
-  if (printEl) printEl.innerHTML = labelHTML;
+  // Preenche área de impressão com img (canvas não migra via innerHTML)
+  const printEl = byId('paintPrintArea');
+  if (printEl) {
+    const qrHtml = qrDataUrl
+      ? `<img class="label-qr-img" src="${qrDataUrl}">`
+      : `<div class="label-qr-placeholder">QR</div>`;
+    printEl.innerHTML = `
+      <div class="paint-label-print-area">
+        <div class="label-qr-col">${qrHtml}</div>
+        <div class="label-text-col">
+          <div class="label-car-num">${carLabel}</div>
+          <div class="label-part-name">${partName}</div>
+          <div class="label-paint-badge">🎨 PINTURA</div>
+          <div class="label-date">${dateStr}</div>
+        </div>
+      </div>`;
+  }
 
   openModal('paintLabelModal');
 };
+
+// Desenha placeholder quando QRCode library não está disponível
+function _drawQRFallback(canvas, url) {
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#F0F0F0';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#888';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('QR indisponível', canvas.width / 2, canvas.height / 2 - 8);
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#AAA';
+  ctx.fillText('Recarregue a página', canvas.width / 2, canvas.height / 2 + 10);
+}
 
 window.closePaintLabel = (e) => {
   if (!e || e.target === document.getElementById('paintLabelModal'))

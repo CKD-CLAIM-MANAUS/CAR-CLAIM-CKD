@@ -911,10 +911,19 @@
     <div class="modal-title">🖨 Etiqueta de Pintura</div>
     <div class="modal-sub">Imprima e cole na peça antes de enviar para a pintoria</div>
 
-    <!-- Prévia da etiqueta -->
+    <!-- Prévia da etiqueta — estrutura estática com IDs fixos -->
     <div class="paint-label-preview-wrap">
-      <div id="paintLabelPrintArea">
-        <!-- preenchido por JS -->
+      <div class="paint-label-print-area" id="paintLabelPrintArea">
+        <div class="label-qr-col">
+          <!-- canvas: QRCode.toCanvas() renderiza aqui directamente -->
+          <canvas id="paintLabelQR" class="label-qr-img"></canvas>
+        </div>
+        <div class="label-text-col">
+          <div class="label-car-num"  id="labelCarNum">—</div>
+          <div class="label-part-name" id="labelPartName">—</div>
+          <div class="label-paint-badge">🎨 PINTURA</div>
+          <div class="label-date"     id="labelDate">—</div>
+        </div>
       </div>
     </div>
 
