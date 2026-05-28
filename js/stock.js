@@ -67,13 +67,15 @@ export async function recordStockMovement({
 }
 
 // ── Histórico de movimentos de uma peça ──────────────────────
+// Ordenação feita no cliente para evitar índice composto no Firestore
 export async function getStockHistory(partNo) {
   if (!partNo) return [];
   const q = fb.query(
     fb.collection(db, MOVE_COL),
-    fb.where('partNo', '==', partNo),
-    fb.orderBy('date', 'desc')
+    fb.where('partNo', '==', partNo)
   );
   const snap = await fb.getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.date || 0) - (a.date || 0));
 }
