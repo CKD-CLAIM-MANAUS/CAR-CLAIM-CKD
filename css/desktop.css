@@ -244,3 +244,44 @@ html.is-desktop .list-panel-body::-webkit-scrollbar-thumb {
 html.is-desktop .list-panel-body::-webkit-scrollbar-thumb:hover {
   background: rgba(255,102,0,0.45);
 }
+
+/* ══════════════════════════════════════════════════════════
+   STITCH FULL — desktop specific
+════════════════════════════════════════════════════════════ */
+
+/* List panel — fundo semi-transparente deixa dots visíveis */
+html.is-desktop .desktop-list-panel {
+  background: rgba(12,12,12,0.92);
+}
+
+/* Detail panel — micro-grid laranja na camada do painel */
+html.is-desktop .desktop-detail-panel {
+  background-image:
+    radial-gradient(ellipse at 72% 8%,  rgba(255,102,0,0.07) 0%, transparent 48%),
+    radial-gradient(ellipse at 18% 92%, rgba(255,102,0,0.03) 0%, transparent 40%),
+    radial-gradient(rgba(255,102,0,0.055) 1px, transparent 0) !important;
+  background-size: auto, auto, 16px 16px !important;
+}
+
+/* Incident cards desktop — cards mais compactos e táticos */
+html.is-desktop .incident-card {
+  background: rgba(17,17,17,0.75) !important;
+  border-radius: var(--radius-md);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+html.is-desktop .incident-card:not(.selected):hover {
+  background: rgba(37,37,37,0.9) !important;
+  box-shadow: 0 4px 22px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,102,0,0.12);
+  transform: translateY(-1px);
+}
+
+/* Empty state do painel — estilo tático */
+html.is-desktop .empty-kpi-val {
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+html.is-desktop .empty-kpi-lbl {
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  font-size: 8px;
+}
