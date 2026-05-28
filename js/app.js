@@ -1474,9 +1474,10 @@ function _drawQRToCanvas(canvas, text) {
   }
 
   try {
-    // Tipo 4 (33 módulos) suporta ~78 chars em modo M — suficiente para o URL
-    // Módulos maiores = QR mais pequeno e mais fácil de escanear
-    const qr = qrcode(4, 'M');
+    // Tipo 0 = auto-detecta o mínimo necessário para o URL (~76 chars)
+    // Selecciona tipo 6 automaticamente (41 módulos vs 57 do tipo 10)
+    // Resultado: QR mais pequeno, módulos maiores, mais fácil de escanear
+    const qr = qrcode(0, 'M');
     qr.addData(text, 'Byte');
     qr.make();
 
