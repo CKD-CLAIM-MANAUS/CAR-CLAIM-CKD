@@ -1,5 +1,6 @@
 // ── dashboard.js — KPI Dashboard ─────────────────────────────
 import { incidents } from './incidents.js';
+import { escHtml } from './ui.js';
 
 let dashPeriod = 'month'; // 'month' | '3m' | 'all'
 let monthlyChartInstance = null; // instância Chart.js activa
@@ -95,13 +96,13 @@ function barRow(name, sub, value, max, color) {
   return `
     <div class="dash-bar-row">
       <div class="dash-bar-labels">
-        <span class="dash-bar-name">${name}</span>
-        ${sub ? `<span class="dash-bar-sub">${sub}</span>` : ''}
+        <span class="dash-bar-name">${escHtml(name)}</span>
+        ${sub ? `<span class="dash-bar-sub">${escHtml(sub)}</span>` : ''}
       </div>
       <div class="dash-bar-track">
         <div class="dash-bar-fill" style="width:0%;background:${color}" data-target="${pct}"></div>
       </div>
-      <span class="dash-bar-val">${value}</span>
+      <span class="dash-bar-val">${Number(value) || 0}</span>
     </div>`;
 }
 
