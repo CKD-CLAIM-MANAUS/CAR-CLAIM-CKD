@@ -1,5 +1,24 @@
 // ── ui.js ─────────────────────────────────────────────────────
 
+// ── HTML escape — previne XSS em qualquer dado de utilizador ──
+export function escHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
+// ── Sanitiza URLs de fotos — bloqueia javascript: e data: ─────
+export function sanitizeUrl(url) {
+  if (!url) return '';
+  const s = String(url).trim().toLowerCase();
+  if (s.startsWith('javascript:') || s.startsWith('data:text') || s.startsWith('vbscript:')) return '';
+  return url;
+}
+
 // ── Toast ─────────────────────────────────────────────────────
 let toastTimer = null;
 
@@ -60,8 +79,8 @@ export function fmtDate(ts) {
 export function renderDetailRow(label, value) {
   return `
     <div class="detail-row">
-      <span class="detail-label">${label}</span>
-      <span class="detail-value">${value || '—'}</span>
+      <span class="detail-label">${escHtml(label)}</span>
+      <span class="detail-value">${escHtml(value) || '—'}</span>
     </div>`;
 }
 

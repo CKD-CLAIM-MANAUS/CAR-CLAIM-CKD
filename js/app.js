@@ -5,7 +5,7 @@ import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
 import { importPackList } from './packList.js';
-import { showToast, showPage, openFullscreen, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading } from './ui.js';
+import { showToast, showPage, openFullscreen, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
 import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 import { getTrackingUrl, getCarrierLabel } from './tracking.js';
@@ -160,20 +160,25 @@ async function renderUsersList() {
       el.innerHTML = '<div style="font-size:13px;color:var(--ink-300);text-align:center;padding:16px;">Nenhum utilizador</div>';
       return;
     }
-    el.innerHTML = users.map(u => `
+    el.innerHTML = users.map(u => {
+      const initials = escHtml((u.name || u.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2));
+      const roleBg   = u.role === 'admin' ? 'rgba(255,179,0,0.15)' : 'var(--blue-50,#111E38)';
+      const roleClr  = u.role === 'admin' ? '#FFB300' : 'var(--blue-300,#6B9BF0)';
+      const roleLabel = u.role === 'admin' ? '👑 Admin' : 'User';
+      return `
       <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-card,#0D1E35);border-radius:10px;margin-bottom:8px;border:1px solid var(--border,rgba(255,255,255,0.07));">
         <div style="width:36px;height:36px;background:var(--blue-500,#FF6600);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;flex-shrink:0;">
-          ${(u.name || u.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2)}
+          ${initials}
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;color:var(--ink-100,rgba(255,255,255,0.88));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name || '—'}</div>
-          <div style="font-size:11px;color:var(--ink-300,rgba(255,255,255,0.4));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.email || ''}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--ink-100,rgba(255,255,255,0.88));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(u.name) || '—'}</div>
+          <div style="font-size:11px;color:var(--ink-300,rgba(255,255,255,0.4));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(u.email) || ''}</div>
         </div>
-        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${u.role === 'admin' ? 'rgba(255,179,0,0.15)' : 'var(--blue-50,#111E38)'};color:${u.role === 'admin' ? '#FFB300' : 'var(--blue-300,#6B9BF0)'};">
-          ${u.role === 'admin' ? '👑 Admin' : 'User'}
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${roleBg};color:${roleClr};">
+          ${roleLabel}
         </span>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   } catch {
     el.innerHTML = '<div style="font-size:13px;color:#FF6B6B;padding:10px;">Erro ao carregar utilizadores.</div>';
   }
@@ -292,8 +297,8 @@ function renderStockList(search = '') {
       <div class="stock-card" onclick="openStockDetail('${safePartNo}')">
         <span class="stock-dot" style="background:${dot}"></span>
         <div class="stock-info">
-          <div class="stock-name">${item.partName || '—'}</div>
-          <div class="stock-code">${item.partNo || '—'}</div>
+          <div class="stock-name">${escHtml(item.partName) || '—'}</div>
+          <div class="stock-code">${escHtml(item.partNo) || '—'}</div>
         </div>
         <div class="stock-qty ${cls}">${qty}</div>
       </div>`;
@@ -350,11 +355,11 @@ window.openStockDetail = async (partNo) => {
         <div class="stock-move-row">
           <span class="stock-move-icon">${icon}</span>
           <div class="stock-move-info">
-            <span class="stock-move-label">${m.note || (m.type === 'in' ? 'Entrada' : m.type === 'out' ? 'Saída' : 'Ajuste')}</span>
-            ${m.carNum ? `<span class="stock-move-car">${m.carNum}</span>` : ''}
+            <span class="stock-move-label">${escHtml(m.note) || (m.type === 'in' ? 'Entrada' : m.type === 'out' ? 'Saída' : 'Ajuste')}</span>
+            ${m.carNum ? `<span class="stock-move-car">${escHtml(m.carNum)}</span>` : ''}
           </div>
           <div class="stock-move-right">
-            <span class="stock-move-qty" style="color:${color}">${sign}${m.qty}</span>
+            <span class="stock-move-qty" style="color:${color}">${sign}${Number(m.qty) || 0}</span>
             <span class="stock-move-date">${ds}</span>
           </div>
         </div>`;
@@ -621,17 +626,6 @@ function _isPaintInc(inc) { return (inc?.incidentType || 'normal') === 'paint'; 
 function _flowFor(inc)    { return _isPaintInc(inc) ? PAINT_STATUS_FLOW   : STATUS_FLOW;   }
 function _configFor(inc)  { return _isPaintInc(inc) ? PAINT_STATUS_CONFIG : STATUS_CONFIG; }
 
-// ── Escape HTML — previne XSS em campos de utilizador ─────────
-function escHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
 // Pintura usa só 3 estados; 'received' herdado é tratado como 'done'
 function _normalisePaintStatus(st) {
   return (st === 'received' || st === 'awaiting' || st === 'eta_confirmed') ? 'done' : st;
@@ -681,9 +675,11 @@ function buildDetailHTML(inc) {
   const stCfg   = _configFor(inc)[st] || STATUS_CONFIG.pending;
 
   // ── Photos
-  const photos = (inc.photos || []).map(p =>
-    `<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="openFullscreen('${p.url}')"></div>`
-  ).join('');
+  const photos = (inc.photos || []).map(p => {
+    const safeUrl = sanitizeUrl(p.url);
+    if (!safeUrl) return '';
+    return `<div class="photo-thumb"><img src="${escHtml(safeUrl)}" loading="lazy" onclick="openFullscreen('${escHtml(safeUrl)}')"></div>`;
+  }).join('');
 
   // ── CAR block
   const missing = getMissingFields(inc);

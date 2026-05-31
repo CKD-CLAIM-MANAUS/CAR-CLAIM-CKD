@@ -11,6 +11,9 @@ import {
   onAuthStateChanged, updateProfile
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
+// SEGURANÇA: restringir esta API key na Firebase Console →
+// Google Cloud Console → APIs → Browser key → Restrições de aplicação → HTTP referrers
+// Adicionar: https://ckd-claim-manaus.github.io/* e http://localhost:*
 const firebaseConfig = {
   apiKey: "AIzaSyBkOtlCGjrfSkR2HgVP2OOv4UZpW6txm90",
   authDomain: "car-garantia.firebaseapp.com",

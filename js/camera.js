@@ -1,4 +1,5 @@
 // ── camera.js ─────────────────────────────────────────────────
+import { auth } from './firebase.js';
 
 const MAX_FILE_SIZE  = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_TYPES  = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
@@ -47,6 +48,11 @@ export async function compressImage(file, maxW = 1600, maxKB = 900) {
 
 // ── Upload to Cloudinary ──────────────────────────────────────
 export async function uploadPhoto(file) {
+  // Bloqueia uploads sem sessão Firebase activa
+  if (!auth.currentUser) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+
   const cloudName    = 'dos2jsgzg';
   const uploadPreset = 'Garantia CAR';
   const fd = new FormData();
