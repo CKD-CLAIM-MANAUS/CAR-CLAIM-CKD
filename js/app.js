@@ -1940,8 +1940,10 @@ window.openQRScanner = () => {
       if (partData) {
         document.getElementById('fPartName').value = partData.partName || '';
         document.getElementById('fModel').value    = partData.model    || '';
-        if (!document.getElementById('fOrderNo').value) {
-          document.getElementById('fOrderNo').value = partData.orderNo || '';
+        // Prioriza o orderNo guardado no Firestore (pode ter sido sobreposto manualmente na importação)
+        // em vez do que veio no QR (que é o nome da aba do Excel)
+        if (partData.orderNo) {
+          document.getElementById('fOrderNo').value = partData.orderNo;
         }
         showToast('✅ Dados preenchidos automaticamente!');
       } else {
