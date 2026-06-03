@@ -1,6 +1,6 @@
 // ── app.js ────────────────────────────────────────────────────
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
-import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA } from './incidents.js';
+import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
@@ -238,6 +238,8 @@ window.goToForm  = () => {
   setDesktopTab('form');
   // Pré-selecciona o tipo de acordo com a tab activa
   setIncidentType(currentTypeTab);
+  // Pré-preenche o campo Nº CAR com o próximo número sugerido
+  _prefillCARNumber();
   startDraftTimer();
   attachDraftListeners();
 };
@@ -1513,6 +1515,48 @@ function updatePaintDescription() {
 window.onPartNameChange = () => { if (currentIncidentType === 'paint') updatePaintDescription(); saveDraft(); };
 window.onQtyChange      = () => { if (currentIncidentType === 'paint') updatePaintDescription(); saveDraft(); };
 
+// ── CAR Number helpers ────────────────────────────────────────
+
+// Pré-preenche o campo fCarNum com o próximo número sugerido
+// e mostra a dica "Último usado: 005/26" abaixo do campo
+function _prefillCARNumber() {
+  const input = document.getElementById('fCarNum');
+  if (!input) return;
+
+  const { lastFull, nextNum } = getCARCounter();
+  input.value = String(nextNum).padStart(3, '0');
+
+  // Mostra/actualiza dica abaixo do campo
+  let hint = document.getElementById('carNumHint');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.id = 'carNumHint';
+    hint.style.cssText = 'font-size:11px;color:var(--ink-300,rgba(255,255,255,0.4));margin-top:4px;';
+    input.parentElement.appendChild(hint);
+  }
+  hint.textContent = lastFull ? `Último usado: ${lastFull}` : 'Nenhum CAR registado ainda';
+}
+
+// Actualiza a dica enquanto o utilizador edita o campo
+window.onCARNumInput = () => {
+  const input   = document.getElementById('fCarNum');
+  const hint    = document.getElementById('carNumHint');
+  if (!input || !hint) return;
+
+  const val      = input.value.trim();
+  const conflict = val ? isCARNumberInUse(val, editingId) : null;
+
+  if (conflict) {
+    hint.style.color = 'var(--red-500,#EF4444)';
+    hint.textContent = `⚠️ Número já usado por: ${conflict.partName || conflict.partNo || conflict.id}`;
+  } else {
+    const { lastFull } = getCARCounter();
+    hint.style.color   = 'var(--ink-300,rgba(255,255,255,0.4))';
+    hint.textContent   = lastFull ? `Último usado: ${lastFull}` : 'Nenhum CAR registado ainda';
+  }
+  saveDraft();
+};
+
 // ── Form helpers ──────────────────────────────────────────────
 function clearForm() {
   editingId = null;
@@ -1521,6 +1565,8 @@ function clearForm() {
   stopDraftTimer();
   ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  // Remove dica do campo CAR
+  document.getElementById('carNumHint')?.remove();
   // Reset tipo para normal
   setTimeout(() => setIncidentType('normal'), 50);
   renderPhotoGrid();
@@ -1913,11 +1959,21 @@ window.doGenerateCAR = async (id) => {
   const inc = incidents.find(i => i.id === id);
   if (!inc) { showToast('Incidente não encontrado'); return; }
 
+  const year       = new Date().getFullYear().toString().slice(-2);
+  const manualNum  = inc.carNum ? inc.carNum.trim() : null;
+
+  // ── Validação: verifica se o número já está em uso por outro incidente
+  if (manualNum) {
+    const conflict = isCARNumberInUse(manualNum, id);
+    if (conflict) {
+      showToast(`⚠️ CAR ${manualNum.padStart(3,'0')}/${year} já está em uso por: "${conflict.partName || conflict.partNo || ''}". Edite o incidente e altere o número.`);
+      return;
+    }
+  }
+
   showToast('⏳ A gerar CAR Excel...');
 
   try {
-    const year = new Date().getFullYear().toString().slice(-2);
-    const manualNum = inc.carNum ? inc.carNum.trim() : null;
     const carNum = manualNum
       ? (manualNum.padStart(3, '0') + '/' + year)
       : await getNextCARNumber();

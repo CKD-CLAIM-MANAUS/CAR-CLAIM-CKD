@@ -242,6 +242,47 @@ export async function getNextCARNumber() {
   return String(nextNum).padStart(3, '0') + '/' + year;
 }
 
+// ── Último e próximo número CAR (a partir dos incidentes em memória) ──
+// Retorna { lastNum, lastFull, nextNum, nextFull }
+// Exemplo: { lastNum: 5, lastFull: '005/26', nextNum: 6, nextFull: '006/26' }
+export function getCARCounter() {
+  const year = new Date().getFullYear().toString().slice(-2);
+  let lastNum = 0;
+
+  for (const inc of incidents) {
+    if (!inc.carNum) continue;
+    // Aceita formatos: "005", "005/26", "5/26"
+    const raw = String(inc.carNum).trim();
+    const parts = raw.split('/');
+    const num = parseInt(parts[0], 10);
+    if (!isNaN(num) && num > lastNum) lastNum = num;
+  }
+
+  const nextNum  = lastNum + 1;
+  const lastFull = lastNum > 0 ? String(lastNum).padStart(3, '0') + '/' + year : null;
+  const nextFull = String(nextNum).padStart(3, '0') + '/' + year;
+
+  return { lastNum, lastFull, nextNum, nextFull };
+}
+
+// ── Verifica se um número CAR já está em uso por outro incidente ──
+// excludeId: ID do incidente actual (para não bloquear ao editar o próprio)
+export function isCARNumberInUse(carNum, excludeId = null) {
+  if (!carNum) return null;
+  const raw = String(carNum).trim();
+  const num = parseInt(raw.split('/')[0], 10);
+  if (isNaN(num)) return null;
+
+  const conflict = incidents.find(inc => {
+    if (excludeId && inc.id === excludeId) return false;
+    if (!inc.carNum) return false;
+    const incNum = parseInt(String(inc.carNum).split('/')[0], 10);
+    return incNum === num;
+  });
+
+  return conflict || null; // retorna o incidente em conflito ou null
+}
+
 // ── Parts DB lookup ───────────────────────────────────────────
 export async function lookupPart(partNo, lotNo) {
   if (!partNo) return null;
