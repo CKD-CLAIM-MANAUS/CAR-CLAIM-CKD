@@ -6,15 +6,15 @@ export let incidents = [];
 
 // ── Status config ─────────────────────────────────────────────
 export const STATUS_CONFIG = {
-  pending:       { label: 'Pendente',      icon: '⏳', color: '#F59E0B', badge: 'badge-pending'  },
-  sent:          { label: 'Enviado',        icon: '📤', color: '#3B82F6', badge: 'badge-sent'     },
-  awaiting:      { label: 'Aguardando',     icon: '🕐', color: '#8B5CF6', badge: 'badge-awaiting' },
-  eta_confirmed: { label: 'ETA Confirmado', icon: '📅', color: '#06B6D4', badge: 'badge-eta'      },
-  received:      { label: 'Recebido',       icon: '📦', color: '#84CC16', badge: 'badge-received' },
-  done:          { label: 'Encerrado',      icon: '✓',  color: '#22C55E', badge: 'badge-done'     },
+  pending:       { label: 'Pendente',       icon: '⏳', color: '#F59E0B', badge: 'badge-pending'  },
+  sent:          { label: 'Enviado',         icon: '📤', color: '#3B82F6', badge: 'badge-sent'     },
+  awaiting:      { label: 'Enviado',         icon: '📤', color: '#3B82F6', badge: 'badge-sent'     }, // legado
+  eta_confirmed: { label: 'ETA Confirmado',  icon: '📅', color: '#06B6D4', badge: 'badge-eta'      },
+  received:      { label: 'Recebido',        icon: '📦', color: '#84CC16', badge: 'badge-received' },
+  done:          { label: 'Encerrado',       icon: '✓',  color: '#22C55E', badge: 'badge-done'     },
 };
 
-export const STATUS_FLOW = ['pending', 'sent', 'awaiting', 'eta_confirmed', 'received', 'done'];
+export const STATUS_FLOW = ['pending', 'sent', 'eta_confirmed', 'received', 'done'];
 
 // ── Status de pintura (fluxo independente: 3 passos) ──────────
 // pending → sent (na pintoria) → done (retornou + encerrado)
@@ -64,7 +64,7 @@ export async function batchAdvanceToETA(id, user, eta, tracking) {
   const now      = Date.now();
   const userName = user.displayName || user.email || '';
   const curSt    = inc.status || 'pending';
-  const FLOW     = ['pending', 'sent', 'awaiting', 'eta_confirmed'];
+  const FLOW     = ['pending', 'sent', 'eta_confirmed'];
   const curIdx   = FLOW.indexOf(curSt);
   const etaIdx   = FLOW.indexOf('eta_confirmed');
 

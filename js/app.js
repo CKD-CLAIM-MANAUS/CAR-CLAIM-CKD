@@ -709,18 +709,25 @@ function buildDetailHTML(inc) {
   } else {
     // ── Peças: fluxo normal ───────────────────────────────────
     const nextStatus = STATUS_FLOW[stIdx + 1];
-    const BTN_LABELS = {
-      sent:          '📤 Marcar como Enviado',
-      awaiting:      '🕐 Aguardando Resposta China',
-      eta_confirmed: '📅 Confirmar ETA',
-      received:      '📦 Marcar como Recebido',
-      done:          '✓ Encerrar Claim',
-    };
     if (nextStatus) {
-      if (nextStatus === 'eta_confirmed') {
-        nextBtn = `<button class="btn btn-primary" onclick="doOpenETAInput('${inc.id}')">📅 Confirmar ETA</button>`;
+      if (nextStatus === 'sent') {
+        // "Enviado" só aparece se o CAR já foi gerado — e só como fallback manual
+        if (inc.carNum) {
+          nextBtn = `<button class="btn btn-primary" onclick="doAdvanceStatus('${inc.id}','sent')">📤 Marcar como Enviado</button>`;
+        }
+      } else if (nextStatus === 'eta_confirmed') {
+        // ETA só para admin
+        if (isAdmin) {
+          nextBtn = `<button class="btn btn-primary" onclick="doOpenETAInput('${inc.id}')">📅 Confirmar ETA</button>`;
+        }
+      } else if (nextStatus === 'done') {
+        // Encerrar: pede nº chassis
+        nextBtn = `<button class="btn btn-primary" onclick="doOpenCloseIncident('${inc.id}')">✓ Encerrar Claim</button>`;
       } else {
-        nextBtn = `<button class="btn btn-primary" onclick="doAdvanceStatus('${inc.id}','${nextStatus}')">${BTN_LABELS[nextStatus]}</button>`;
+        const BTN_LABELS = {
+          received: '📦 Marcar como Recebido',
+        };
+        nextBtn = `<button class="btn btn-primary" onclick="doAdvanceStatus('${inc.id}','${nextStatus}')">${BTN_LABELS[nextStatus] || nextStatus}</button>`;
       }
     }
   }
@@ -921,11 +928,11 @@ window.doMarkPending = async (id) => {
 // ── Status flow actions ───────────────────────────────────────
 window.doAdvanceStatus = async (id, newStatus) => {
   const LABELS = {
-    sent:     '📤 Marcado como enviado!',
-    awaiting: '🕐 A aguardar resposta da China',
-    received: '📦 Peça recebida!',
-    done:     '✅ Claim encerrado!',
-    pending:  '↩ Reaberto como pendente',
+    sent:          '📤 Marcado como enviado!',
+    eta_confirmed: '📅 ETA confirmado!',
+    received:      '📦 Peça recebida!',
+    done:          '✅ Claim encerrado!',
+    pending:       '↩ Reaberto como pendente',
   };
   try {
     await updateIncidentStatus(id, newStatus, currentUser);
@@ -985,6 +992,47 @@ window.doConfirmETA = async (id) => {
     window.showDetail(id);
     renderList();
   } catch (e) { showToast('Erro: ' + e.message); }
+};
+
+// ── Encerrar incidente com nº chassis ────────────────────────
+window.doOpenCloseIncident = (id) => {
+  document.getElementById('closeIncidentOverlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'closeIncidentOverlay';
+  overlay.className = 'paint-action-confirm';
+  overlay.innerHTML = `
+    <div class="paint-action-confirm-box">
+      <div class="paint-action-confirm-title">✓ Encerrar Claim</div>
+      <div class="paint-action-confirm-subtitle">Registe o veículo onde a peça foi instalada.</div>
+      <div class="field" style="margin:12px 0 8px">
+        <label class="field-label" style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.05em;">Nº Chassis / Veículo</label>
+        <input class="field-input" type="text" id="chassisInput"
+               placeholder="ex: 9C2JC6150SR000123"
+               style="font-family:var(--font-mono);text-transform:uppercase;">
+      </div>
+      <div class="paint-action-confirm-btns">
+        <button class="btn btn-primary" id="closeIncidentOk">✓ Confirmar e Encerrar</button>
+        <button class="btn" id="closeIncidentCancel">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // Foco automático no campo
+  setTimeout(() => document.getElementById('chassisInput')?.focus(), 100);
+
+  document.getElementById('closeIncidentOk').onclick = async () => {
+    const chassis = (document.getElementById('chassisInput')?.value || '').trim().toUpperCase();
+    if (!chassis) { showToast('⚠️ Introduza o nº de chassis'); return; }
+    overlay.remove();
+    try {
+      await updateIncidentStatus(id, 'done', currentUser, `Peça instalada no veículo: ${chassis}`);
+      showToast('✅ Claim encerrado!');
+      window.showDetail(id);
+      renderList();
+    } catch (e) { showToast('Erro: ' + e.message); }
+  };
+  document.getElementById('closeIncidentCancel').onclick = () => overlay.remove();
 };
 
 // ── Batch ETA / Tracking ──────────────────────────────────────
@@ -1984,11 +2032,50 @@ window.doGenerateCAR = async (id) => {
     const code = carNum.replace('/', '_');
     const label = (inc.partName || inc.partNo || 'PART').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 30);
     downloadBlob(blob, `CAR_No_${code}_${label}.xlsx`);
-    showToast('✅ CAR Excel gerado!');
+
+    // ── Pergunta se quer marcar como Enviado (só se ainda estiver Pendente)
+    if ((inc.status || 'pending') === 'pending') {
+      _showMarkSentConfirm(id, carNum);
+    } else {
+      showToast('✅ CAR Excel gerado!');
+    }
   } catch (e) {
     showToast('Erro: ' + e.message);
   }
 };
+
+// ── Confirmação pós-geração CAR: marcar como Enviado? ─────────
+function _showMarkSentConfirm(id, carNum) {
+  document.getElementById('markSentConfirm')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'markSentConfirm';
+  overlay.className = 'paint-action-confirm';
+  overlay.innerHTML = `
+    <div class="paint-action-confirm-box">
+      <div class="paint-action-confirm-title">📤 CAR ${carNum} gerado!</div>
+      <div class="paint-action-confirm-subtitle">Deseja marcar este incidente como <strong>Enviado</strong> para a China?</div>
+      <div class="paint-action-confirm-btns">
+        <button class="btn btn-primary" id="markSentOk">✅ Sim, marcar como Enviado</button>
+        <button class="btn" id="markSentNo">Agora não</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById('markSentOk').onclick = async () => {
+    overlay.remove();
+    try {
+      await updateIncidentStatus(id, 'sent', currentUser, `CAR ${carNum} gerado e enviado para a China.`);
+      showToast('📤 Marcado como Enviado!');
+      window.showDetail(id);
+      renderList();
+    } catch (e) { showToast('Erro: ' + e.message); }
+  };
+  document.getElementById('markSentNo').onclick = () => {
+    overlay.remove();
+    showToast('✅ CAR Excel gerado!');
+  };
+}
 
 // ══════════════════════════════════════════════════════════════
 // RELATÓRIO PINTORIA
