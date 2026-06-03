@@ -174,9 +174,7 @@ def generate_car():
         short_defect = part_name + (' (' + defect[:50] + ')' if defect else '')
         parts_desc = []
         if detected_en:
-            parts_desc.append('HOW DETECTED: ' + detected_en + '.')
-        if defect:
-            parts_desc.append(defect)
+            parts_desc.append(detected_en + '.')
         parts_desc.append('PHOTOS ARE ATTACHED FOR YOUR REFERENCE.')
         full_desc = ' '.join(parts_desc)
 
