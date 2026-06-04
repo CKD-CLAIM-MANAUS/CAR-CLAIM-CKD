@@ -2,6 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Helpers de autenticação ───────────────────────────────
     function isAuth() {
       return request.auth != null;
     }
@@ -15,39 +16,124 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == userId;
     }
 
-    // Usuários: cada um lê o próprio perfil; admin lê todos e gerencia
+    // ── Helpers de validação de tipos ─────────────────────────
+    function isStr(v, maxLen) {
+      return v is string && v.size() <= maxLen;
+    }
+
+    function isOptStr(data, field, maxLen) {
+      return !(field in data) || isStr(data[field], maxLen);
+    }
+
+    function isOptInt(data, field, minVal, maxVal) {
+      return !(field in data) || (data[field] is int &&
+             data[field] >= minVal && data[field] <= maxVal);
+    }
+
+    // ── Valida campos de um incidente ao criar ────────────────
+    // Regras: userId deve ser o próprio utilizador, campos com tamanho máximo
+    function validNewIncident(data) {
+      return data.userId == request.auth.uid
+          && isStr(data.partName, 300)
+          && isOptStr(data, 'partNo',       200)
+          && isOptStr(data, 'model',        100)
+          && isOptStr(data, 'orderNo',      100)
+          && isOptStr(data, 'lotNo',        100)
+          && isOptStr(data, 'carNum',        30)
+          && isOptStr(data, 'defect',      2000)
+          && isOptStr(data, 'detected',    2000)
+          && isOptStr(data, 'user',         100)
+          && isOptStr(data, 'incidentType',  20)
+          && isOptInt(data, 'ngQty',          0, 9999)
+          && isOptInt(data, 'createdAt',      0, 9999999999999)
+          && isOptInt(data, 'updatedAt',      0, 9999999999999);
+    }
+
+    // ── Valida que userId não muda ao actualizar ──────────────
+    function userIdUnchanged() {
+      return !('userId' in request.resource.data) ||
+             request.resource.data.userId == resource.data.userId;
+    }
+
+
+    // ── Utilizadores ──────────────────────────────────────────
+    // Cada utilizador lê o próprio perfil; só admin escreve
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create, update, delete: if isAdmin();
+      allow read:                    if isOwner(userId) || isAdmin();
+      allow create, update, delete:  if isAdmin();
     }
 
-    // Incidentes: todos autenticados leem e criam; só dono ou admin edita/deleta
+
+    // ── Incidentes ────────────────────────────────────────────
+    // - Qualquer autenticado lê
+    // - Criar: campos validados + userId == próprio uid
+    // - Actualizar: só dono ou admin; não pode mudar userId
+    // - Eliminar: só dono ou admin
     match /incidents/{incidentId} {
-      allow read, create: if isAuth();
-      allow update: if isAuth() && (isOwner(resource.data.userId) || isAdmin());
-      allow delete: if isAuth() && (isOwner(resource.data.userId) || isAdmin());
+      allow read:   if isAuth();
+      allow create: if isAuth() && validNewIncident(request.resource.data);
+      allow update: if isAuth()
+                    && (isOwner(resource.data.userId) || isAdmin())
+                    && userIdUnchanged();
+      allow delete: if isAuth()
+                    && (isOwner(resource.data.userId) || isAdmin());
     }
 
-    // Numeração CAR: qualquer autenticado pode ler e registrar
+
+    // ── Numeração CAR ─────────────────────────────────────────
+    // Qualquer autenticado lê; ao criar valida a estrutura mínima
+    // (evita documentos arbitrários ou reset malicioso do contador)
     match /carNumbers/{docId} {
-      allow read, write: if isAuth();
+      allow read: if isAuth();
+      allow create: if isAuth()
+                    && request.resource.data.keys().hasAll(['year', 'num', 'createdAt'])
+                    && isStr(request.resource.data.year, 4)
+                    && request.resource.data.num is int
+                    && request.resource.data.num > 0
+                    && request.resource.data.num <= 9999;
+      allow update, delete: if isAdmin();
     }
 
-    // Base de peças: todos leem; só admin importa e sobrescreve
+
+    // ── Base de peças (partsDB) ───────────────────────────────
+    // Qualquer autenticado lê; só admin importa
     match /partsDB/{partId} {
-      allow read: if isAuth();
+      allow read:  if isAuth();
       allow write: if isAdmin();
     }
 
-    // Stock: todos autenticados leem e escrevem (criação/actualização automática)
+
+    // ── Stock ─────────────────────────────────────────────────
+    // Leitura livre para autenticados
+    // Escrita: valida campos e intervalo da quantidade
+    // (evita que um utilizador coloque qty=-9999 ou campos arbitrários)
     match /stock/{partId} {
-      allow read, write: if isAuth();
+      allow read: if isAuth();
+      allow write: if isAuth()
+                   && request.resource.data.keys().hasOnly(
+                        ['partNo', 'partName', 'qty', 'updatedAt', 'updatedBy'])
+                   && isStr(request.resource.data.partNo,   200)
+                   && isOptStr(request.resource.data, 'partName', 300)
+                   && request.resource.data.qty is int
+                   && request.resource.data.qty >= -9999
+                   && request.resource.data.qty <= 99999;
     }
 
-    // Movimentos de stock: todos autenticados leem e criam; só admin elimina
+
+    // ── Movimentos de stock ───────────────────────────────────
+    // Criar: qualquer autenticado, com campos obrigatórios e type válido
+    // Eliminar: só admin
     match /stockMovements/{moveId} {
-      allow read, create: if isAuth();
+      allow read:   if isAuth();
+      allow create: if isAuth()
+                    && request.resource.data.keys().hasAll(['partNo', 'type', 'qty', 'date'])
+                    && isStr(request.resource.data.partNo, 200)
+                    && request.resource.data.type in ['in', 'out', 'adjust']
+                    && request.resource.data.qty is int
+                    && request.resource.data.qty >= -9999
+                    && request.resource.data.qty <= 9999;
       allow delete: if isAdmin();
     }
+
   }
 }

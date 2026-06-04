@@ -129,12 +129,10 @@ def download_and_process(url, width, height):
 # ── Rotas ─────────────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({
-        'status': 'ok',
-        'pillow': PILImage.__version__,
-        'firebase_initialized': _firebase_initialized,
-        'firebase_error': _firebase_init_error
-    })
+    # Resposta mínima — não expõe versões nem estado interno ao público
+    if not _firebase_initialized:
+        return jsonify({'status': 'degraded'}), 503
+    return jsonify({'status': 'ok'})
 
 @app.route('/generate-car', methods=['POST'])
 def generate_car():
