@@ -25,10 +25,11 @@ let _pendingPaintId = null;
 })();
 
 // ── State ─────────────────────────────────────────────────────
-let currentPhotos = [];
-let editingId     = null;
-let stockItems    = [];
+let currentPhotos     = [];
+let editingId         = null;
+let stockItems        = [];
 let stockDetailPartNo = null;
+let _currentDetailId  = null; // ID do incidente actualmente visível no painel de detalhe
 
 // ── Tabs de tipo (Peças / Pintura) ────────────────────────────
 let currentTypeTab = 'normal'; // 'normal' | 'paint'
@@ -71,6 +72,30 @@ function startRealtimeSync(onFirstLoad) {
   let _firstLoad = true;
   subscribeToIncidents(() => {
     renderList();
+
+    // Re-renderiza o painel de detalhe se estiver aberto — corrige o bug
+    // de alterações só aparecerem após F5
+    if (_currentDetailId) {
+      const inc = incidents.find(i => i.id === _currentDetailId);
+      if (inc) {
+        const html = buildDetailHTML(inc);
+        if (isDesktop()) {
+          const content = document.getElementById('desktopDetailContent');
+          if (content && content.style.display !== 'none') {
+            content.innerHTML = html;
+          }
+        } else {
+          const detailPage = document.getElementById('page-detail');
+          if (detailPage?.classList.contains('active')) {
+            document.getElementById('detailContent').innerHTML = html;
+          }
+        }
+      } else {
+        // Incidente foi eliminado — limpa o detalhe
+        _currentDetailId = null;
+      }
+    }
+
     // Atualiza dashboard se estiver visível (com debounce)
     const dashSection = document.getElementById('dashboardSection');
     const dashPage    = document.querySelector('.page#dashboard');
@@ -240,7 +265,7 @@ function setDesktopTab(tabId) {
   if (tab) tab.classList.add('active');
 }
 
-window.goToList  = () => { showPage('list');  setDesktopTab('list');  renderList(); checkForDraft(); };
+window.goToList  = () => { _currentDetailId = null; showPage('list'); setDesktopTab('list'); renderList(); checkForDraft(); };
 window.goToForm  = () => {
   clearForm();
   showPage('form');
@@ -936,6 +961,8 @@ function buildDetailHTML(inc) {
 window.showDetail = (id) => {
   const inc = incidents.find(i => i.id === id);
   if (!inc) return;
+
+  _currentDetailId = id; // regista qual detalhe está aberto
 
   // Marca card seleccionado
   document.querySelectorAll('.incident-card').forEach(c => c.classList.remove('selected'));
