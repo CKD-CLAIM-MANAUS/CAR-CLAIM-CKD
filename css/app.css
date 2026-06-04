@@ -3198,6 +3198,21 @@ img { display: block; max-width: 100%; }
   #batchLabelPrintArea[data-mode="a4"] .label-date      { font-size: 7pt  !important; }
 }
 
+/* ── Badge Nº CAR no header do detalhe ──────────────────────── */
+.detail-car-badge {
+  display: inline-block;
+  background: rgba(255,102,0,0.15);
+  color: var(--blue-400);
+  border: 1px solid rgba(255,102,0,0.3);
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
 /* ── Banner de rascunho guardado ─────────────────────────────── */
 .draft-banner {
   position: fixed;

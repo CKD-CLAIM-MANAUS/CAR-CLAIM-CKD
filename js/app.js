@@ -896,7 +896,9 @@ function buildDetailHTML(inc) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div>
           <div class="detail-title">${escHtml(inc.partName) || '—'}</div>
-          <div class="detail-subtitle">${escHtml(inc.partNo)} · ${fmtDate(inc.createdAt)}</div>
+          <div class="detail-subtitle">
+            ${inc.carNum ? `<span class="detail-car-badge">CAR ${escHtml(inc.carNum)}</span> · ` : ''}${escHtml(inc.partNo)} · ${fmtDate(inc.createdAt)}
+          </div>
         </div>
         ${statusBadge(st, inc)}
       </div>
@@ -920,6 +922,7 @@ function buildDetailHTML(inc) {
 
     <div class="form-card" style="margin-bottom:10px">
       <div class="form-card-title">${svgIcon('package')} Dados da Peça</div>
+      ${inc.carNum ? renderDetailRow('Nº CAR', inc.carNum) : ''}
       ${renderDetailRow('Código', inc.partNo)}
       ${renderDetailRow('Modelo', inc.model)}
       ${renderDetailRow('Nº Pedido', inc.orderNo)}
