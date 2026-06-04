@@ -603,7 +603,9 @@ function renderList() {
           <div class="incident-code">${escHtml(inc.partNo)}</div>
         </div>
         <div class="incident-footer">
-          <span class="incident-meta">${escHtml(inc.model) || '—'} · ${fmtDate(inc.createdAt)}</span>
+          <span class="incident-meta">
+            ${inc.carNum ? `<span class="card-car-num">CAR ${escHtml(inc.carNum)}</span> · ` : ''}${escHtml(inc.model) || '—'} · ${fmtDate(inc.createdAt)}
+          </span>
           ${statusBadge(inc.status, inc)}
         </div>
       </div>

@@ -3198,6 +3198,15 @@ img { display: block; max-width: 100%; }
   #batchLabelPrintArea[data-mode="a4"] .label-date      { font-size: 7pt  !important; }
 }
 
+/* ── Nº CAR no card da lista ─────────────────────────────────── */
+.card-car-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue-400);
+  letter-spacing: 0.03em;
+}
+
 /* ── Badge Nº CAR no header do detalhe ──────────────────────── */
 .detail-car-badge {
   display: inline-block;
