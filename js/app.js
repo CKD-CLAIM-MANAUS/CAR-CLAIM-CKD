@@ -1682,7 +1682,7 @@ window.onCARNumInput = () => {
   if (!input || !hint) return;
 
   const val      = input.value.trim();
-  const conflict = val ? isCARNumberInUse(val, editingId) : null;
+  const conflict = val ? isCARNumberInUse(val, editingId, currentIncidentType) : null;
 
   if (conflict) {
     hint.style.color = 'var(--red-500,#EF4444)';
@@ -2089,7 +2089,7 @@ window.doGenerateCAR = async (id) => {
 
   // ── Validação: verifica se o número já está em uso por outro incidente
   if (manualNum) {
-    const conflict = isCARNumberInUse(manualNum, id);
+    const conflict = isCARNumberInUse(manualNum, id, inc.incidentType || 'normal');
     if (conflict) {
       showToast(`⚠️ CAR ${manualNum.padStart(3,'0')}/${year} já está em uso por: "${conflict.partName || conflict.partNo || ''}". Edite o incidente e altere o número.`);
       return;

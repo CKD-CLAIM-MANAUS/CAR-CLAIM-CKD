@@ -266,9 +266,15 @@ export function getCARCounter() {
 }
 
 // ── Verifica se um número CAR já está em uso por outro incidente ──
-// excludeId: ID do incidente actual (para não bloquear ao editar o próprio)
-export function isCARNumberInUse(carNum, excludeId = null) {
+// excludeId:    ID do incidente actual (para não bloquear ao editar o próprio)
+// incidentType: 'normal' | 'paint' — valida apenas dentro do mesmo tipo.
+//               Incidentes de pintura podem partilhar número (mesma sessão de retrabalho).
+//               Incidentes normais têm numeração única.
+export function isCARNumberInUse(carNum, excludeId = null, incidentType = 'normal') {
   if (!carNum) return null;
+  // Pintura permite duplicados — vários itens podem partilhar o mesmo documento
+  if (incidentType === 'paint') return null;
+
   const raw = String(carNum).trim();
   const num = parseInt(raw.split('/')[0], 10);
   if (isNaN(num)) return null;
@@ -276,6 +282,8 @@ export function isCARNumberInUse(carNum, excludeId = null) {
   const conflict = incidents.find(inc => {
     if (excludeId && inc.id === excludeId) return false;
     if (!inc.carNum) return false;
+    // Só valida conflito dentro do mesmo tipo
+    if ((inc.incidentType || 'normal') !== incidentType) return false;
     const incNum = parseInt(String(inc.carNum).split('/')[0], 10);
     return incNum === num;
   });
