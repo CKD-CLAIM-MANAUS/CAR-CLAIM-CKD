@@ -171,6 +171,12 @@ def generate_car():
 
         repl_qty    = 0 if replacement == 'NO NEED' else ng_qty
         detected_en = translate_to_english(detected)
+        # Remove prefixos de label que a tradução pode gerar
+        # ex: "HOW DETECTED:", "HOW IT WAS DETECTED:", "COMO FOI DETECTADO:"
+        detected_en = re.sub(
+            r'^(HOW\s+(IT\s+WAS\s+)?DETECTED\s*:\s*|COMO\s+FOI\s+DETECTAD[OA]\s*:\s*)',
+            '', detected_en, flags=re.IGNORECASE
+        ).strip()
         short_defect = part_name + (' (' + defect[:50] + ')' if defect else '')
         parts_desc = []
         if detected_en:
