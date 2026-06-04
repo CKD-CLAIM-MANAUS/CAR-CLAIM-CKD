@@ -2205,6 +2205,9 @@ function renderPaintReport() {
           <button class="chip${_paintReportFilter === 'sent'    ? ' active' : ''}" onclick="setPaintReportFilter('sent')">Na Pintoria (${countSent})</button>
           <button class="chip${_paintReportFilter === 'pending' ? ' active' : ''}" onclick="setPaintReportFilter('pending')">Aguardando (${countPending})</button>
         </div>
+        <button class="btn btn-paint-label pr-label-btn" onclick="openBatchLabelModal()" ${totalOpen === 0 ? 'disabled' : ''}>
+          🖨 Etiquetas em Lote
+        </button>
         <button class="btn btn-success pr-export-btn" onclick="exportPaintExcel()" ${totalOpen === 0 ? 'disabled' : ''}>
           📥 Exportar Excel
         </button>
@@ -2274,6 +2277,172 @@ window.exportPaintExcel = () => {
   const date = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `Pintoria-Aberto-${date}.xlsx`);
   showToast('📥 Excel exportado!');
+};
+
+// ══════════════════════════════════════════════════════════════
+// BATCH LABEL PRINT — Impressão de etiquetas em lote (Opção C)
+// Modo Térmica: 58×40mm, uma etiqueta por página
+// Modo A4: grade 2×3, 6 etiquetas por folha A4, com marcas de corte
+// ══════════════════════════════════════════════════════════════
+
+let _batchPrintMode = 'thermal'; // 'thermal' | 'a4'
+
+window.openBatchLabelModal = () => {
+  const paintIncs = incidents.filter(i =>
+    (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
+  );
+  if (!paintIncs.length) { showToast('Nenhuma peça de pintura em aberto.'); return; }
+
+  _renderBatchLabelList(paintIncs);
+  _applyBatchMode(_batchPrintMode);
+  _updateBatchLabelCount();
+  openModal('batchLabelModal');
+};
+
+window.closeBatchLabelModal = (e) => {
+  if (!e || e.target === document.getElementById('batchLabelModal'))
+    closeModal('batchLabelModal');
+};
+
+function _renderBatchLabelList(paintIncs) {
+  const el = document.getElementById('batchLabelList');
+  if (!el) return;
+
+  const sorted = [...paintIncs].sort((a, b) => {
+    const order = { sent: 0, pending: 1 };
+    return (order[a.status] ?? 2) - (order[b.status] ?? 2);
+  });
+
+  el.innerHTML = sorted.map(inc => {
+    const st  = inc.status || 'pending';
+    const cfg = PAINT_STATUS_CONFIG[st] || PAINT_STATUS_CONFIG.pending;
+    return `
+      <label class="batch-label-item">
+        <input type="checkbox" class="batch-label-cb" value="${inc.id}" checked
+               onchange="updateBatchLabelCount()">
+        <div class="batch-label-item-info">
+          <div class="batch-label-item-name">${escHtml(inc.partName) || '—'}</div>
+          <div class="batch-label-item-meta">
+            ${inc.carNum ? `CAR ${escHtml(inc.carNum)} · ` : ''}${escHtml(inc.partNo) || '—'}
+          </div>
+        </div>
+        <span class="batch-status-pill"
+              style="background:${cfg.color}20;color:${cfg.color};border-color:${cfg.color}40">
+          ${cfg.icon} ${cfg.label}
+        </span>
+      </label>`;
+  }).join('');
+}
+
+window.setBatchPrintMode = (mode) => {
+  _batchPrintMode = mode;
+  _applyBatchMode(mode);
+};
+
+function _applyBatchMode(mode) {
+  document.getElementById('batchModeThermal')?.classList.toggle('active', mode === 'thermal');
+  document.getElementById('batchModeA4')?.classList.toggle('active', mode === 'a4');
+  const hint = document.getElementById('batchModeHint');
+  if (hint) hint.textContent = mode === 'thermal'
+    ? '🖨 Uma etiqueta por página — compatível com impressoras térmicas 58mm (NIIMBOT, Phomemo, genéricas)'
+    : '📄 6 etiquetas por folha A4 com marcas de corte — compatível com folhas autocolantes Pimaco';
+}
+
+window.batchLabelToggleAll = (checked) => {
+  document.querySelectorAll('.batch-label-cb').forEach(cb => cb.checked = checked);
+  updateBatchLabelCount();
+};
+
+window.updateBatchLabelCount = () => {
+  const total    = document.querySelectorAll('.batch-label-cb').length;
+  const selected = document.querySelectorAll('.batch-label-cb:checked').length;
+  const el  = document.getElementById('batchLabelCount');
+  const btn = document.getElementById('batchLabelPrintBtn');
+  if (el)  el.textContent  = `${selected} de ${total} seleccionados`;
+  if (btn) btn.disabled    = selected === 0;
+};
+
+// Gera o HTML interno de uma etiqueta (QR via canvas temporário → data URL)
+function _buildLabelHTML(inc) {
+  const qrUrl    = `${PAINT_APP_URL}?paint=${encodeURIComponent(inc.id)}`;
+  const carLabel = inc.carNum ? `CAR ${inc.carNum}` : 'SEM CAR';
+  const partName = (inc.partName || '—').toUpperCase().slice(0, 40);
+  const dateStr  = new Date(inc.createdAt || Date.now()).toLocaleDateString('pt-BR');
+
+  // Canvas temporário para gerar QR sem tocar no DOM existente
+  const tmp = document.createElement('canvas');
+  tmp.width = tmp.height = 280;
+  const ok       = _drawQRToCanvas(tmp, qrUrl);
+  const qrDataUrl = ok ? tmp.toDataURL('image/png') : '';
+
+  const qrHtml = qrDataUrl
+    ? `<img class="label-qr-img" src="${qrDataUrl}" alt="QR">`
+    : `<div class="label-qr-placeholder">QR</div>`;
+
+  return `
+    <div class="paint-label-print-area">
+      <div class="label-qr-col">${qrHtml}</div>
+      <div class="label-text-col">
+        <div class="label-car-num">${escHtml(carLabel)}</div>
+        <div class="label-part-name">${escHtml(partName)}</div>
+        <div class="label-paint-badge">🎨 PINTURA</div>
+        <div class="label-date">${escHtml(dateStr)}</div>
+      </div>
+    </div>`;
+}
+
+window.doBatchPrint = () => {
+  const selectedIds = [...document.querySelectorAll('.batch-label-cb:checked')].map(cb => cb.value);
+  if (!selectedIds.length) { showToast('⚠️ Selecciona pelo menos 1 etiqueta'); return; }
+
+  const selected = selectedIds.map(id => incidents.find(i => i.id === id)).filter(Boolean);
+  const printEl  = document.getElementById('batchLabelPrintArea');
+  if (!printEl) return;
+
+  if (_batchPrintMode === 'thermal') {
+    // ── Modo térmico: uma etiqueta por "página" ───────────────
+    printEl.dataset.mode = 'thermal';
+    printEl.innerHTML = selected.map((inc, idx) =>
+      `<div class="batch-thermal-label${idx < selected.length - 1 ? ' batch-page-break' : ''}">${_buildLabelHTML(inc)}</div>`
+    ).join('');
+  } else {
+    // ── Modo A4: grade 2 colunas × 3 linhas = 6 por página ───
+    printEl.dataset.mode = 'a4';
+    const pages = [];
+    for (let i = 0; i < selected.length; i += 6) {
+      const chunk = selected.slice(i, i + 6);
+      // Preenche células vazias para manter o grid completo
+      while (chunk.length < 6) chunk.push(null);
+      pages.push(`
+        <div class="batch-a4-page${i + 6 < selected.length ? ' batch-page-break' : ''}">
+          ${chunk.map(inc => `
+            <div class="batch-a4-cell">
+              ${inc ? _buildLabelHTML(inc) : ''}
+            </div>`).join('')}
+        </div>`);
+    }
+    printEl.innerHTML = pages.join('');
+  }
+
+  // Injeta @page dinâmico conforme o modo
+  const styleId = 'batchPrintPageStyle';
+  document.getElementById(styleId)?.remove();
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = _batchPrintMode === 'thermal'
+    ? '@page { size: 58mm 40mm; margin: 0; }'
+    : '@page { size: A4 portrait; margin: 6mm; }';
+  document.head.appendChild(style);
+
+  // Limpa após imprimir
+  window.addEventListener('afterprint', () => {
+    document.getElementById(styleId)?.remove();
+    printEl.innerHTML = '';
+    printEl.removeAttribute('data-mode');
+  }, { once: true });
+
+  closeModal('batchLabelModal');
+  setTimeout(() => window.print(), 150);
 };
 
 // ── Excel export ──────────────────────────────────────────────

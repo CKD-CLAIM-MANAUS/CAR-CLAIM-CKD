@@ -973,5 +973,50 @@
 <!-- Área de impressão — só visível no @media print -->
 <div id="paintPrintArea"></div>
 
+<!-- ══════════════════════════════════════════════════════════
+     BATCH LABEL MODAL — Impressão em lote de etiquetas de pintura
+═══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="batchLabelModal" onclick="closeBatchLabelModal(event)">
+  <div class="modal batch-label-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🖨 Etiquetas em Lote</div>
+    <div class="modal-sub">Seleccione os incidentes e o modo de impressão</div>
+
+    <!-- Toggle modo de impressão -->
+    <div class="batch-mode-toggle">
+      <button id="batchModeThermal" class="batch-mode-btn active" onclick="setBatchPrintMode('thermal')">
+        🖨 Térmica <span class="batch-mode-sub">58 × 40mm</span>
+      </button>
+      <button id="batchModeA4" class="batch-mode-btn" onclick="setBatchPrintMode('a4')">
+        📄 Folha A4 <span class="batch-mode-sub">6 por folha</span>
+      </button>
+    </div>
+    <div id="batchModeHint" class="batch-mode-hint"></div>
+
+    <!-- Seleccionar todos + contador -->
+    <div class="batch-label-header">
+      <label class="batch-label-select-all">
+        <input type="checkbox" id="batchLabelSelectAll"
+               onchange="batchLabelToggleAll(this.checked)" checked>
+        Seleccionar todos
+      </label>
+      <span id="batchLabelCount" class="batch-label-count">0 seleccionados</span>
+    </div>
+
+    <!-- Lista de incidentes -->
+    <div id="batchLabelList" class="batch-label-list"></div>
+
+    <!-- Acções -->
+    <div class="batch-label-actions">
+      <button class="btn" onclick="closeBatchLabelModal()">Fechar</button>
+      <button class="btn btn-primary batch-label-print-btn" id="batchLabelPrintBtn"
+              onclick="doBatchPrint()">🖨 Imprimir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Área de impressão em lote — só visível no @media print -->
+<div id="batchLabelPrintArea"></div>
+
 </body>
 </html>

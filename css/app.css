@@ -2991,11 +2991,126 @@ img { display: block; max-width: 100%; }
   animation: navQrGlow 3s ease-in-out infinite !important;
 }
 
-/* ── Print ───────────────────────────────────────────────── */
-@media print {
-  /* Esconde tudo excepto a área de impressão */
-  body > *:not(#paintPrintArea) { display: none !important; }
+/* ── Botão etiquetas em lote no relatório de pintura ─────── */
+.pr-label-btn { white-space: nowrap; }
 
+/* ── Modal impressão em lote ─────────────────────────────── */
+.batch-label-modal { max-width: 420px; }
+
+.batch-mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.batch-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 8px;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--ink-300);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+  line-height: 1.2;
+}
+.batch-mode-btn.active {
+  background: rgba(255,102,0,0.12);
+  border-color: var(--blue-500);
+  color: var(--blue-400);
+}
+.batch-mode-sub {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+.batch-mode-hint {
+  font-size: 11px;
+  color: var(--ink-300);
+  background: var(--bg-input);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.batch-label-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.batch-label-select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-200);
+  cursor: pointer;
+}
+.batch-label-count {
+  font-size: 11px;
+  color: var(--ink-300);
+}
+
+.batch-label-list {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.batch-label-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.batch-label-item:hover { background: var(--bg-hover); }
+.batch-label-item input[type="checkbox"] { flex-shrink: 0; accent-color: var(--blue-500); }
+.batch-label-item-info { flex: 1; min-width: 0; }
+.batch-label-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-100);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.batch-label-item-meta {
+  font-size: 11px;
+  color: var(--ink-300);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.batch-label-actions {
+  display: flex;
+  gap: 8px;
+}
+.batch-label-print-btn { flex: 1; }
+
+/* ── Print — etiqueta única e impressão em lote ──────────── */
+@media print {
+  /* Esconde tudo excepto as áreas de impressão activas */
+  body > *:not(#paintPrintArea):not(#batchLabelPrintArea) { display: none !important; }
+
+  /* ── Etiqueta única (modal individual) ────────────────── */
   #paintPrintArea {
     display: flex !important;
     position: fixed !important;
@@ -3005,33 +3120,82 @@ img { display: block; max-width: 100%; }
     align-items: center;
   }
 
-  @page {
-    size: 58mm 40mm;
-    margin: 0;
-  }
+  /* ── Lote: área visível ───────────────────────────────── */
+  #batchLabelPrintArea { display: block !important; background: #FFF; }
 
-  .paint-label-print-area {
+  /* ── Lote: modo térmico ───────────────────────────────── */
+  #batchLabelPrintArea[data-mode="thermal"] .batch-thermal-label {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     width: 58mm;
     height: 40mm;
+  }
+  #batchLabelPrintArea[data-mode="thermal"] .batch-page-break {
+    page-break-after: always;
+  }
+
+  /* ── Lote: modo A4 ────────────────────────────────────── */
+  #batchLabelPrintArea[data-mode="a4"] .batch-a4-page {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, auto);
+    gap: 4mm;
+    width: 100%;
+  }
+  #batchLabelPrintArea[data-mode="a4"] .batch-page-break {
+    page-break-after: always;
+  }
+  #batchLabelPrintArea[data-mode="a4"] .batch-a4-cell {
+    border: 0.3mm dashed #AAAAAA;
+    border-radius: 2mm;
+    padding: 3mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46mm;
+  }
+
+  /* ── Etiqueta dentro de qualquer área de impressão ─────── */
+  .paint-label-print-area {
+    width: 100%;
     max-width: none;
+    height: auto;
     padding: 2mm;
-    gap: 2mm;
+    gap: 3mm;
     display: flex;
     align-items: center;
     border: none;
     border-radius: 0;
     background: #FFFFFF;
   }
+  /* Térmico: tamanho fixo */
+  #batchLabelPrintArea[data-mode="thermal"] .paint-label-print-area,
+  #paintPrintArea .paint-label-print-area {
+    width: 58mm;
+    height: 40mm;
+  }
 
   .label-qr-img {
     width: 22mm !important;
     height: 22mm !important;
+    flex-shrink: 0;
+  }
+  /* A4: QR maior */
+  #batchLabelPrintArea[data-mode="a4"] .label-qr-img {
+    width: 30mm !important;
+    height: 30mm !important;
   }
 
-  .label-car-num  { font-size: 14pt !important; color: #000 !important; }
-  .label-part-name { font-size: 6pt !important; color: #333 !important; -webkit-line-clamp: 3; }
-  .label-paint-badge { font-size: 6pt !important; background: #F59E0B !important; color: #000 !important; }
-  .label-date     { font-size: 6pt !important; color: #555 !important; }
+  .label-car-num    { font-size: 11pt !important; color: #000 !important; font-weight: 800 !important; }
+  .label-part-name  { font-size: 6pt  !important; color: #333 !important; }
+  .label-paint-badge{ font-size: 6pt  !important; background: #F59E0B !important; color: #000 !important; }
+  .label-date       { font-size: 6pt  !important; color: #555 !important; }
+
+  /* A4: texto um pouco maior */
+  #batchLabelPrintArea[data-mode="a4"] .label-car-num   { font-size: 14pt !important; }
+  #batchLabelPrintArea[data-mode="a4"] .label-part-name { font-size: 7pt  !important; }
+  #batchLabelPrintArea[data-mode="a4"] .label-date      { font-size: 7pt  !important; }
 }
 
 /* ── Banner de rascunho guardado ─────────────────────────────── */
