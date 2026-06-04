@@ -1903,11 +1903,15 @@ function renderPhotoGrid() {
   const grid = document.getElementById('photoGrid');
   if (!grid) return;
   const previews = currentPhotos.map(p => p.localPreview || p.url || '').filter(Boolean);
+  // Guarda URLs no data-attribute para evitar conflito de aspas no onclick
+  grid.dataset.urls = JSON.stringify(previews);
   grid.innerHTML = currentPhotos.map((p, i) => {
     const src = p.localPreview || p.url || '';
     return `
       <div class="photo-thumb">
-        <img src="${src}" alt="foto ${i + 1}" onclick="window.openLightbox(${JSON.stringify(previews)},${i})" style="cursor:zoom-in">
+        <img src="${src}" alt="foto ${i + 1}"
+             onclick="window.openLightbox(JSON.parse(this.closest('[data-urls]').dataset.urls),${i})"
+             style="cursor:zoom-in">
         <button class="photo-thumb-del" onclick="removePhoto(${i}, event)">✕</button>
       </div>`;
   }).join('');
