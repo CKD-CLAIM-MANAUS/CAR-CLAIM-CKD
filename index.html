@@ -819,10 +819,25 @@
   </div>
 </div>
 
-<!-- Fullscreen image -->
-<div class="fs-overlay" id="fsOverlay" onclick="closeFullscreen()">
-  <button class="fs-close">✕</button>
-  <img id="fsImg" src="" alt="">
+<!-- Fullscreen image / Lightbox -->
+<div class="fs-overlay" id="fsOverlay">
+  <div class="fs-top-bar">
+    <span class="fs-counter" id="fsCounter"></span>
+    <div class="fs-top-actions">
+      <a class="fs-btn" id="fsDownload" download target="_blank" title="Descarregar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </a>
+      <button class="fs-btn" onclick="window.closeLightbox()" title="Fechar">✕</button>
+    </div>
+  </div>
+  <div class="fs-stage" id="fsStage">
+    <div class="fs-img-wrap" id="fsImgWrap">
+      <img id="fsImg" src="" alt="" draggable="false">
+    </div>
+  </div>
+  <button class="fs-nav fs-prev" id="fsPrev" onclick="window.lbNavigate(-1)">&#8249;</button>
+  <button class="fs-nav fs-next" id="fsNext" onclick="window.lbNavigate(1)">&#8250;</button>
+  <div class="fs-hint" id="fsHint">Scroll ou pinça para zoom · Arrasta para mover</div>
 </div>
 
 <!-- QR Scanner -->

@@ -5,7 +5,7 @@ import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, getMissingFields } from './car.js';
 import { importPackList } from './packList.js';
-import { showToast, showPage, openFullscreen, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
+import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNavigate, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
 import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 import { getTrackingUrl, getCarrierLabel } from './tracking.js';
@@ -676,12 +676,12 @@ function buildDetailHTML(inc) {
   const stIdx   = (isPaint ? PAINT_STATUS_FLOW : STATUS_FLOW).indexOf(st);
   const stCfg   = _configFor(inc)[st] || STATUS_CONFIG.pending;
 
-  // ── Photos
-  const photos = (inc.photos || []).map(p => {
-    const safeUrl = sanitizeUrl(p.url);
-    if (!safeUrl) return '';
-    return `<div class="photo-thumb"><img src="${escHtml(safeUrl)}" loading="lazy" onclick="openFullscreen('${escHtml(safeUrl)}')"></div>`;
-  }).join('');
+  // ── Photos — passa array completo ao lightbox para navegar entre fotos
+  const _photoUrls = (inc.photos || []).map(p => sanitizeUrl(p.url)).filter(Boolean);
+  const _photoUrlsJson = escHtml(JSON.stringify(_photoUrls));
+  const photos = _photoUrls.map((url, i) =>
+    `<div class="photo-thumb"><img src="${escHtml(url)}" loading="lazy" onclick="window.openLightbox(JSON.parse(this.closest('.photo-grid').dataset.urls),${i})"></div>`
+  ).join('');
 
   // ── CAR block
   const missing = getMissingFields(inc);
@@ -858,7 +858,7 @@ function buildDetailHTML(inc) {
     ${photos ? `
       <div class="form-card" style="margin-bottom:10px">
         <div class="form-card-title">${svgIcon('camera')} Fotos (${inc.photos.length})</div>
-        <div class="photo-grid">${photos}</div>
+        <div class="photo-grid" data-urls="${_photoUrlsJson}">${photos}</div>
       </div>
     ` : ''}
 
@@ -1902,12 +1902,15 @@ window.handleDrop = (e) => {
 function renderPhotoGrid() {
   const grid = document.getElementById('photoGrid');
   if (!grid) return;
-  grid.innerHTML = currentPhotos.map((p, i) => `
-    <div class="photo-thumb">
-      <img src="${p.localPreview || p.url}" alt="foto ${i + 1}">
-      <button class="photo-thumb-del" onclick="removePhoto(${i}, event)">✕</button>
-    </div>
-  `).join('');
+  const previews = currentPhotos.map(p => p.localPreview || p.url || '').filter(Boolean);
+  grid.innerHTML = currentPhotos.map((p, i) => {
+    const src = p.localPreview || p.url || '';
+    return `
+      <div class="photo-thumb">
+        <img src="${src}" alt="foto ${i + 1}" onclick="window.openLightbox(${JSON.stringify(previews)},${i})" style="cursor:zoom-in">
+        <button class="photo-thumb-del" onclick="removePhoto(${i}, event)">✕</button>
+      </div>`;
+  }).join('');
   // Guarda rascunho sempre que fotos mudam
   if (draftTimer !== null) saveDraft();
 }
@@ -2304,9 +2307,12 @@ window.doImportPackList = async () => {
   }
 };
 
-// ── Fullscreen ────────────────────────────────────────────────
+// ── Lightbox ──────────────────────────────────────────────────
 window.openFullscreen  = openFullscreen;
 window.closeFullscreen = closeFullscreen;
+window.openLightbox    = openLightbox;
+window.closeLightbox   = closeLightbox;
+window.lbNavigate      = lbNavigate;
 window.closeModal      = closeModal;       // expõe ao HTML (botões Cancelar/Fechar nos modals)
 
 // ── Helper: abre ajuste de stock a partir do modal de detalhe ──
