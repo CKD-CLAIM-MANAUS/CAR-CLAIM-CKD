@@ -2739,6 +2739,72 @@ img { display: block; max-width: 100%; }
 }
 .paint-action-confirm-btns .btn { flex: 1; justify-content: center; }
 
+/* ── Overlay de confirmação genérico ─────────────────────── */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn .18s ease;
+}
+.confirm-box {
+  background: var(--bg-card, #0D1E35);
+  border: 1.5px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  animation: scaleIn .18s ease;
+}
+.confirm-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  line-height: 1;
+}
+.confirm-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink-100, rgba(255,255,255,0.88));
+  margin-bottom: 8px;
+}
+.confirm-subtitle {
+  font-size: 13px;
+  color: var(--ink-300, rgba(255,255,255,0.45));
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.confirm-subtitle em {
+  font-style: normal;
+  color: var(--ink-200, rgba(255,255,255,0.65));
+  font-weight: 500;
+}
+.confirm-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.confirm-btn-main {
+  width: 100%;
+  justify-content: center;
+  padding: 13px;
+  font-size: 14px;
+}
+.confirm-btn-sec {
+  width: 100%;
+  justify-content: center;
+  padding: 11px;
+  font-size: 13px;
+  color: var(--ink-300, rgba(255,255,255,0.4));
+  background: transparent;
+  border-color: transparent;
+}
+.confirm-btn-sec:hover { color: var(--ink-200); }
+
 /* ── Área de impressão — só activa em @media print ──────── */
 #paintPrintArea { display: none; }
 

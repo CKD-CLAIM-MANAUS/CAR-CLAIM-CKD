@@ -1000,20 +1000,21 @@ window.doOpenCloseIncident = (id) => {
 
   const overlay = document.createElement('div');
   overlay.id        = 'closeIncidentOverlay';
-  overlay.className = 'paint-action-confirm';
+  overlay.className = 'confirm-overlay';
   overlay.innerHTML = `
-    <div class="paint-action-confirm-box">
-      <div class="paint-action-confirm-title">✓ Encerrar Claim</div>
-      <div class="paint-action-confirm-subtitle">Registe o veículo onde a peça foi instalada.</div>
-      <div class="field" style="margin:12px 0 8px">
-        <label class="field-label" style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.05em;">Nº Chassis / Veículo</label>
+    <div class="confirm-box">
+      <div class="confirm-icon">✓</div>
+      <div class="confirm-title">Encerrar Claim</div>
+      <div class="confirm-subtitle">Indique o veículo onde a peça foi instalada.</div>
+      <div class="field" style="margin:4px 0 16px">
+        <label class="field-label">Nº Chassis / Veículo</label>
         <input class="field-input" type="text" id="chassisInput"
                placeholder="ex: 9C2JC6150SR000123"
                style="font-family:var(--font-mono);text-transform:uppercase;">
       </div>
-      <div class="paint-action-confirm-btns">
-        <button class="btn btn-primary" id="closeIncidentOk">✓ Confirmar e Encerrar</button>
-        <button class="btn" id="closeIncidentCancel">Cancelar</button>
+      <div class="confirm-btns">
+        <button class="btn btn-primary confirm-btn-main" id="closeIncidentOk">✓ Confirmar e Encerrar</button>
+        <button class="btn confirm-btn-sec" id="closeIncidentCancel">Cancelar</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -2057,14 +2058,15 @@ function _showMarkSentConfirm(id, carNum) {
 
   const overlay = document.createElement('div');
   overlay.id        = 'markSentConfirm';
-  overlay.className = 'paint-action-confirm';
+  overlay.className = 'confirm-overlay';
   overlay.innerHTML = `
-    <div class="paint-action-confirm-box">
-      <div class="paint-action-confirm-title">📤 CAR ${carNum} gerado!</div>
-      <div class="paint-action-confirm-subtitle">Deseja marcar este incidente como <strong>Enviado</strong> para a China?</div>
-      <div class="paint-action-confirm-btns">
-        <button class="btn btn-primary" id="markSentOk">✅ Sim, marcar como Enviado</button>
-        <button class="btn" id="markSentNo">Agora não</button>
+    <div class="confirm-box">
+      <div class="confirm-icon">📤</div>
+      <div class="confirm-title">CAR ${escHtml(carNum)} gerado!</div>
+      <div class="confirm-subtitle">Marcar este incidente como <em>Enviado para a China</em>?</div>
+      <div class="confirm-btns">
+        <button class="btn btn-primary confirm-btn-main" id="markSentOk">✓ Sim, marcar como Enviado</button>
+        <button class="btn confirm-btn-sec" id="markSentNo">Agora não</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
