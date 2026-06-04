@@ -32,10 +32,10 @@ let stockDetailPartNo = null;
 
 // ── Tabs de tipo (Peças / Pintura) ────────────────────────────
 let currentTypeTab = 'normal'; // 'normal' | 'paint'
-// Estado independente por tab: pesquisa + filtro de status
+// Estado independente por tab: pesquisa + filtro de status + modelo
 let tabState = {
-  normal: { search: '', filter: 'all' },
-  paint:  { search: '', filter: 'all' },
+  normal: { search: '', filter: 'all', model: '' },
+  paint:  { search: '', filter: 'all', model: '' },
 };
 
 // ── Splash screen ─────────────────────────────────────────────
@@ -49,10 +49,18 @@ function hideSplash() {
 // ── Realtime sync ─────────────────────────────────────────────
 let _realtimeStarted = false;
 
-function startRealtimeSync() {
+// ── Debounce para renderDashboard — evita recalcular a cada snapshot ─
+let _dashDebounceTimer = null;
+function _debouncedRenderDashboard() {
+  clearTimeout(_dashDebounceTimer);
+  _dashDebounceTimer = setTimeout(renderDashboard, 500);
+}
+
+function startRealtimeSync(onFirstLoad) {
   if (_realtimeStarted) {
     // Já subscrito — apenas re-renderiza
     renderList();
+    onFirstLoad?.();
     return;
   }
   _realtimeStarted = true;
@@ -60,13 +68,19 @@ function startRealtimeSync() {
   const el = document.getElementById('incidentList');
   if (el) el.innerHTML = '<div class="loading-state"><div class="spinner"></div> A carregar...</div>';
 
+  let _firstLoad = true;
   subscribeToIncidents(() => {
     renderList();
-    // Atualiza dashboard se estiver visível
+    // Atualiza dashboard se estiver visível (com debounce)
     const dashSection = document.getElementById('dashboardSection');
     const dashPage    = document.querySelector('.page#dashboard');
     if (dashSection && dashPage && dashPage.classList.contains('active')) {
-      renderDashboard();
+      _debouncedRenderDashboard();
+    }
+    // Notifica o callback de primeiro carregamento
+    if (_firstLoad) {
+      _firstLoad = false;
+      onFirstLoad?.();
     }
   });
 }
@@ -100,11 +114,11 @@ initAuth(
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('appScreen').classList.add('visible');
     showPage('list');
-    startRealtimeSync();
-    // Verifica rascunho após login — pequeno delay para garantir que a UI carregou
-    setTimeout(checkForDraft, 1000);
-    // Trata QR de pintura se a app foi aberta por scan
-    if (_pendingPaintId) setTimeout(handlePendingPaint, 2000);
+    // Verifica rascunho e QR pendente após o primeiro snapshot carregar
+    startRealtimeSync(() => {
+      checkForDraft();
+      if (_pendingPaintId) handlePendingPaint();
+    });
   },
   () => {
     stopRealtimeSync();
@@ -157,30 +171,25 @@ async function renderUsersList() {
   try {
     const users = await loadUsers();
     if (!users.length) {
-      el.innerHTML = '<div style="font-size:13px;color:var(--ink-300);text-align:center;padding:16px;">Nenhum utilizador</div>';
+      el.innerHTML = '<div class="user-list-empty">Nenhum utilizador</div>';
       return;
     }
     el.innerHTML = users.map(u => {
-      const initials = escHtml((u.name || u.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2));
-      const roleBg   = u.role === 'admin' ? 'rgba(255,179,0,0.15)' : 'var(--blue-50,#111E38)';
-      const roleClr  = u.role === 'admin' ? '#FFB300' : 'var(--blue-300,#6B9BF0)';
+      const initials  = escHtml((u.name || u.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2));
+      const roleClass = u.role === 'admin' ? 'admin' : 'user';
       const roleLabel = u.role === 'admin' ? '👑 Admin' : 'User';
       return `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-card,#0D1E35);border-radius:10px;margin-bottom:8px;border:1px solid var(--border,rgba(255,255,255,0.07));">
-        <div style="width:36px;height:36px;background:var(--blue-500,#FF6600);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;flex-shrink:0;">
-          ${initials}
+      <div class="user-list-item">
+        <div class="user-list-avatar">${initials}</div>
+        <div class="user-list-info">
+          <div class="user-list-name">${escHtml(u.name) || '—'}</div>
+          <div class="user-list-email">${escHtml(u.email) || ''}</div>
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;color:var(--ink-100,rgba(255,255,255,0.88));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(u.name) || '—'}</div>
-          <div style="font-size:11px;color:var(--ink-300,rgba(255,255,255,0.4));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(u.email) || ''}</div>
-        </div>
-        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${roleBg};color:${roleClr};">
-          ${roleLabel}
-        </span>
+        <span class="user-list-role ${roleClass}">${roleLabel}</span>
       </div>`;
     }).join('');
   } catch {
-    el.innerHTML = '<div style="font-size:13px;color:#FF6B6B;padding:10px;">Erro ao carregar utilizadores.</div>';
+    el.innerHTML = '<div class="user-list-error">Erro ao carregar utilizadores.</div>';
   }
 }
 
@@ -478,12 +487,17 @@ function renderList() {
   const state  = tabState[currentTypeTab];
   const search = state.search;
   const filter = state.filter;
+  const model  = state.model;
+
+  // Actualiza opções do dropdown de modelo
+  _updateModelFilterOptions();
 
   // Incidentes do tipo actual (para stats e empty state)
   const typeIncs = incidents.filter(i => (i.incidentType || 'normal') === currentTypeTab);
 
-  // Lista filtrada por tipo + status + pesquisa
-  const list = filterIncidents(incidents, { filter, search, incidentType: currentTypeTab });
+  // Lista filtrada por tipo + status + pesquisa + modelo
+  let list = filterIncidents(incidents, { filter, search, incidentType: currentTypeTab });
+  if (model) list = list.filter(i => i.model === model);
 
   // Stats da tab activa
   const stats = getStats(typeIncs);
@@ -580,7 +594,7 @@ window.setTypeTab = (type) => {
   document.getElementById('tab-normal')?.classList.toggle('active', type === 'normal');
   document.getElementById('tab-paint')?.classList.toggle('active', type === 'paint');
 
-  // Restaura pesquisa e filtro de status independentes desta tab
+  // Restaura pesquisa, filtro de status e modelo independentes desta tab
   const state = tabState[type];
   const searchEl = document.getElementById('searchInput');
   if (searchEl) searchEl.value = state.search;
@@ -603,6 +617,49 @@ window.onSearch = () => {
   tabState[currentTypeTab].search = document.getElementById('searchInput')?.value || '';
   renderList();
 };
+
+window.onModelFilter = () => {
+  tabState[currentTypeTab].model = document.getElementById('modelFilter')?.value || '';
+  renderList();
+};
+
+// Actualiza as opções do dropdown de modelo com os modelos existentes na tab activa
+function _updateModelFilterOptions() {
+  const select = document.getElementById('modelFilter');
+  if (!select) return;
+
+  const typeIncs = incidents.filter(i => (i.incidentType || 'normal') === currentTypeTab);
+  const models   = [...new Set(typeIncs.map(i => i.model).filter(Boolean))].sort();
+  const current  = tabState[currentTypeTab].model;
+
+  // Reconstrói as opções preservando a selecção actual
+  select.innerHTML = '<option value="">Todos os modelos</option>' +
+    models.map(m => `<option value="${escHtml(m)}"${m === current ? ' selected' : ''}>${escHtml(m)}</option>`).join('');
+}
+
+// ── Banner de conectividade offline/online ────────────────────
+function _showOfflineBanner() {
+  if (document.getElementById('offlineBanner')) return;
+  const banner = document.createElement('div');
+  banner.id        = 'offlineBanner';
+  banner.className = 'offline-banner';
+  banner.innerHTML = `
+    <span class="offline-banner-dot"></span>
+    <span>Sem ligação — os dados podem estar desactualizados</span>`;
+  document.body.appendChild(banner);
+}
+
+function _hideOfflineBanner() {
+  const banner = document.getElementById('offlineBanner');
+  if (!banner) return;
+  banner.classList.add('offline-banner-hide');
+  setTimeout(() => banner.remove(), 400);
+}
+
+window.addEventListener('offline', _showOfflineBanner);
+window.addEventListener('online',  _hideOfflineBanner);
+// Verifica estado inicial (dispositivo pode já estar offline ao carregar)
+if (!navigator.onLine) _showOfflineBanner();
 
 // ── Layout mode — sincroniza html.is-desktop / html.is-mobile ─
 function setLayoutMode() {
@@ -1713,38 +1770,16 @@ function showDraftBanner(draft, timeAgo) {
   document.getElementById('draftBanner')?.remove();
 
   const banner = document.createElement('div');
-  banner.id = 'draftBanner';
-  banner.style.cssText = `
-    position: fixed; bottom: calc(var(--bottom-h) + 12px); left: 50%;
-    transform: translateX(-50%);
-    background: var(--bg-card, #0D1E35);
-    border: 1.5px solid var(--blue-500, #FF6600);
-    border-radius: 12px; padding: 12px 16px;
-    display: flex; align-items: center; gap: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    z-index: 150; max-width: calc(100vw - 32px);
-    animation: slideUp 0.25s ease;
-  `;
+  banner.id        = 'draftBanner';
+  banner.className = 'draft-banner';
 
   banner.innerHTML = `
-    <div style="flex:1;min-width:0;">
-      <div style="font-size:13px;font-weight:700;color:var(--ink-100,rgba(255,255,255,0.88));">📝 Rascunho guardado</div>
-      <div style="font-size:11px;color:var(--ink-300,rgba(255,255,255,0.4));margin-top:2px;">
-        ${draft.fields.partName || 'Incidente'} · ${timeAgo}
-      </div>
+    <div class="draft-banner-info">
+      <div class="draft-banner-title">📝 Rascunho guardado</div>
+      <div class="draft-banner-meta">${escHtml(draft.fields.partName) || 'Incidente'} · ${timeAgo}</div>
     </div>
-    <button onclick="recoverDraft()" style="
-      padding:7px 14px; background:var(--blue-500,#FF6600); color:white;
-      border:none; border-radius:8px; font-size:12px; font-weight:700;
-      cursor:pointer; white-space:nowrap; font-family:var(--font-sans);">
-      Recuperar
-    </button>
-    <button onclick="dismissDraft()" style="
-      padding:7px 10px; background:transparent; color:var(--ink-300,rgba(255,255,255,0.4));
-      border:1px solid var(--border,rgba(255,255,255,0.07)); border-radius:8px;
-      font-size:12px; cursor:pointer; font-family:var(--font-sans);">
-      Descartar
-    </button>
+    <button class="btn btn-primary draft-banner-btn" onclick="recoverDraft()">Recuperar</button>
+    <button class="btn draft-banner-dismiss" onclick="dismissDraft()">Descartar</button>
   `;
 
   document.body.appendChild(banner);

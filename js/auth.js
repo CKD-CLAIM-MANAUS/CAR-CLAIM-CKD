@@ -19,8 +19,34 @@ function checkSessionTimeout() {
   const ts = parseInt(localStorage.getItem(SESSION_KEY) || '0');
   if (Date.now() - ts > SESSION_TIMEOUT_MS) {
     clearSessionTimer();
+    _showSessionExpiredModal();
     logout();
   }
+}
+
+function _showSessionExpiredModal() {
+  // Remove modal anterior se existir
+  document.getElementById('sessionExpiredOverlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'sessionExpiredOverlay';
+  overlay.className = 'confirm-overlay';
+  overlay.style.cssText = 'z-index:9998';
+  overlay.innerHTML = `
+    <div class="confirm-box">
+      <div class="confirm-icon session-expired-icon">🔒</div>
+      <div class="confirm-title">Sessão expirada</div>
+      <div class="confirm-subtitle">
+        A sua sessão de 8 horas terminou.<br>
+        Os seus dados foram guardados — faça login para continuar.
+      </div>
+      <div class="confirm-btns">
+        <button class="btn btn-primary confirm-btn-main" id="sessionExpiredOk">Fazer login</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById('sessionExpiredOk').onclick = () => overlay.remove();
 }
 
 export function refreshSession() {

@@ -8,7 +8,13 @@ export async function generateCAR(inc, carNum) {
   if (!auth.currentUser) {
     throw new Error('Sessão expirada. Faça login novamente.');
   }
-  const token = await auth.currentUser.getIdToken(/* forceRefresh */ false);
+  // forceRefresh:true garante token válido — tokens expiram em 1h e a sessão dura 8h
+  let token;
+  try {
+    token = await auth.currentUser.getIdToken(true);
+  } catch {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
 
   const issueDate = inc.createdAt
     ? new Date(inc.createdAt).toLocaleDateString('pt-BR')
