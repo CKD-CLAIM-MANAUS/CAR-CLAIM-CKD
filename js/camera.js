@@ -30,7 +30,7 @@ export async function compressImage(file, maxW = 1600, maxKB = 900) {
         const encode = () => {
           const dataUrl = canvas.toDataURL('image/jpeg', quality);
           const kb = (dataUrl.length * 3 / 4) / 1024;
-          if (kb > maxKB && quality > 0.35) { quality -= 0.1; encode(); return; }
+          if (kb > maxKB && quality > 0.60) { quality -= 0.05; encode(); return; }
           const byteStr = atob(dataUrl.split(',')[1]);
           const arr = new Uint8Array(byteStr.length);
           for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);

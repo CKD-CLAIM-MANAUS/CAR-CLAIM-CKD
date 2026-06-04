@@ -118,7 +118,7 @@ def download_and_process(url, width, height):
             img = img.convert('RGB')
         img.thumbnail((width, height), PILImage.LANCZOS)
         tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-        img.save(tmp.name, 'JPEG', quality=85)
+        img.save(tmp.name, 'JPEG', quality=88)
         tmp.close()
         print(f'Processed image: {img.size} -> saved to {tmp.name}')
         return tmp.name
@@ -201,7 +201,7 @@ def generate_car():
 
         for i, photo_url in enumerate(photos):
             anchor = photo_anchors[i] if i < len(photo_anchors) else f'A{16 + (i * 15)}'
-            tmp_path = download_and_process(photo_url, 800, 600)
+            tmp_path = download_and_process(photo_url, 1400, 1050)
             if tmp_path:
                 tmp_files.append(tmp_path)
                 try:
