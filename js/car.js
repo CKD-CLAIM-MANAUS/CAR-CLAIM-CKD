@@ -60,6 +60,47 @@ export function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+// ── Download com "Guardar como..." (se suportado e activado) ──
+const SAVE_PICKER_KEY = 'car_save_picker';
+
+export function getSavePickerPref() {
+  return localStorage.getItem(SAVE_PICKER_KEY) === 'true';
+}
+
+export function setSavePickerPref(value) {
+  localStorage.setItem(SAVE_PICKER_KEY, value ? 'true' : 'false');
+}
+
+export function isSavePickerSupported() {
+  return typeof window.showSaveFilePicker === 'function';
+}
+
+export async function downloadBlobSmart(blob, filename) {
+  // Usa "Guardar como..." se suportado e preferência activada
+  if (isSavePickerSupported() && getSavePickerPref()) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: 'Excel',
+          accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (e) {
+      // Utilizador cancelou o diálogo — não faz nada
+      if (e.name === 'AbortError') return;
+      // Outro erro — fallback para download normal
+      console.warn('showSaveFilePicker falhou, usando fallback:', e);
+    }
+  }
+  // Fallback: download normal para pasta Downloads
+  downloadBlob(blob, filename);
+}
+
 export function getMissingFields(inc) {
   const missing = [];
   if (!inc.partNo)  missing.push('Código da Peça');

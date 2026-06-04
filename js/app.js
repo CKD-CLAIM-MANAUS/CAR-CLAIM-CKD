@@ -3,7 +3,7 @@ import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUse
 import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
-import { generateCAR, downloadBlob, getMissingFields } from './car.js';
+import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
 import { importPackList } from './packList.js';
 import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNavigate, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
 import { renderDashboard, setDashPeriod } from './dashboard.js';
@@ -135,7 +135,7 @@ window.doLogout = async () => {
 };
 
 // ── User modal ────────────────────────────────────────────────
-window.openUserModal  = () => openModal('userModal');
+window.openUserModal  = () => { openModal('userModal'); _renderSavePickerToggle(); };
 window.closeUserModal = (e) => {
   if (!e || e.target === document.getElementById('userModal')) closeModal('userModal');
 };
@@ -2039,7 +2039,7 @@ window.doGenerateCAR = async (id) => {
     const blob = await generateCAR(inc, carNum);
     const code = carNum.replace('/', '_');
     const label = (inc.partName || inc.partNo || 'PART').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 30);
-    downloadBlob(blob, `CAR_No_${code}_${label}.xlsx`);
+    await downloadBlobSmart(blob, `CAR_No_${code}_${label}.xlsx`);
 
     // ── Pergunta se quer marcar como Enviado (só se ainda estiver Pendente)
     if ((inc.status || 'pending') === 'pending') {
@@ -2312,6 +2312,37 @@ window.doImportPackList = async () => {
     progress.textContent = 'Erro: ' + e.message;
   }
 };
+
+// ── Preferência "Guardar como..." ────────────────────────────
+window.toggleSavePicker = () => {
+  const newVal = !getSavePickerPref();
+  setSavePickerPref(newVal);
+  _renderSavePickerToggle();
+  showToast(newVal ? '📁 "Guardar como..." activado' : '📁 "Guardar como..." desactivado');
+};
+
+function _renderSavePickerToggle() {
+  const wrap = document.getElementById('savePickerWrap');
+  if (!wrap) return;
+  const supported = isSavePickerSupported();
+  const active    = getSavePickerPref();
+  wrap.innerHTML = supported ? `
+    <div class="setting-row" onclick="toggleSavePicker()">
+      <div class="setting-info">
+        <div class="setting-label">📁 Escolher pasta ao guardar Excel</div>
+        <div class="setting-desc">Abre "Guardar como..." ao gerar o CAR</div>
+      </div>
+      <div class="setting-toggle ${active ? 'on' : ''}">
+        <div class="setting-toggle-knob"></div>
+      </div>
+    </div>` : `
+    <div class="setting-row setting-row-disabled">
+      <div class="setting-info">
+        <div class="setting-label">📁 Escolher pasta ao guardar Excel</div>
+        <div class="setting-desc">Não suportado neste browser (use Chrome ou Edge)</div>
+      </div>
+    </div>`;
+}
 
 // ── Lightbox ──────────────────────────────────────────────────
 window.openFullscreen  = openFullscreen;

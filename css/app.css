@@ -1156,6 +1156,48 @@ img { display: block; max-width: 100%; }
 .modal-user-name  { font-size: 15px; font-weight: 600; color: var(--ink-100); }
 .modal-user-email { font-size: 12px; color: var(--ink-300); margin-top: 2px; }
 
+/* ── Setting row (preferências no modal conta) ──────────────── */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.setting-row:hover { background: rgba(255,255,255,0.04); }
+.setting-row-disabled { opacity: 0.45; cursor: not-allowed; }
+.setting-row-disabled:hover { background: var(--bg-card); }
+.setting-info { flex: 1; min-width: 0; }
+.setting-label { font-size: 13px; font-weight: 600; color: var(--ink-100); }
+.setting-desc  { font-size: 11px; color: var(--ink-400); margin-top: 2px; }
+.setting-toggle {
+  width: 42px;
+  height: 24px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 12px;
+  position: relative;
+  flex-shrink: 0;
+  transition: background .2s;
+}
+.setting-toggle.on { background: var(--blue-500, #1A56CC); }
+.setting-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: transform .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.setting-toggle.on .setting-toggle-knob { transform: translateX(18px); }
+
 /* ── Divider ────────────────────────────────────────────────── */
 .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 
