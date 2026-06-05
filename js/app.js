@@ -2327,7 +2327,7 @@ window.openBatchLabelModal = () => {
 
   _renderBatchLabelList(paintIncs);
   _applyBatchMode(_batchPrintMode);
-  _updateBatchLabelCount();
+  updateBatchLabelCount();
   openModal('batchLabelModal');
 };
 
