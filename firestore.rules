@@ -16,22 +16,30 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == userId;
     }
 
-    // ── Helpers de validação de tipos ─────────────────────────
+    // ── Helpers de validação ──────────────────────────────────
+    // String obrigatória com tamanho máximo
     function isStr(v, maxLen) {
       return v is string && v.size() <= maxLen;
     }
 
+    // String opcional: campo pode não existir, ser null, ou string com tamanho máximo
     function isOptStr(data, field, maxLen) {
-      return !(field in data) || isStr(data[field], maxLen);
+      return !(field in data)
+          || data[field] == null
+          || isStr(data[field], maxLen);
     }
 
-    function isOptInt(data, field, minVal, maxVal) {
-      return !(field in data) || (data[field] is int &&
-             data[field] >= minVal && data[field] <= maxVal);
+    // Número opcional: campo pode não existir, ser null, int ou float dentro do intervalo
+    // (Date.now() pode ser serializado como int ou float dependendo do SDK)
+    function isOptNum(data, field, minVal, maxVal) {
+      return !(field in data)
+          || data[field] == null
+          || ((data[field] is int || data[field] is float)
+              && data[field] >= minVal
+              && data[field] <= maxVal);
     }
 
     // ── Valida campos de um incidente ao criar ────────────────
-    // Regras: userId deve ser o próprio utilizador, campos com tamanho máximo
     function validNewIncident(data) {
       return data.userId == request.auth.uid
           && isStr(data.partName, 300)
@@ -42,33 +50,28 @@ service cloud.firestore {
           && isOptStr(data, 'carNum',        30)
           && isOptStr(data, 'defect',      2000)
           && isOptStr(data, 'detected',    2000)
-          && isOptStr(data, 'user',         100)
+          && isOptStr(data, 'user',         200)
           && isOptStr(data, 'incidentType',  20)
-          && isOptInt(data, 'ngQty',          0, 9999)
-          && isOptInt(data, 'createdAt',      0, 9999999999999)
-          && isOptInt(data, 'updatedAt',      0, 9999999999999);
+          && isOptNum(data, 'ngQty',          0, 9999)
+          && isOptNum(data, 'createdAt',      0, 9999999999999)
+          && isOptNum(data, 'updatedAt',      0, 9999999999999);
     }
 
     // ── Valida que userId não muda ao actualizar ──────────────
     function userIdUnchanged() {
-      return !('userId' in request.resource.data) ||
-             request.resource.data.userId == resource.data.userId;
+      return !('userId' in request.resource.data)
+          || request.resource.data.userId == resource.data.userId;
     }
 
 
     // ── Utilizadores ──────────────────────────────────────────
-    // Cada utilizador lê o próprio perfil; só admin escreve
     match /users/{userId} {
-      allow read:                    if isOwner(userId) || isAdmin();
-      allow create, update, delete:  if isAdmin();
+      allow read:                   if isOwner(userId) || isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
 
     // ── Incidentes ────────────────────────────────────────────
-    // - Qualquer autenticado lê
-    // - Criar: campos validados + userId == próprio uid
-    // - Actualizar: só dono ou admin; não pode mudar userId
-    // - Eliminar: só dono ou admin
     match /incidents/{incidentId} {
       allow read:   if isAuth();
       allow create: if isAuth() && validNewIncident(request.resource.data);
@@ -81,8 +84,6 @@ service cloud.firestore {
 
 
     // ── Numeração CAR ─────────────────────────────────────────
-    // Qualquer autenticado lê; ao criar valida a estrutura mínima
-    // (evita documentos arbitrários ou reset malicioso do contador)
     match /carNumbers/{docId} {
       allow read: if isAuth();
       allow create: if isAuth()
@@ -96,7 +97,6 @@ service cloud.firestore {
 
 
     // ── Base de peças (partsDB) ───────────────────────────────
-    // Qualquer autenticado lê; só admin importa
     match /partsDB/{partId} {
       allow read:  if isAuth();
       allow write: if isAdmin();
@@ -104,32 +104,27 @@ service cloud.firestore {
 
 
     // ── Stock ─────────────────────────────────────────────────
-    // Leitura livre para autenticados
-    // Escrita: valida campos e intervalo da quantidade
-    // (evita que um utilizador coloque qty=-9999 ou campos arbitrários)
     match /stock/{partId} {
       allow read: if isAuth();
       allow write: if isAuth()
                    && request.resource.data.keys().hasOnly(
                         ['partNo', 'partName', 'qty', 'updatedAt', 'updatedBy'])
-                   && isStr(request.resource.data.partNo,   200)
+                   && isStr(request.resource.data.partNo, 200)
                    && isOptStr(request.resource.data, 'partName', 300)
-                   && request.resource.data.qty is int
+                   && (request.resource.data.qty is int || request.resource.data.qty is float)
                    && request.resource.data.qty >= -9999
                    && request.resource.data.qty <= 99999;
     }
 
 
     // ── Movimentos de stock ───────────────────────────────────
-    // Criar: qualquer autenticado, com campos obrigatórios e type válido
-    // Eliminar: só admin
     match /stockMovements/{moveId} {
       allow read:   if isAuth();
       allow create: if isAuth()
                     && request.resource.data.keys().hasAll(['partNo', 'type', 'qty', 'date'])
                     && isStr(request.resource.data.partNo, 200)
                     && request.resource.data.type in ['in', 'out', 'adjust']
-                    && request.resource.data.qty is int
+                    && (request.resource.data.qty is int || request.resource.data.qty is float)
                     && request.resource.data.qty >= -9999
                     && request.resource.data.qty <= 9999;
       allow delete: if isAdmin();
