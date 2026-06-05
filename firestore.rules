@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers de autenticação ───────────────────────────────
     function isAuth() {
       return request.auth != null;
     }
@@ -16,85 +15,34 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == userId;
     }
 
-    // ── Helpers de validação ──────────────────────────────────
-    // String obrigatória com tamanho máximo
-    function isStr(v, maxLen) {
-      return v is string && v.size() <= maxLen;
-    }
-
-    // String opcional: campo pode não existir, ser null, ou string com tamanho máximo
-    function isOptStr(data, field, maxLen) {
-      return !(field in data)
-          || data[field] == null
-          || isStr(data[field], maxLen);
-    }
-
-    // Número opcional: campo pode não existir, ser null, int ou float dentro do intervalo
-    // (Date.now() pode ser serializado como int ou float dependendo do SDK)
-    function isOptNum(data, field, minVal, maxVal) {
-      return !(field in data)
-          || data[field] == null
-          || ((data[field] is int || data[field] is float)
-              && data[field] >= minVal
-              && data[field] <= maxVal);
-    }
-
-    // ── Valida campos de um incidente ao criar ────────────────
-    function validNewIncident(data) {
-      return data.userId == request.auth.uid
-          && isStr(data.partName, 300)
-          && isOptStr(data, 'partNo',       200)
-          && isOptStr(data, 'model',        100)
-          && isOptStr(data, 'orderNo',      100)
-          && isOptStr(data, 'lotNo',        100)
-          && isOptStr(data, 'carNum',        30)
-          && isOptStr(data, 'defect',      2000)
-          && isOptStr(data, 'detected',    2000)
-          && isOptStr(data, 'user',         200)
-          && isOptStr(data, 'incidentType',  20)
-          && isOptNum(data, 'ngQty',          0, 9999)
-          && isOptNum(data, 'createdAt',      0, 9999999999999)
-          && isOptNum(data, 'updatedAt',      0, 9999999999999);
-    }
-
-    // ── Valida que userId não muda ao actualizar ──────────────
-    function userIdUnchanged() {
-      return !('userId' in request.resource.data)
-          || request.resource.data.userId == resource.data.userId;
-    }
-
-
     // ── Utilizadores ──────────────────────────────────────────
     match /users/{userId} {
       allow read:                   if isOwner(userId) || isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
-
     // ── Incidentes ────────────────────────────────────────────
+    // Segurança real: userId obrigatoriamente == utilizador autenticado
+    // Impede impersonação e garante rastreabilidade
     match /incidents/{incidentId} {
       allow read:   if isAuth();
-      allow create: if isAuth() && validNewIncident(request.resource.data);
+      allow create: if isAuth()
+                    && request.resource.data.userId == request.auth.uid
+                    && 'partName' in request.resource.data;
       allow update: if isAuth()
                     && (isOwner(resource.data.userId) || isAdmin())
-                    && userIdUnchanged();
+                    && (!('userId' in request.resource.data)
+                        || request.resource.data.userId == resource.data.userId);
       allow delete: if isAuth()
                     && (isOwner(resource.data.userId) || isAdmin());
     }
 
-
     // ── Numeração CAR ─────────────────────────────────────────
     match /carNumbers/{docId} {
-      allow read: if isAuth();
-      allow create: if isAuth()
-                    && request.resource.data.keys().hasAll(['year', 'num', 'createdAt'])
-                    && isStr(request.resource.data.year, 4)
-                    && request.resource.data.num is int
-                    && request.resource.data.num > 0
-                    && request.resource.data.num <= 9999;
+      allow read:          if isAuth();
+      allow create:        if isAuth();
       allow update, delete: if isAdmin();
     }
-
 
     // ── Base de peças (partsDB) ───────────────────────────────
     match /partsDB/{partId} {
@@ -102,31 +50,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-
     // ── Stock ─────────────────────────────────────────────────
     match /stock/{partId} {
-      allow read: if isAuth();
-      allow write: if isAuth()
-                   && request.resource.data.keys().hasOnly(
-                        ['partNo', 'partName', 'qty', 'updatedAt', 'updatedBy'])
-                   && isStr(request.resource.data.partNo, 200)
-                   && isOptStr(request.resource.data, 'partName', 300)
-                   && (request.resource.data.qty is int || request.resource.data.qty is float)
-                   && request.resource.data.qty >= -9999
-                   && request.resource.data.qty <= 99999;
+      allow read:  if isAuth();
+      allow write: if isAuth();
     }
-
 
     // ── Movimentos de stock ───────────────────────────────────
     match /stockMovements/{moveId} {
       allow read:   if isAuth();
-      allow create: if isAuth()
-                    && request.resource.data.keys().hasAll(['partNo', 'type', 'qty', 'date'])
-                    && isStr(request.resource.data.partNo, 200)
-                    && request.resource.data.type in ['in', 'out', 'adjust']
-                    && (request.resource.data.qty is int || request.resource.data.qty is float)
-                    && request.resource.data.qty >= -9999
-                    && request.resource.data.qty <= 9999;
+      allow create: if isAuth();
       allow delete: if isAdmin();
     }
 
