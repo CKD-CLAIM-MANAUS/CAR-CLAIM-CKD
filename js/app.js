@@ -581,11 +581,11 @@ function renderList() {
   }
 
   el.innerHTML = list.map(inc => {
-    const firstPhoto = inc.photos && inc.photos.length ? inc.photos[0].url : null;
+    const firstPhoto = inc.photos && inc.photos.length ? sanitizeUrl(inc.photos[0].url) : null;
     const photoCount = inc.photos ? inc.photos.length : 0;
     const thumb = firstPhoto
       ? `<div class="incident-thumb">
-           <img src="${firstPhoto}" loading="lazy" alt="">
+           <img src="${escHtml(firstPhoto)}" loading="lazy" alt="">
            ${photoCount > 1 ? `<div class="photo-count-pill">${photoCount}</div>` : ''}
          </div>`
       : `<div class="incident-thumb-empty">
@@ -833,9 +833,9 @@ function buildDetailHTML(inc) {
       ${inc.tracking ? `
       <div class="tracking-row">
         <span class="tracking-label">📦 Tracking</span>
-        <span class="tracking-num">${inc.tracking}</span>
-        <a href="${trackUrl}" target="_blank" rel="noopener" class="btn btn-tracking">
-          🔍 ${carrierLabel}
+        <span class="tracking-num">${escHtml(inc.tracking)}</span>
+        <a href="${escHtml(sanitizeUrl(trackUrl))}" target="_blank" rel="noopener" class="btn btn-tracking">
+          🔍 ${escHtml(carrierLabel)}
         </a>
       </div>` : ''}
     </div>` : '';
@@ -1163,7 +1163,7 @@ function renderBatchList(incs, search = '') {
     const stCfg   = STATUS_CONFIG[st] || STATUS_CONFIG.pending;
     const isPend  = st === 'pending';
     const trackBadge  = i.tracking
-      ? `<span class="batch-tracking-badge">📦 ${i.tracking}</span>` : '';
+      ? `<span class="batch-tracking-badge">📦 ${escHtml(i.tracking)}</span>` : '';
     const advBadge = isPend
       ? `<span class="batch-advance-badge">⚡ auto-avançado</span>` : '';
     return `
@@ -1172,13 +1172,13 @@ function renderBatchList(incs, search = '') {
                onchange="updateBatchCount()">
         <div class="batch-item-info">
           <div class="batch-item-name-row">
-            <span class="batch-item-name">${i.partName || '—'}</span>
+            <span class="batch-item-name">${escHtml(i.partName) || '—'}</span>
             <span class="batch-status-pill" style="background:${stCfg.color}20;color:${stCfg.color};border-color:${stCfg.color}40">
               ${stCfg.icon} ${stCfg.label}
             </span>
           </div>
           <span class="batch-item-meta">
-            ${[i.partNo, i.model, i.ngQty ? i.ngQty + ' un' : ''].filter(Boolean).join(' · ')}
+            ${escHtml([i.partNo, i.model, i.ngQty ? i.ngQty + ' un' : ''].filter(Boolean).join(' · '))}
             ${trackBadge}${advBadge}
           </span>
         </div>
@@ -1389,7 +1389,7 @@ window.doAdminPaintAdvance = (id, targetStatus) => {
   const notes  = { sent: 'Enviado para pintoria (admin, sem QR).', done: 'Encerrado pelo admin sem leitura de QR.' };
   _showPaintActionConfirm(
     `⚠️ ${labels[targetStatus] || 'Avançar'} sem QR`,
-    `Admin · ${inc.partName || '—'} · sem leitura de etiqueta`,
+    `Admin · ${escHtml(inc.partName) || '—'} · sem leitura de etiqueta`,
     `⚠️ ${labels[targetStatus] || 'Avançar'}`,
     async () => {
       try {
@@ -1418,7 +1418,7 @@ function handlePendingPaint() {
     if (st === 'pending') {
       _showPaintActionConfirm(
         '🎨 Enviar para Pintoria',
-        `${inc.partName || '—'} · QR lido — confirmar envio?`,
+        `${escHtml(inc.partName) || '—'} · QR lido — confirmar envio?`,
         '✅ Confirmar Envio',
         async () => {
           try {
@@ -1431,7 +1431,7 @@ function handlePendingPaint() {
     } else {
       _showPaintActionConfirm(
         '✅ Confirmar Retorno da Pintoria',
-        `${inc.partName || '—'} · Retrabalho concluído?`,
+        `${escHtml(inc.partName) || '—'} · Retrabalho concluído?`,
         '✅ Confirmar e Encerrar',
         async () => {
           try {
@@ -1459,7 +1459,7 @@ function _showPaintReturnBanner(id, inc) {
   banner.innerHTML = `
     <div class="paint-return-banner-info">
       <div class="paint-return-banner-title">🎨 Retorno da Pintoria detectado</div>
-      <div class="paint-return-banner-name">${inc.partName || '—'}</div>
+      <div class="paint-return-banner-name">${escHtml(inc.partName) || '—'}</div>
     </div>
     <button class="paint-return-btn" onclick="doPaintReturn('${id}')">${btnLabel}</button>
     <button class="paint-return-close"
@@ -1521,9 +1521,9 @@ window.printPaintLabel = (id) => {
       <div class="paint-label-print-area">
         <div class="label-qr-col">${qrHtml}</div>
         <div class="label-text-col">
-          <div class="label-car-num">${carLabel}</div>
-          <div class="label-part-name">${partName}</div>
-          <div class="label-date">${dateStr}</div>
+          <div class="label-car-num">${escHtml(carLabel)}</div>
+          <div class="label-part-name">${escHtml(partName)}</div>
+          <div class="label-date">${escHtml(dateStr)}</div>
         </div>
       </div>`;
   }
@@ -2018,7 +2018,7 @@ window.openQRScanner = () => {
             if (st === 'pending') {
               _showPaintActionConfirm(
                 '🎨 Enviar para Pintoria',
-                `${inc.partName || '—'} · ${inc.carNum ? 'CAR ' + inc.carNum : 'SEM CAR'}`,
+                `${escHtml(inc.partName) || '—'} · ${inc.carNum ? 'CAR ' + escHtml(inc.carNum) : 'SEM CAR'}`,
                 '✅ Confirmar Envio',
                 async () => {
                   try {
@@ -2031,7 +2031,7 @@ window.openQRScanner = () => {
             } else {
               _showPaintActionConfirm(
                 '✅ Confirmar Retorno da Pintoria',
-                `${inc.partName || '—'} · Retrabalho concluído?`,
+                `${escHtml(inc.partName) || '—'} · Retrabalho concluído?`,
                 '✅ Confirmar e Encerrar',
                 async () => {
                   try {
@@ -2193,10 +2193,10 @@ function renderPaintReport() {
     return `
       <tr class="pr-row" onclick="goToList(); window.showDetail('${inc.id}');">
         <td class="pr-td pr-num">${i + 1}</td>
-        <td class="pr-td pr-car">${inc.carNum ? inc.carNum : '—'}</td>
-        <td class="pr-td pr-name">${inc.partName || '—'}</td>
-        <td class="pr-td pr-partno">${inc.partNo || '—'}</td>
-        <td class="pr-td pr-qty">${inc.ngQty || '—'}</td>
+        <td class="pr-td pr-car">${inc.carNum ? escHtml(inc.carNum) : '—'}</td>
+        <td class="pr-td pr-name">${escHtml(inc.partName) || '—'}</td>
+        <td class="pr-td pr-partno">${escHtml(inc.partNo) || '—'}</td>
+        <td class="pr-td pr-qty">${escHtml(inc.ngQty) || '—'}</td>
         <td class="pr-td pr-status">
           <span class="badge ${cfg.badge}" style="white-space:nowrap">${cfg.icon} ${cfg.label}</span>
         </td>
