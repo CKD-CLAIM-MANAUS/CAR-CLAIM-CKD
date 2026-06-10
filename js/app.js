@@ -1317,12 +1317,14 @@ function _showPaintActionConfirm(title, subtitle, confirmLabel, onConfirm) {
   const overlay = document.createElement('div');
   overlay.id        = 'paintActionConfirm';
   overlay.className = 'paint-action-confirm';
+  // Escapa título/subtítulo/label — protege contra XSS de partName/carNum
+  // injectados pelos chamadores (são texto simples, sem HTML intencional)
   overlay.innerHTML = `
     <div class="paint-action-confirm-box">
-      <div class="paint-action-confirm-title">${title}</div>
-      <div class="paint-action-confirm-subtitle">${subtitle}</div>
+      <div class="paint-action-confirm-title">${escHtml(title)}</div>
+      <div class="paint-action-confirm-subtitle">${escHtml(subtitle)}</div>
       <div class="paint-action-confirm-btns">
-        <button class="btn btn-primary" id="paintConfirmOk">${confirmLabel}</button>
+        <button class="btn btn-primary" id="paintConfirmOk">${escHtml(confirmLabel)}</button>
         <button class="btn" id="paintConfirmCancel">Cancelar</button>
       </div>
     </div>`;
@@ -1974,10 +1976,10 @@ function renderPhotoGrid() {
   // Guarda URLs no data-attribute para evitar conflito de aspas no onclick
   grid.dataset.urls = JSON.stringify(previews);
   grid.innerHTML = currentPhotos.map((p, i) => {
-    const src = p.localPreview || p.url || '';
+    const src = sanitizeUrl(p.localPreview || p.url || '');
     return `
       <div class="photo-thumb">
-        <img src="${src}" alt="foto ${i + 1}"
+        <img src="${escHtml(src)}" alt="foto ${i + 1}"
              onclick="window.openLightbox(JSON.parse(this.closest('[data-urls]').dataset.urls),${i})"
              style="cursor:zoom-in">
         <button class="photo-thumb-del" onclick="removePhoto(${i}, event)">✕</button>
