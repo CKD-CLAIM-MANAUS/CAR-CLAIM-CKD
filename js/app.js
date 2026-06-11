@@ -2277,39 +2277,185 @@ window.setPaintReportFilter = (f) => {
   renderPaintReport();
 };
 
-window.exportPaintExcel = () => {
+// ══════════════════════════════════════════════════════════════
+// EXPORTS EXCEL FORMATADOS (ExcelJS)
+// Identidade CFMOTO: título escuro, cabeçalho laranja, status com
+// cor, datas reais, zebra rows, autofilter, freeze e linha de totais
+// ══════════════════════════════════════════════════════════════
+
+const XL_BRAND = {
+  orange:    'FFFF6600',
+  dark:      'FF1A1A1A',
+  zebra:     'FFF6F6F6',
+  border:    'FFD9D9D9',
+  subtitle:  'FF6B6B6B',
+};
+
+function _xlThinBorder() {
+  const side = { style: 'thin', color: { argb: XL_BRAND.border } };
+  return { top: side, bottom: side, left: side, right: side };
+}
+
+// Converte '#F59E0B' → 'FFF59E0B' (ARGB do ExcelJS)
+function _xlArgb(hexColor) {
+  return 'FF' + String(hexColor || '#888888').replace('#', '').toUpperCase();
+}
+
+// Cabeçalho do relatório: título + subtítulo merged, devolve a linha seguinte
+function _xlAddTitleBlock(ws, colCount, title, subtitle) {
+  const titleRow = ws.addRow([title]);
+  ws.mergeCells(titleRow.number, 1, titleRow.number, colCount);
+  titleRow.height = 30;
+  titleRow.getCell(1).style = {
+    font:      { bold: true, size: 14, color: { argb: 'FFFFFFFF' } },
+    fill:      { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_BRAND.dark } },
+    alignment: { vertical: 'middle', horizontal: 'left', indent: 1 },
+  };
+
+  const subRow = ws.addRow([subtitle]);
+  ws.mergeCells(subRow.number, 1, subRow.number, colCount);
+  subRow.height = 18;
+  subRow.getCell(1).style = {
+    font:      { size: 9, italic: true, color: { argb: XL_BRAND.subtitle } },
+    alignment: { vertical: 'middle', horizontal: 'left', indent: 1 },
+  };
+  ws.addRow([]); // linha em branco de respiro
+}
+
+// Linha de cabeçalho da tabela: fundo laranja, texto branco bold
+function _xlAddHeaderRow(ws, headers) {
+  const row = ws.addRow(headers);
+  row.height = 22;
+  row.eachCell(cell => {
+    cell.style = {
+      font:      { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
+      fill:      { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_BRAND.orange } },
+      alignment: { vertical: 'middle', horizontal: 'center', wrapText: true },
+      border:    _xlThinBorder(),
+    };
+  });
+  return row.number;
+}
+
+// Estilo base de uma linha de dados (zebra + bordas)
+function _xlStyleDataRow(row, isZebra) {
+  row.eachCell({ includeEmpty: true }, cell => {
+    cell.border = _xlThinBorder();
+    cell.font   = { size: 10 };
+    cell.alignment = { vertical: 'middle', wrapText: true };
+    if (isZebra) {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_BRAND.zebra } };
+    }
+  });
+}
+
+// Célula de status: fundo na cor do estado, texto branco bold centrado
+function _xlStyleStatusCell(cell, hexColor) {
+  cell.style = {
+    font:      { bold: true, size: 9, color: { argb: 'FFFFFFFF' } },
+    fill:      { type: 'pattern', pattern: 'solid', fgColor: { argb: _xlArgb(hexColor) } },
+    alignment: { vertical: 'middle', horizontal: 'center' },
+    border:    _xlThinBorder(),
+  };
+}
+
+// Linha de totais no fim da tabela
+function _xlAddTotalsRow(ws, colCount, text) {
+  ws.addRow([]);
+  const row = ws.addRow([text]);
+  ws.mergeCells(row.number, 1, row.number, colCount);
+  row.height = 20;
+  row.getCell(1).style = {
+    font:      { bold: true, size: 10, color: { argb: XL_BRAND.dark } },
+    fill:      { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE8D9' } },
+    alignment: { vertical: 'middle', horizontal: 'left', indent: 1 },
+    border:    _xlThinBorder(),
+  };
+}
+
+// Descarrega o workbook como ficheiro .xlsx
+async function _xlDownload(wb, filename) {
+  const buf  = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+  downloadBlob(blob, filename);
+}
+
+function _xlGeneratedBy() {
+  const who  = currentUser?.displayName || currentUser?.email || '—';
+  const when = new Date().toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+  return `Gerado por ${who} em ${when}`;
+}
+
+window.exportPaintExcel = async () => {
+  if (typeof window.ExcelJS === 'undefined') { showToast('❌ ExcelJS não carregado. Recarregue a página.'); return; }
+
   const paintIncs = incidents.filter(i =>
     (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
   );
   if (!paintIncs.length) { showToast('Nenhuma peça de pintura em aberto.'); return; }
 
-  const rows = paintIncs
-    .sort((a, b) => {
-      const order = { sent: 0, pending: 1 };
-      return (order[a.status] ?? 2) - (order[b.status] ?? 2);
-    })
-    .map((inc, i) => {
-      const cfg = PAINT_STATUS_CONFIG[inc.status || 'pending'] || PAINT_STATUS_CONFIG.pending;
-      return {
-        'Nº':              i + 1,
-        'Nº CAR':          inc.carNum || '—',
-        'Nome da Peça':    inc.partName || '—',
-        'Código da Peça':  inc.partNo  || '—',
-        'Qtd Defeituosa':  inc.ngQty   || '—',
-        'Status':          cfg.label,
-        'Registado por':   inc.user    || '—',
-        'Data Registo':    fmtDate(inc.createdAt),
-        'Data Envio Pintoria': inc.sentAt ? fmtDate(inc.sentAt) : '—',
-        'Observações':     inc.defect  || '—',
-      };
-    });
+  const sorted = [...paintIncs].sort((a, b) => {
+    const order = { sent: 0, pending: 1 };
+    return (order[a.status] ?? 2) - (order[b.status] ?? 2);
+  });
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [5, 12, 28, 20, 8, 20, 20, 14, 18, 40].map(w => ({ wch: w }));
-  const wb   = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Pintoria em Aberto');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Pintoria em Aberto', {
+    views: [{ state: 'frozen', ySplit: 4 }]  // congela título + cabeçalho
+  });
+
+  const HEADERS = ['Nº', 'Nº CAR', 'Nome da Peça', 'Código da Peça', 'Qtd',
+                   'Status', 'Registado por', 'Data Registo', 'Envio Pintoria', 'Observações'];
+  const WIDTHS  = [5, 11, 30, 24, 6, 16, 20, 13, 13, 45];
+  ws.columns = WIDTHS.map(w => ({ width: w }));
+
+  _xlAddTitleBlock(ws, HEADERS.length,
+    'CFMOTO da Amazônia — Peças na Pintoria',
+    `Relatório de retrabalho de pintura em aberto · ${_xlGeneratedBy()}`);
+
+  const headerRowNum = _xlAddHeaderRow(ws, HEADERS);
+
+  sorted.forEach((inc, i) => {
+    const st  = inc.status || 'pending';
+    const cfg = PAINT_STATUS_CONFIG[st] || PAINT_STATUS_CONFIG.pending;
+    const row = ws.addRow([
+      i + 1,
+      inc.carNum || '—',
+      inc.partName || '—',
+      inc.partNo || '—',
+      parseInt(inc.ngQty) || 0,
+      cfg.label,
+      inc.user || '—',
+      inc.createdAt ? new Date(inc.createdAt) : '—',
+      inc.sentAt ? new Date(inc.sentAt) : '—',
+      inc.defect || '—',
+    ]);
+    row.height = 18;
+    _xlStyleDataRow(row, i % 2 === 1);
+    row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
+    if (inc.createdAt) row.getCell(8).numFmt = 'dd/mm/yyyy';
+    if (inc.sentAt)    row.getCell(9).numFmt = 'dd/mm/yyyy';
+    _xlStyleStatusCell(row.getCell(6), cfg.color);
+  });
+
+  // AutoFilter sobre a tabela
+  ws.autoFilter = {
+    from: { row: headerRowNum, column: 1 },
+    to:   { row: headerRowNum + sorted.length, column: HEADERS.length },
+  };
+
+  const totalQty = sorted.reduce((s, i) => s + (parseInt(i.ngQty) || 0), 0);
+  const naPint   = sorted.filter(i => i.status === 'sent').length;
+  _xlAddTotalsRow(ws, HEADERS.length,
+    `TOTAIS: ${sorted.length} peças em aberto · ${naPint} na pintoria · ${sorted.length - naPint} aguardando envio · ${totalQty} unidades`);
+
   const date = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `Pintoria-Aberto-${date}.xlsx`);
+  await _xlDownload(wb, `Pintoria-Aberto-${date}.xlsx`);
   showToast('📥 Excel exportado!');
 };
 
@@ -2487,12 +2633,14 @@ function updateExcelStats() {
   document.getElementById('exSDone').textContent    = stats.done;
 }
 
-window.exportExcel = () => {
+window.exportExcel = async () => {
+  if (typeof window.ExcelJS === 'undefined') { showToast('❌ ExcelJS não carregado. Recarregue a página.'); return; }
+
   const filter = document.getElementById('excelFilter').value;
   const period = document.getElementById('excelPeriod').value;
   const now = Date.now();
 
-  let list = incidents.filter(inc => {
+  const list = incidents.filter(inc => {
     const mf = filter === 'all' || inc.status === filter;
     const mp = period === 'all' || (now - (inc.createdAt || 0)) <= parseInt(period) * 86400000;
     return mf && mp;
@@ -2500,28 +2648,79 @@ window.exportExcel = () => {
 
   if (!list.length) { showToast('Nenhum incidente para exportar.'); return; }
 
-  const rows = list.map((inc, i) => ({
-    'Nº': i + 1, 'ID': inc.id,
-    'Status': (STATUS_CONFIG[inc.status] || STATUS_CONFIG.pending).label,
-    'Código da Peça': inc.partNo || '', 'Nome da Peça': inc.partName || '',
-    'Modelo': inc.model || '', 'Nº Pedido': inc.orderNo || '', 'Lote': inc.lotNo || '',
-    'Qtd. Defeituosa': inc.ngQty || '', 'Descrição do Defeito': inc.defect || '',
-    'Como Detectado': inc.detected || '',
-    'Registado por': inc.user || '', 'Data Registo': fmtDate(inc.createdAt),
-    'Data Envio': inc.sentAt ? fmtDate(inc.sentAt) : '',
-    'ETA Confirmado': inc.eta || '',
-    'Data Recepção': inc.receivedAt ? fmtDate(inc.receivedAt) : '',
-    'Data Conclusão': inc.completedAt ? fmtDate(inc.completedAt) : '',
-    'Nº Fotos': (inc.photos || []).length,
-    'Links das Fotos': (inc.photos || []).map(p => p.url).join(' | '),
-  }));
+  const FILTER_LABELS = { all: 'Todos os incidentes', pending: 'Só pendentes', done: 'Só concluídos' };
+  const PERIOD_LABELS = { all: 'todo o período', '7': 'últimos 7 dias', '30': 'últimos 30 dias', '90': 'últimos 90 dias' };
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [5,16,12,20,22,14,22,14,8,40,30,20,14,14,8,60].map(w => ({ wch: w }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Incidentes CAR');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Incidentes CAR', {
+    views: [{ state: 'frozen', ySplit: 4 }]  // congela título + cabeçalho
+  });
+
+  const HEADERS = ['Nº', 'Nº CAR', 'Status', 'Código da Peça', 'Nome da Peça',
+                   'Modelo', 'Nº Pedido', 'Lote', 'Qtd NG', 'Descrição do Defeito',
+                   'Como Detectado', 'Registado por', 'Registo', 'Envio', 'ETA',
+                   'Recepção', 'Conclusão', 'Fotos'];
+  const WIDTHS  = [5, 11, 15, 24, 26, 13, 18, 13, 8, 38, 30, 18, 12, 12, 12, 12, 12, 12];
+  ws.columns = WIDTHS.map(w => ({ width: w }));
+
+  _xlAddTitleBlock(ws, HEADERS.length,
+    'CFMOTO da Amazônia — Relatório de Garantia CAR',
+    `Filtro: ${FILTER_LABELS[filter] || filter} · Período: ${PERIOD_LABELS[period] || period} · ${_xlGeneratedBy()}`);
+
+  const headerRowNum = _xlAddHeaderRow(ws, HEADERS);
+
+  list.forEach((inc, i) => {
+    const cfg = (STATUS_CONFIG[inc.status] || STATUS_CONFIG.pending);
+    const photos = inc.photos || [];
+    const row = ws.addRow([
+      i + 1,
+      inc.carNum || '—',
+      cfg.label,
+      inc.partNo || '',
+      inc.partName || '',
+      inc.model || '',
+      inc.orderNo || '',
+      inc.lotNo || '',
+      parseInt(inc.ngQty) || 0,
+      inc.defect || '',
+      inc.detected || '',
+      inc.user || '',
+      inc.createdAt   ? new Date(inc.createdAt)   : '',
+      inc.sentAt      ? new Date(inc.sentAt)      : '',
+      inc.eta || '',
+      inc.receivedAt  ? new Date(inc.receivedAt)  : '',
+      inc.completedAt ? new Date(inc.completedAt) : '',
+      photos.length ? `Ver (${photos.length})` : '—',
+    ]);
+    row.height = 18;
+    _xlStyleDataRow(row, i % 2 === 1);
+    row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell(9).alignment = { vertical: 'middle', horizontal: 'center' };
+    [13, 14, 16, 17].forEach(c => { if (row.getCell(c).value instanceof Date) row.getCell(c).numFmt = 'dd/mm/yyyy'; });
+    _xlStyleStatusCell(row.getCell(3), cfg.color);
+
+    // Fotos como hyperlink clicável para a primeira foto
+    if (photos.length && photos[0].url) {
+      const cell = row.getCell(18);
+      cell.value = { text: `Ver (${photos.length})`, hyperlink: photos[0].url };
+      cell.font  = { size: 10, color: { argb: 'FF1A56CC' }, underline: true };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
+  });
+
+  ws.autoFilter = {
+    from: { row: headerRowNum, column: 1 },
+    to:   { row: headerRowNum + list.length, column: HEADERS.length },
+  };
+
+  const totalNG    = list.reduce((s, i) => s + (parseInt(i.ngQty) || 0), 0);
+  const nPending   = list.filter(i => (i.status || 'pending') === 'pending').length;
+  const nDone      = list.filter(i => i.status === 'done').length;
+  _xlAddTotalsRow(ws, HEADERS.length,
+    `TOTAIS: ${list.length} incidentes · ${totalNG} peças NG · ${nPending} pendentes · ${nDone} encerrados`);
+
   const date = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `CAR-Garantia-${date}.xlsx`);
+  await _xlDownload(wb, `CAR-Garantia-${date}.xlsx`);
   showToast('📥 Excel exportado!');
 };
 
