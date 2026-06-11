@@ -9,6 +9,7 @@ import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNav
 import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 import { getTrackingUrl, getCarrierLabel } from './tracking.js';
+import { saveDraftDB, loadDraftDB, clearDraftDB } from './draftStore.js';
 
 // ── Paint URL detection — executa antes do auth ───────────────
 // QR das etiquetas de pintura codifica: APP_URL?paint=INCIDENT_ID
@@ -486,11 +487,12 @@ window.setDashPeriod = setDashPeriod;
 // ── Listeners para guardar rascunho ao digitar ────────────────
 function attachDraftListeners() {
   const fields = ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected'];
+  const onEdit = () => { markDraftDirty(); saveDraft(); };
   fields.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener('input', saveDraft);
-      el.addEventListener('change', saveDraft);
+      el.addEventListener('input', onEdit);
+      el.addEventListener('change', onEdit);
     }
   });
 }
@@ -1694,6 +1696,7 @@ window.onCARNumInput = () => {
     hint.style.color   = 'var(--ink-300,rgba(255,255,255,0.4))';
     hint.textContent   = lastFull ? `Último usado: ${lastFull}` : 'Nenhum CAR registado ainda';
   }
+  markDraftDirty();
   saveDraft();
 };
 
@@ -1702,6 +1705,7 @@ function clearForm() {
   editingId = null;
   currentPhotos = [];
   currentIncidentType = 'normal';
+  _draftDirty = false; // form limpo — o nº CAR pré-preenchido não conta como edição
   stopDraftTimer();
   ['fCarNum','fPartNo','fPartName','fModel','fOrderNo','fLotNo','fNgQty','fDefect','fDetected']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -1713,47 +1717,53 @@ function clearForm() {
   document.getElementById('photoError')?.classList.remove('visible');
 }
 
-// ── Draft auto-save ───────────────────────────────────────────
-const DRAFT_KEY = 'car_form_draft';
+// ── Draft auto-save (IndexedDB) ───────────────────────────────
 let draftTimer = null;
+// Só persiste depois de o utilizador realmente mexer no formulário.
+// Impede que o nº CAR pré-preenchido sobrescreva um rascunho com fotos.
+let _draftDirty = false;
 
-function saveDraft() {
-  if (!editingId) { // só guarda rascunhos de incidentes novos
-    try {
-      const draft = {
-        savedAt: Date.now(),
-        incidentType: currentIncidentType,
-        fields: {
-          carNum:   document.getElementById('fCarNum')?.value   || '',
-          partNo:   document.getElementById('fPartNo')?.value   || '',
-          partName: document.getElementById('fPartName')?.value || '',
-          model:    document.getElementById('fModel')?.value    || '',
-          orderNo:  document.getElementById('fOrderNo')?.value  || '',
-          lotNo:    document.getElementById('fLotNo')?.value    || '',
-          ngQty:    document.getElementById('fNgQty')?.value    || '',
-          defect:   document.getElementById('fDefect')?.value   || '',
-          detected: document.getElementById('fDetected')?.value || '',
-        },
-        // Guarda só fotos já enviadas (URL) — fotos novas não cabem no localStorage
-        photos: currentPhotos
-          .filter(p => !p.isNew)
-          .map(p => ({ url: p.url, publicId: p.publicId, isNew: false, localPreview: p.url }))
-      };
+// Marca o formulário como "tocado" pelo utilizador (campo ou foto alterada)
+function markDraftDirty() { _draftDirty = true; }
 
-      // Só guarda se tiver algum conteúdo
-      const hasContent = Object.values(draft.fields).some(v => v.trim() !== '');
-      if (hasContent || draft.photos.length > 0) {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-      }
-    } catch (e) {
-      console.warn('Draft save failed:', e);
+async function saveDraft() {
+  if (editingId) return;     // só guarda rascunhos de incidentes novos
+  if (!_draftDirty) return;  // nada que o utilizador tenha alterado ainda
+  try {
+    const draft = {
+      savedAt: Date.now(),
+      incidentType: currentIncidentType,
+      fields: {
+        carNum:   document.getElementById('fCarNum')?.value   || '',
+        partNo:   document.getElementById('fPartNo')?.value   || '',
+        partName: document.getElementById('fPartName')?.value || '',
+        model:    document.getElementById('fModel')?.value    || '',
+        orderNo:  document.getElementById('fOrderNo')?.value  || '',
+        lotNo:    document.getElementById('fLotNo')?.value    || '',
+        ngQty:    document.getElementById('fNgQty')?.value    || '',
+        defect:   document.getElementById('fDefect')?.value   || '',
+        detected: document.getElementById('fDetected')?.value || '',
+      },
+      // Fotos: guarda o blob (file) das que ainda não subiram → sobrevivem
+      // ao fecho do app; e a URL leve das que já estão no Cloudinary.
+      photos: currentPhotos.map(p =>
+        (p.isNew && p.file)
+          ? { isNew: true,  file: p.file, publicId: null }
+          : { isNew: false, url: p.url, publicId: p.publicId || '' }
+      ),
+    };
+
+    const hasContent = Object.values(draft.fields).some(v => v.trim() !== '');
+    if (hasContent || draft.photos.length > 0) {
+      await saveDraftDB(draft);
     }
+  } catch (e) {
+    console.warn('Draft save failed:', e);
   }
 }
 
 function startDraftTimer() {
   stopDraftTimer();
-  // Guarda imediatamente e depois a cada 5 segundos
   saveDraft();
   draftTimer = setInterval(saveDraft, 5000);
 }
@@ -1762,16 +1772,16 @@ function stopDraftTimer() {
   if (draftTimer) { clearInterval(draftTimer); draftTimer = null; }
 }
 
-function clearDraft() {
-  localStorage.removeItem(DRAFT_KEY);
+async function clearDraft() {
+  _draftDirty = false;
   stopDraftTimer();
+  try { await clearDraftDB(); } catch (e) { console.warn('Draft clear failed:', e); }
 }
 
-function checkForDraft() {
+async function checkForDraft() {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return;
-    const draft = JSON.parse(raw);
+    const draft = await loadDraftDB();
+    if (!draft) return;
 
     // Ignora rascunhos com mais de 7 dias
     if (Date.now() - draft.savedAt > 7 * 24 * 60 * 60 * 1000) {
@@ -1782,10 +1792,11 @@ function checkForDraft() {
     const hasContent = Object.values(draft.fields || {}).some(v => v.trim() !== '');
     if (!hasContent && (!draft.photos || draft.photos.length === 0)) return;
 
-    const timeAgo = formatTimeAgo(draft.savedAt);
-    showDraftBanner(draft, timeAgo);
+    const timeAgo  = formatTimeAgo(draft.savedAt);
+    const nPhotos  = (draft.photos || []).length;
+    showDraftBanner(draft, timeAgo, nPhotos);
   } catch (e) {
-    clearDraft();
+    console.warn('checkForDraft failed:', e);
   }
 }
 
@@ -1799,7 +1810,7 @@ function formatTimeAgo(ts) {
   return `há ${Math.floor(hours / 24)} dias`;
 }
 
-function showDraftBanner(draft, timeAgo) {
+function showDraftBanner(draft, timeAgo, nPhotos = 0) {
   // Remove banner anterior se existir
   document.getElementById('draftBanner')?.remove();
 
@@ -1807,10 +1818,11 @@ function showDraftBanner(draft, timeAgo) {
   banner.id        = 'draftBanner';
   banner.className = 'draft-banner';
 
+  const photoTag = nPhotos > 0 ? ` · 📷 ${nPhotos} foto${nPhotos > 1 ? 's' : ''}` : '';
   banner.innerHTML = `
     <div class="draft-banner-info">
       <div class="draft-banner-title">📝 Rascunho guardado</div>
-      <div class="draft-banner-meta">${escHtml(draft.fields.partName) || 'Incidente'} · ${timeAgo}</div>
+      <div class="draft-banner-meta">${escHtml(draft.fields.partName) || 'Incidente'} · ${timeAgo}${photoTag}</div>
     </div>
     <button class="btn btn-primary draft-banner-btn" onclick="recoverDraft()">Recuperar</button>
     <button class="btn draft-banner-dismiss" onclick="dismissDraft()">Descartar</button>
@@ -1819,15 +1831,25 @@ function showDraftBanner(draft, timeAgo) {
   document.body.appendChild(banner);
 }
 
-window.recoverDraft = () => {
+// Reconstrói currentPhotos a partir do draft: blobs → object URL para preview
+function _photosFromDraft(draftPhotos) {
+  return (draftPhotos || []).map(p => {
+    if (p.isNew && p.file) {
+      const preview = URL.createObjectURL(p.file);
+      return { isNew: true, file: p.file, url: preview, localPreview: preview };
+    }
+    return { isNew: false, url: p.url, publicId: p.publicId || '', localPreview: p.url };
+  });
+}
+
+window.recoverDraft = async () => {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) { showToast('Rascunho não encontrado.'); return; }
-    const draft = JSON.parse(raw);
+    const draft = await loadDraftDB();
+    if (!draft) { showToast('Rascunho não encontrado.'); return; }
 
     // Navega para o formulário SEM limpar (não chama clearForm)
     editingId = null;
-    currentPhotos = draft.photos || [];
+    currentPhotos = _photosFromDraft(draft.photos);
     currentIncidentType = draft.incidentType || 'normal';
 
     // Mostra a página do formulário directamente
@@ -1849,6 +1871,7 @@ window.recoverDraft = () => {
       setIncidentType(draft.incidentType || 'normal');
       renderPhotoGrid();
       document.getElementById('photoError')?.classList.remove('visible');
+      _draftDirty = true; // continua a persistir alterações a partir daqui
       startDraftTimer();
       attachDraftListeners();
     }, 50);
@@ -1985,7 +2008,8 @@ function renderPhotoGrid() {
         <button class="photo-thumb-del" onclick="removePhoto(${i}, event)">✕</button>
       </div>`;
   }).join('');
-  // Guarda rascunho sempre que fotos mudam
+  // Guarda rascunho sempre que fotos mudam — ter fotos conta como edição real
+  if (currentPhotos.length > 0) markDraftDirty();
   if (draftTimer !== null) saveDraft();
 }
 
