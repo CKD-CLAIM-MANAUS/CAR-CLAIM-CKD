@@ -1,7 +1,7 @@
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import firebase_admin
-from firebase_admin import credentials, auth as fb_auth
+from firebase_admin import credentials, auth as fb_auth, firestore
 import openpyxl
 from openpyxl.drawing.image import Image as XLImage
 from datetime import datetime
@@ -10,6 +10,7 @@ import urllib.request
 import urllib.parse
 import json
 import re
+import hmac
 from PIL import Image as PILImage
 
 # ── Firebase Admin SDK ────────────────────────────────────────
@@ -34,6 +35,18 @@ else:
 ALLOWED_ORIGIN  = os.environ.get('ALLOWED_ORIGIN', 'https://ckd-claim-manaus.github.io')
 CLOUDINARY_BASE = 'https://res.cloudinary.com/dos2jsgzg/'
 TEMPLATE_PATH   = os.path.join(os.path.dirname(__file__), 'template.xlsx')
+
+# Chave para o endpoint de exportação (Power BI / Power Apps).
+# Definir no Railway como variável de ambiente EXPORT_API_KEY.
+EXPORT_API_KEY  = os.environ.get('EXPORT_API_KEY', '')
+
+# Cliente Firestore (lazy) — só inicializa quando o endpoint é usado
+_fs_client = None
+def get_firestore():
+    global _fs_client
+    if _fs_client is None and _firebase_initialized:
+        _fs_client = firestore.client()
+    return _fs_client
 
 app = Flask(__name__)
 CORS(app,
@@ -133,6 +146,93 @@ def health():
     if not _firebase_initialized:
         return jsonify({'status': 'degraded'}), 503
     return jsonify({'status': 'ok'})
+
+
+# ── Export para Power BI / Power Apps ─────────────────────────
+def _check_export_key():
+    """Valida a chave de API (header X-API-Key ou query ?key=) de forma
+    resistente a timing attacks. Devolve True se válida."""
+    if not EXPORT_API_KEY:
+        return False  # sem chave configurada → endpoint fechado
+    provided = request.headers.get('X-API-Key') or request.args.get('key', '')
+    return hmac.compare_digest(str(provided), EXPORT_API_KEY)
+
+
+def _ms_to_iso(value):
+    """Converte timestamp em milissegundos para ISO 8601 (ou None)."""
+    if not value:
+        return None
+    try:
+        return datetime.utcfromtimestamp(int(value) / 1000).isoformat() + 'Z'
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+@app.route('/export-data', methods=['GET'])
+def export_data():
+    # 1. Autenticação por chave de API
+    if not _check_export_key():
+        return jsonify({'error': 'Não autorizado.'}), 401
+
+    fs = get_firestore()
+    if fs is None:
+        return jsonify({'error': 'Serviço indisponível.'}), 503
+
+    try:
+        # 2. Lê todos os incidentes do Firestore
+        docs = fs.collection('incidents').stream()
+        rows = []
+        for doc in docs:
+            d = doc.to_dict() or {}
+            photos = d.get('photos', []) or []
+            history = d.get('history', []) or []
+
+            rows.append({
+                'id':            doc.id,
+                'carNum':        d.get('carNum', ''),
+                'status':        d.get('status', 'pending'),
+                'incidentType':  d.get('incidentType', 'normal'),
+                'partNo':        d.get('partNo', ''),
+                'partName':      d.get('partName', ''),
+                'model':         d.get('model', ''),
+                'orderNo':       d.get('orderNo', ''),
+                'lotNo':         d.get('lotNo', ''),
+                'ngQty':         d.get('ngQty', ''),
+                'defect':        d.get('defect', ''),
+                'detected':      d.get('detected', ''),
+                'user':          d.get('user', ''),
+                'userId':        d.get('userId', ''),
+                'tracking':      d.get('tracking', ''),
+                'eta':           d.get('eta', ''),
+                'chassisNote':   d.get('chassisNote', ''),
+                'createdAt':     _ms_to_iso(d.get('createdAt')),
+                'updatedAt':     _ms_to_iso(d.get('updatedAt')),
+                'sentAt':        _ms_to_iso(d.get('sentAt')),
+                'receivedAt':    _ms_to_iso(d.get('receivedAt')),
+                'completedAt':   _ms_to_iso(d.get('completedAt')),
+                'nPhotos':       len(photos),
+                'photoUrls':     ' | '.join(p.get('url', '') for p in photos if isinstance(p, dict)),
+                'history':       [
+                    {
+                        'status':    h.get('status', ''),
+                        'note':      h.get('note', ''),
+                        'user':      h.get('user', ''),
+                        'isNote':    bool(h.get('isNote', False)),
+                        'timestamp': _ms_to_iso(h.get('timestamp')),
+                    }
+                    for h in history if isinstance(h, dict)
+                ],
+            })
+
+        return jsonify({
+            'generatedAt': datetime.utcnow().isoformat() + 'Z',
+            'count':       len(rows),
+            'incidents':   rows,
+        })
+
+    except Exception as e:
+        print(f'Error in export_data: {e}')
+        return jsonify({'error': 'Erro ao exportar dados.'}), 500
 
 @app.route('/generate-car', methods=['POST'])
 def generate_car():
