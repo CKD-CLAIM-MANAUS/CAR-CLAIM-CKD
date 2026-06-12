@@ -234,6 +234,45 @@ def export_data():
         print(f'Error in export_data: {e}')
         return jsonify({'error': 'Erro ao exportar dados.'}), 500
 
+
+@app.route('/export-partslist', methods=['GET'])
+def export_partslist():
+    # Exporta a base de peças (partsDB) — pack lists importadas.
+    # Mesma chave de API do /export-data.
+    if not _check_export_key():
+        return jsonify({'error': 'Não autorizado.'}), 401
+
+    fs = get_firestore()
+    if fs is None:
+        return jsonify({'error': 'Serviço indisponível.'}), 503
+
+    try:
+        docs = fs.collection('partsDB').stream()
+        rows = []
+        for doc in docs:
+            d = doc.to_dict() or {}
+            rows.append({
+                'id':         doc.id,
+                'partNo':     d.get('partNo', ''),
+                'partName':   d.get('partName', ''),
+                'lotNo':      d.get('lotNo', ''),
+                'orderNo':    d.get('orderNo', ''),
+                'model':      d.get('model', ''),
+                'qty':        d.get('qty', ''),
+                'source':     d.get('source', ''),
+                'importedAt': _ms_to_iso(d.get('importedAt')),
+            })
+
+        return jsonify({
+            'generatedAt': datetime.utcnow().isoformat() + 'Z',
+            'count':       len(rows),
+            'parts':       rows,
+        })
+
+    except Exception as e:
+        print(f'Error in export_partslist: {e}')
+        return jsonify({'error': 'Erro ao exportar peças.'}), 500
+
 @app.route('/generate-car', methods=['POST'])
 def generate_car():
     # 1. Autenticação obrigatória
