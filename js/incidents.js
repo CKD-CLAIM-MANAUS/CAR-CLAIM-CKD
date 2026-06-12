@@ -166,6 +166,17 @@ export async function markPending(id) {
   if (inc) { inc.status = 'pending'; delete inc.completedAt; }
 }
 
+// ── Marca que o CAR (relatório de reembolso) foi gerado ───────
+// carNum: número CAR final usado na geração (com /ano)
+export async function markCARGenerated(id, carNum) {
+  const now = Date.now();
+  const data = { carGeneratedAt: now };
+  if (carNum) data.carNum = String(carNum).split('/')[0]; // guarda só o número, sem /ano
+  await fb.updateDoc(fb.doc(db, 'incidents', id), data);
+  const inc = incidents.find(i => i.id === id);
+  if (inc) { inc.carGeneratedAt = now; if (carNum) inc.carNum = data.carNum; }
+}
+
 // ── Avança status com registo no histórico ────────────────────
 export async function updateIncidentStatus(id, newStatus, user, note = '', eta = null, tracking = '') {
   const historyEntry = {

@@ -1,6 +1,6 @@
 // ── app.js ────────────────────────────────────────────────────
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
-import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA } from './incidents.js';
+import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA, markCARGenerated } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
@@ -596,8 +596,11 @@ function renderList() {
              <circle cx="12" cy="13" r="4"/>
            </svg>
          </div>`;
+    const refundFlag = _paintNeedsRefund(inc)
+      ? '<span class="refund-flag" title="Peça enviada para pintura sem CAR de reembolso gerado">⚠️ Sem reembolso</span>'
+      : '';
     return `
-    <div class="incident-card ${inc.status || 'pending'}" onclick="showDetail('${inc.id}')">
+    <div class="incident-card ${inc.status || 'pending'}${_paintNeedsRefund(inc) ? ' card-needs-refund' : ''}" onclick="showDetail('${inc.id}')">
       ${thumb}
       <div class="incident-info">
         <div>
@@ -608,7 +611,7 @@ function renderList() {
           <span class="incident-meta">
             ${inc.carNum ? `<span class="card-car-num">CAR ${escHtml(inc.carNum)}</span> · ` : ''}${escHtml(inc.model) || '—'} · ${fmtDate(inc.createdAt)}
           </span>
-          ${statusBadge(inc.status, inc)}
+          <span class="incident-badges">${refundFlag}${statusBadge(inc.status, inc)}</span>
         </div>
       </div>
     </div>`;
@@ -713,6 +716,14 @@ function isDesktop() {
 function _isPaintInc(inc) { return (inc?.incidentType || 'normal') === 'paint'; }
 function _flowFor(inc)    { return _isPaintInc(inc) ? PAINT_STATUS_FLOW   : STATUS_FLOW;   }
 function _configFor(inc)  { return _isPaintInc(inc) ? PAINT_STATUS_CONFIG : STATUS_CONFIG; }
+
+// Peça de pintura que já saiu de "Aguardando Envio" (foi para a pintura)
+// mas nunca teve o CAR gerado → falta pedir o reembolso à China.
+function _paintNeedsRefund(inc) {
+  if (!_isPaintInc(inc)) return false;
+  if ((inc.status || 'pending') === 'pending') return false; // ainda não foi enviada
+  return !inc.carGeneratedAt; // sem relatório de reembolso gerado
+}
 
 // Pintura usa só 3 estados; 'received' herdado é tratado como 'done'
 function _normalisePaintStatus(st) {
@@ -2133,6 +2144,9 @@ window.doGenerateCAR = async (id) => {
     const code = carNum.replace('/', '_');
     const label = (inc.partName || inc.partNo || 'PART').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 30);
     await downloadBlobSmart(blob, `CAR_No_${code}_${label}.xlsx`);
+
+    // ── Marca que o relatório de reembolso (CAR) foi gerado
+    try { await markCARGenerated(id, carNum); } catch (e) { console.warn('markCARGenerated:', e); }
 
     // ── Pergunta se quer marcar como Enviado (só se ainda estiver Pendente)
     if ((inc.status || 'pending') === 'pending') {

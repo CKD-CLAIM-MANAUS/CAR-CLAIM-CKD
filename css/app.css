@@ -3198,6 +3198,32 @@ img { display: block; max-width: 100%; }
   #batchLabelPrintArea[data-mode="a4"] .label-date      { font-size: 7pt  !important; }
 }
 
+/* ── Selo "Sem reembolso" — pintura enviada sem CAR gerado ──── */
+.incident-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.refund-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(239,68,68,0.14);
+  color: #F87171;
+  border: 1px solid rgba(239,68,68,0.35);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.incident-card.card-needs-refund {
+  border-left: 3px solid #EF4444;
+}
+
 /* ── Nº CAR no card da lista ─────────────────────────────────── */
 .card-car-num {
   font-family: var(--font-mono);
