@@ -2116,6 +2116,50 @@ window.openQRScanner = () => {
 
 window.closeQRScanner = closeQR;
 
+// ── Ler QR a meio do preenchimento manual ─────────────────────
+// Preenche só os campos da etiqueta (partNo, lote, qtd, pedido, nome, modelo)
+// e MANTÉM o que o utilizador já escreveu (defeito, como detectado, nº CAR).
+window.scanQRIntoForm = () => {
+  openQR(
+    async (data) => {
+      // Etiqueta de pintura não se aplica ao preenchimento de um incidente
+      try {
+        if (new URL(data).searchParams.get('paint')) {
+          showToast('⚠️ Essa é uma etiqueta de pintura, não de peça.');
+          return;
+        }
+      } catch { /* não é URL — segue para pack list */ }
+
+      const parsed = parseQRData(data);
+      if (!parsed) { showToast('Formato QR não reconhecido'); return; }
+
+      // Preenche os campos vindos do QR (sem limpar o formulário)
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+      setVal('fPartNo',  parsed.partNo);
+      setVal('fLotNo',   parsed.lotNo);
+      setVal('fNgQty',   parsed.qty);
+      setVal('fOrderNo', parsed.orderNo);
+      showToast('QR lido! A procurar dados...');
+
+      const partData = await lookupPart(parsed.partNo, parsed.lotNo);
+      if (partData) {
+        setVal('fPartName', partData.partName);
+        setVal('fModel',    partData.model);
+        if (partData.orderNo) setVal('fOrderNo', partData.orderNo);
+        showToast('✅ Dados da etiqueta preenchidos!');
+      } else {
+        showToast('QR lido! Confirme os dados.');
+      }
+
+      // Se for incidente de pintura, actualiza a descrição automática
+      if (currentIncidentType === 'paint') updatePaintDescription();
+      markDraftDirty();
+      saveDraft();
+    },
+    (err) => showToast('Erro ao aceder à câmera: ' + err.message)
+  );
+};
+
 // ── CAR Generation ────────────────────────────────────────────
 window.doGenerateCAR = async (id) => {
   const inc = incidents.find(i => i.id === id);

@@ -3224,6 +3224,38 @@ img { display: block; max-width: 100%; }
   border-left: 3px solid #EF4444;
 }
 
+/* ── Botão "Ler QR" no cabeçalho do cartão de identificação ──── */
+.form-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.form-card-title-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.btn-scan-form {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,102,0,0.12);
+  color: var(--blue-400);
+  border: 1px solid rgba(255,102,0,0.35);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-scan-form:hover  { background: rgba(255,102,0,0.20); }
+.btn-scan-form:active { background: rgba(255,102,0,0.28); }
+
 /* ── Nº CAR no card da lista ─────────────────────────────────── */
 .card-car-num {
   font-family: var(--font-mono);

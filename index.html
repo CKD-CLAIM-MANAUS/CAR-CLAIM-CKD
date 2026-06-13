@@ -374,11 +374,16 @@
 
         <!-- Identificação -->
         <div class="form-card">
-          <div class="form-card-title">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M7 4H4a1 1 0 00-1 1v11a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1h-3M7 4a2 2 0 012-2h2a2 2 0 012 2M7 4h6"/>
-            </svg>
-            <span id="formCardTitle">Identificação da Peça</span>
+          <div class="form-card-title form-card-title-row">
+            <span class="form-card-title-left">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M7 4H4a1 1 0 00-1 1v11a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1h-3M7 4a2 2 0 012-2h2a2 2 0 012 2M7 4h6"/>
+              </svg>
+              <span id="formCardTitle">Identificação da Peça</span>
+            </span>
+            <button type="button" class="btn-scan-form" onclick="scanQRIntoForm()" title="Ler etiqueta QR e preencher automaticamente">
+              📷 Ler QR
+            </button>
           </div>
           <div class="form-grid">
 
