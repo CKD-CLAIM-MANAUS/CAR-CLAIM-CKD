@@ -25,8 +25,10 @@ export async function openQR(onResult, onError) {
       stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
-          width:  { ideal: 640 },   // Resolução menor = scan mais rápido
-          height: { ideal: 480 },
+          // Resolução alta — QR de peça (pack list) são densos e precisam
+          // de detalhe suficiente para decodificar
+          width:  { ideal: 1920 },
+          height: { ideal: 1080 },
           frameRate: { ideal: 30 }
         },
         audio: false
@@ -66,16 +68,19 @@ function scanLoop(video) {
       return;
     }
 
-    // Só processa 1 em cada 3 frames para não bloquear o UI
+    // Só processa 1 em cada 4 frames (resolução alta é mais pesada para jsQR)
     frameCount++;
-    if (frameCount % 3 !== 0) {
+    if (frameCount % 4 !== 0) {
       qrAnimFrame = requestAnimationFrame(tick);
       return;
     }
 
-    // Usa resolução reduzida para jsQR (mais rápido)
-    const scanW = Math.min(video.videoWidth,  640);
-    const scanH = Math.min(video.videoHeight, 480);
+    // Usa resolução alta (até 1280 de largura) — QR de peça densos precisam
+    // de detalhe; abaixo disto o jsQR não os decodifica
+    const maxW   = 1280;
+    const scale  = video.videoWidth > maxW ? maxW / video.videoWidth : 1;
+    const scanW  = Math.round(video.videoWidth  * scale);
+    const scanH  = Math.round(video.videoHeight * scale);
     canvas.width  = scanW;
     canvas.height = scanH;
 
@@ -90,7 +95,7 @@ function scanLoop(video) {
     }
 
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert'  // Mais rápido — QR codes normais não precisam inversão
+      inversionAttempts: 'attemptBoth'  // tenta normal e invertido — mais robusto
     });
 
     if (code && code.data) {
