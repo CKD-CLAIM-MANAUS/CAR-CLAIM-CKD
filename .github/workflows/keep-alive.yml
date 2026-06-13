@@ -1,0 +1,19 @@
+name: Keep Render Awake
+
+# Faz "ping" ao servidor em horário de fábrica para evitar o cold start
+# do plano grátis do Render. Manaus é UTC-4, logo 07h–18h locais = 11h–22h UTC.
+# Só dias úteis (seg–sex). Fora disso o servidor adormece (ninguém usa).
+
+on:
+  schedule:
+    - cron: '*/14 11-22 * * 1-5'   # a cada 14 min, 11h–22h UTC, seg–sex
+  workflow_dispatch:               # permite disparar manualmente
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" https://car-claim-manaus.onrender.com/health || echo "000")
+          echo "Health check respondeu: $code"

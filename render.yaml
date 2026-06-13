@@ -1,0 +1,21 @@
+# Render Blueprint — API CAR Garantia (Flask)
+# Criar no Render via "New > Blueprint" apontando para este repositório.
+# Os segredos (sync:false) são definidos manualmente no painel do Render.
+services:
+  - type: web
+    name: car-claim-manaus
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: ALLOWED_ORIGIN
+        value: https://ckd-claim-manaus.github.io
+      - key: FIREBASE_ADMIN_CREDENTIALS
+        sync: false   # colar o JSON das credenciais no painel
+      - key: EXPORT_API_KEY
+        sync: false   # colar a chave de exportação no painel
