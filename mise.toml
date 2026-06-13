@@ -1,0 +1,8 @@
+[tools]
+python = "3.11.9"
+
+[settings]
+# O mise passou a exigir attestations do GitHub para instalar o Python,
+# mas a build do CPython 3.11.9 não as tem — o que parava o build do Railway.
+# Desativar a verificação permite instalar o binário oficial normalmente.
+python.github_attestations = false
