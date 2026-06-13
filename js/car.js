@@ -1,7 +1,7 @@
 // ── car.js ────────────────────────────────────────────────────
 import { auth } from './firebase.js';
 
-const CAR_SERVER_URL = 'https://web-production-6bff6.up.railway.app';
+const CAR_SERVER_URL = 'https://car-claim-manaus.onrender.com';
 
 export async function generateCAR(inc, carNum) {
   // Obtém o token Firebase do utilizador autenticado

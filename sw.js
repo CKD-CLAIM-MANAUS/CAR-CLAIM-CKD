@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v14';
+const CACHE_NAME = 'car-garantia-v15';
 
 // Apenas assets estáticos que raramente mudam
 const STATIC_ASSETS = [
@@ -56,7 +56,7 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('gstatic') ||
     url.hostname.includes('jsdelivr') ||
     url.hostname.includes('fonts.google') ||
-    url.hostname.includes('railway.app')
+    url.hostname.includes('onrender.com')
   ) {
     event.respondWith(fetch(event.request).catch(() => new Response('')));
     return;
