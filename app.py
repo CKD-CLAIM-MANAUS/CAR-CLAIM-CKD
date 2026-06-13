@@ -11,6 +11,8 @@ import urllib.parse
 import json
 import re
 import hmac
+import hashlib
+import time
 from PIL import Image as PILImage
 
 # ── Firebase Admin SDK ────────────────────────────────────────
@@ -37,8 +39,14 @@ CLOUDINARY_BASE = 'https://res.cloudinary.com/dos2jsgzg/'
 TEMPLATE_PATH   = os.path.join(os.path.dirname(__file__), 'template.xlsx')
 
 # Chave para o endpoint de exportação (Power BI / Power Apps).
-# Definir no Railway como variável de ambiente EXPORT_API_KEY.
 EXPORT_API_KEY  = os.environ.get('EXPORT_API_KEY', '')
+
+# Cloudinary — para assinar uploads (signed upload).
+# Definir CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET no painel do Render.
+CLOUDINARY_CLOUD      = 'dos2jsgzg'
+CLOUDINARY_API_KEY    = os.environ.get('CLOUDINARY_API_KEY', '')
+CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', '')
+CLOUDINARY_FOLDER     = 'garantia-car'
 
 # Cliente Firestore (lazy) — só inicializa quando o endpoint é usado
 _fs_client = None
@@ -146,6 +154,30 @@ def health():
     if not _firebase_initialized:
         return jsonify({'status': 'degraded'}), 503
     return jsonify({'status': 'ok'})
+
+
+@app.route('/sign-upload', methods=['POST'])
+def sign_upload():
+    # Assina um upload Cloudinary. Só utilizadores autenticados (JWT Firebase)
+    # obtêm assinatura — substitui o upload preset público (unsigned).
+    user_token = verify_token()
+    if not user_token:
+        return jsonify({'error': 'Não autorizado. Faça login novamente.'}), 401
+    if not CLOUDINARY_API_SECRET or not CLOUDINARY_API_KEY:
+        return jsonify({'error': 'Cloudinary não configurado.'}), 503
+
+    timestamp = int(time.time())
+    # Parâmetros a assinar, por ordem alfabética (regra do Cloudinary)
+    to_sign   = f'folder={CLOUDINARY_FOLDER}&timestamp={timestamp}'
+    signature = hashlib.sha1((to_sign + CLOUDINARY_API_SECRET).encode('utf-8')).hexdigest()
+
+    return jsonify({
+        'signature': signature,
+        'timestamp': timestamp,
+        'apiKey':    CLOUDINARY_API_KEY,
+        'folder':    CLOUDINARY_FOLDER,
+        'cloudName': CLOUDINARY_CLOUD,
+    })
 
 
 # ── Export para Power BI / Power Apps ─────────────────────────

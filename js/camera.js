@@ -46,19 +46,33 @@ export async function compressImage(file, maxW = 1600, maxKB = 900) {
   });
 }
 
-// ── Upload to Cloudinary ──────────────────────────────────────
+// ── Upload to Cloudinary (signed) ─────────────────────────────
+// O servidor assina o upload com o segredo Cloudinary; o preset público
+// (unsigned) foi desactivado. Sem assinatura do servidor não há upload.
+const SIGN_URL = 'https://car-claim-manaus.onrender.com/sign-upload';
+
 export async function uploadPhoto(file) {
   // Bloqueia uploads sem sessão Firebase activa
   if (!auth.currentUser) {
     throw new Error('Sessão expirada. Faça login novamente.');
   }
 
-  const cloudName    = 'dos2jsgzg';
-  const uploadPreset = 'Garantia CAR';
+  // 1. Pede uma assinatura ao servidor (autenticado com token Firebase)
+  const token  = await auth.currentUser.getIdToken();
+  const sigRes = await fetch(SIGN_URL, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!sigRes.ok) throw new Error('Falha ao autorizar o upload da foto');
+  const { signature, timestamp, apiKey, folder, cloudName } = await sigRes.json();
+
+  // 2. Upload assinado ao Cloudinary
   const fd = new FormData();
   fd.append('file', file);
-  fd.append('upload_preset', uploadPreset);
-  fd.append('folder', 'garantia-car');
+  fd.append('api_key', apiKey);
+  fd.append('timestamp', timestamp);
+  fd.append('folder', folder);
+  fd.append('signature', signature);
   const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
     method: 'POST', body: fd
   });
