@@ -303,22 +303,42 @@ export function isCARNumberInUse(carNum, excludeId = null, incidentType = 'norma
 }
 
 // ── Parts DB lookup ───────────────────────────────────────────
+// Peça → nome + modelo (partsDB/{partNo}); lote → pedido manual (lotsDB/{lotNo}).
+// Devolve { partName, model, orderNo, lotFound } ou null.
 export async function lookupPart(partNo, lotNo) {
   if (!partNo) return null;
-  try {
-    const key = (partNo + '_' + (lotNo || '')).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const snap = await fb.getDoc(fb.doc(db, 'partsDB', key));
-    if (snap.exists()) return snap.data();
+  const sid = (s) => String(s || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const result = {};
 
-    // Fallback: search by partNo only
-    const allSnap = await fb.getDocs(
-      fb.query(fb.collection(db, 'partsDB'), fb.orderBy('partNo'))
-    );
-    const match = allSnap.docs.find(d => d.data().partNo === partNo);
-    return match ? match.data() : null;
-  } catch {
-    return null;
+  // Peça → nome + modelo
+  try {
+    const pSnap = await fb.getDoc(fb.doc(db, 'partsDB', sid(partNo)));
+    if (pSnap.exists()) {
+      const d = pSnap.data();
+      result.partName = d.partName || '';
+      result.model    = d.model    || '';
+    } else {
+      // Fallback p/ entradas antigas (chave partNo_lotNo) ainda não migradas
+      const allSnap = await fb.getDocs(fb.collection(db, 'partsDB'));
+      const match = allSnap.docs.find(x => x.data().partNo === partNo);
+      if (match) { const d = match.data(); result.partName = d.partName || ''; result.model = d.model || ''; }
+    }
+  } catch { /* ignore */ }
+
+  // Lote → pedido manual
+  if (lotNo) {
+    try {
+      const lSnap = await fb.getDoc(fb.doc(db, 'lotsDB', sid(lotNo)));
+      if (lSnap.exists()) {
+        result.orderNo  = lSnap.data().orderNo || '';
+        result.lotFound = true;
+      } else {
+        result.lotFound = false;
+      }
+    } catch { result.lotFound = false; }
   }
+
+  return (result.partName || result.model || result.orderNo) ? result : null;
 }
 
 // ── Filter & search ───────────────────────────────────────────

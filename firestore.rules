@@ -50,6 +50,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Lotes (lotNo → pedido manual) ─────────────────────────
+    match /lotsDB/{lotId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
     // ── Stock ─────────────────────────────────────────────────
     match /stock/{partId} {
       allow read:  if isAuth();

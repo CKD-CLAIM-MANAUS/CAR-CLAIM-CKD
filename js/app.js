@@ -4,7 +4,7 @@ import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, get
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData, toggleTorch, captureDecode } from './qr.js';
 import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
-import { importPackList } from './packList.js';
+import { importPackList, migratePartsDB } from './packList.js';
 import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNavigate, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
 import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
@@ -2037,6 +2037,29 @@ document.addEventListener('paste', (e) => {
 });
 
 // ── QR Scanner ────────────────────────────────────────────────
+// Preenche o formulário com o resultado do lookup do QR:
+// nome+modelo da peça (partsDB) e nº de pedido do lote (lotsDB).
+// O lote e a quantidade já foram preenchidos a partir do QR.
+function _applyLookupToForm(partData, parsed) {
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+
+  if (partData && (partData.partName || partData.model)) {
+    setVal('fPartName', partData.partName);
+    setVal('fModel',    partData.model);
+  }
+
+  if (partData && partData.orderNo) {
+    // Pedido manual atrelado ao lote
+    setVal('fOrderNo', partData.orderNo);
+    showToast('✅ Dados preenchidos automaticamente!');
+  } else if (parsed && parsed.lotNo) {
+    // Lote ainda não está na base — pedido manual desconhecido
+    showToast('⚠️ Lote não encontrado. Importe a pack list desta BL ou preencha o Nº Pedido à mão.');
+  } else {
+    showToast('QR lido! Confirme os dados.');
+  }
+}
+
 window.openQRScanner = () => {
   openQR(
     async (data) => {
@@ -2089,26 +2112,16 @@ window.openQRScanner = () => {
       if (!parsed) { showToast('Formato QR não reconhecido'); return; }
 
       clearForm();
-      document.getElementById('fPartNo').value  = parsed.partNo;
-      document.getElementById('fLotNo').value   = parsed.lotNo;
-      document.getElementById('fNgQty').value   = parsed.qty;
-      document.getElementById('fOrderNo').value = parsed.orderNo;
+      // Lote e quantidade vêm do QR; código da peça também
+      document.getElementById('fPartNo').value = parsed.partNo;
+      document.getElementById('fLotNo').value  = parsed.lotNo;
+      document.getElementById('fNgQty').value  = parsed.qty;
       showPage('form');
       showToast('QR lido! A procurar dados...');
 
+      // Peça → nome+modelo; lote → pedido manual
       const partData = await lookupPart(parsed.partNo, parsed.lotNo);
-      if (partData) {
-        document.getElementById('fPartName').value = partData.partName || '';
-        document.getElementById('fModel').value    = partData.model    || '';
-        // Prioriza o orderNo guardado no Firestore (pode ter sido sobreposto manualmente na importação)
-        // em vez do que veio no QR (que é o nome da aba do Excel)
-        if (partData.orderNo) {
-          document.getElementById('fOrderNo').value = partData.orderNo;
-        }
-        showToast('✅ Dados preenchidos automaticamente!');
-      } else {
-        showToast('QR lido! Preencha os dados em falta.');
-      }
+      _applyLookupToForm(partData, parsed);
     },
     (err) => showToast('Erro ao aceder à câmera: ' + err.message)
   );
@@ -2140,21 +2153,13 @@ window.scanQRIntoForm = () => {
 
       // Preenche os campos vindos do QR (sem limpar o formulário)
       const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-      setVal('fPartNo',  parsed.partNo);
-      setVal('fLotNo',   parsed.lotNo);
-      setVal('fNgQty',   parsed.qty);
-      setVal('fOrderNo', parsed.orderNo);
+      setVal('fPartNo', parsed.partNo);
+      setVal('fLotNo',  parsed.lotNo);
+      setVal('fNgQty',  parsed.qty);
       showToast('QR lido! A procurar dados...');
 
       const partData = await lookupPart(parsed.partNo, parsed.lotNo);
-      if (partData) {
-        setVal('fPartName', partData.partName);
-        setVal('fModel',    partData.model);
-        if (partData.orderNo) setVal('fOrderNo', partData.orderNo);
-        showToast('✅ Dados da etiqueta preenchidos!');
-      } else {
-        showToast('QR lido! Confirme os dados.');
-      }
+      _applyLookupToForm(partData, parsed);
 
       // Se for incidente de pintura, actualiza a descrição automática
       if (currentIncidentType === 'paint') updatePaintDescription();
@@ -2878,6 +2883,28 @@ window.doImportPackList = async () => {
   } catch (e) {
     progress.className = 'import-progress visible error';
     progress.textContent = 'Erro: ' + e.message;
+  }
+};
+
+// ── Migração da base de peças (formato antigo → peças + lotes) ──
+window.doMigratePartsDB = async () => {
+  if (!isAdmin) { showToast('Apenas admin pode migrar.'); return; }
+  const progress = document.getElementById('migrateProgress');
+  const btn      = document.getElementById('migrateBtn');
+  if (btn) btn.disabled = true;
+  if (progress) progress.className = 'import-progress visible';
+
+  try {
+    const r = await migratePartsDB((msg) => { if (progress) progress.textContent = msg; });
+    if (progress) {
+      progress.className = 'import-progress visible success';
+      progress.textContent = `✅ Migração concluída: ${r.parts} peças, ${r.lots} lotes, ${r.removed} entradas antigas removidas.`;
+    }
+    showToast('Base de peças migrada!');
+  } catch (e) {
+    if (progress) { progress.className = 'import-progress visible error'; progress.textContent = 'Erro: ' + e.message; }
+  } finally {
+    if (btn) btn.disabled = false;
   }
 };
 
