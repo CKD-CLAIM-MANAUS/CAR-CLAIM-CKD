@@ -2116,9 +2116,8 @@ window.openQRScanner = () => {
 
 window.closeQRScanner = closeQR;
 window.toggleQRTorch  = toggleTorch;
-window.captureQR = async () => {
-  showToast('⏳ A analisar...');
-  const ok = await captureDecode();
+window.captureQR = () => {
+  const ok = captureDecode();
   if (!ok) showToast('⚠️ Não foi possível ler. Alise a etiqueta, aproxime e tente de novo.');
 };
 

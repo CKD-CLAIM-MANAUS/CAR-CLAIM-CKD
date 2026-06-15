@@ -67,14 +67,13 @@ export async function openQR(onResult, onError) {
   }
 }
 
-// ── Captura robusta (foto estática + TRY_HARDER, síncrono) ────
-export async function captureDecode() {
+// ── Captura robusta (foto estática + TRY_HARDER) ──────────────
+// Decodificação pontual de um frame; NÃO mexe no scan ao vivo (que
+// continua a correr). Síncrona e rápida — sem parar a câmara.
+export function captureDecode() {
   if (_handled) return true;
   const video = document.getElementById('qrVideo');
   if (!video || !video.videoWidth || typeof ZXing === 'undefined') return false;
-
-  // Para o scan ao vivo para libertar a CPU para a decodificação pesada
-  if (_reader) { try { _reader.stopContinuousDecode(); } catch { /* ignore */ } }
 
   // Frame em resolução nativa completa
   const canvas = document.createElement('canvas');
@@ -95,12 +94,7 @@ export async function captureDecode() {
     _accept(result);
     return true;
   } catch {
-    // Não leu — retoma o scan ao vivo para o utilizador tentar de novo
-    if (qrOpen && _reader && _stream) {
-      _reader.decodeFromStream(_stream, video, (r) => { if (r && !_handled) _accept(r); })
-             .catch(() => {});
-    }
-    return false;
+    return false; // não leu — o scan ao vivo continua a correr normalmente
   }
 }
 
