@@ -24,12 +24,23 @@ export async function openQR(onResult, onError) {
   let _handled = false;
 
   try {
-    _reader = new ZXing.BrowserMultiFormatReader();
+    // Hints: TRY_HARDER aumenta muito a taxa de leitura (mais esforço por frame)
+    const hints = new Map();
+    try { hints.set(ZXing.DecodeHintType.TRY_HARDER, true); } catch { /* ignore */ }
 
-    // Câmara traseira; o ZXing gere o stream e faz o scan internamente
+    // Intervalo curto entre tentativas (200ms em vez de 500ms) → tenta mais vezes
+    _reader = new ZXing.BrowserMultiFormatReader(hints, 200);
+
+    // Câmara traseira, resolução alta e foco contínuo — essenciais para QR
+    // impressos/densos focarem e decodificarem de forma consistente
     const constraints = {
       audio: false,
-      video: { facingMode: { ideal: 'environment' } },
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+        advanced: [{ focusMode: 'continuous' }],
+      },
     };
 
     await _reader.decodeFromConstraints(constraints, video, (result, err) => {
