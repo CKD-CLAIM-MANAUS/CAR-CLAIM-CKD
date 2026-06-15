@@ -588,7 +588,16 @@
 
         <div class="field">
           <label class="field-label">Ficheiro Pack List (.xlsx)</label>
-          <input class="field-input" type="file" id="importFile" accept=".xlsx">
+          <div class="dropzone" id="packDropzone" onclick="document.getElementById('importFile').click()">
+            <input type="file" id="importFile" accept=".xlsx" hidden onchange="onPackFileChange(this.files)">
+            <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+            <div class="dropzone-text" id="packDropText">
+              <strong>Arraste o ficheiro aqui</strong><br>
+              <span>ou toque para procurar (.xlsx)</span>
+            </div>
+          </div>
         </div>
 
         <button class="btn btn-primary btn-full" style="margin-top:4px" onclick="doImportPackList()">

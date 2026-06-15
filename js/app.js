@@ -2812,11 +2812,51 @@ window.exportExcel = async () => {
 };
 
 // ── Pack List Import ──────────────────────────────────────────
+// ── Pack List: ficheiro escolhido (por arrasto ou picker) ─────
+let _packFile = null;
+
+function _isXlsx(file) {
+  return file && /\.xlsx$/i.test(file.name);
+}
+
+window.onPackFileChange = (files) => {
+  const file = files && files[0];
+  const txt  = document.getElementById('packDropText');
+  if (!file) return;
+  if (!_isXlsx(file)) {
+    _packFile = null;
+    if (txt) txt.innerHTML = '<strong style="color:var(--red-500)">Formato inválido</strong><br><span>Use um ficheiro .xlsx</span>';
+    return;
+  }
+  _packFile = file;
+  const kb = (file.size / 1024).toFixed(0);
+  if (txt) txt.innerHTML = `<strong>📄 ${escHtml(file.name)}</strong><br><span>${kb} KB · toque para trocar</span>`;
+  document.getElementById('packDropzone')?.classList.add('has-file');
+};
+
+// Drag & drop na dropzone (desktop); no telemóvel o clique abre o picker
+function setupPackDropzone() {
+  const dz = document.getElementById('packDropzone');
+  if (!dz) return;
+  ['dragenter', 'dragover'].forEach(ev =>
+    dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('dragover'); }));
+  ['dragleave', 'dragend'].forEach(ev =>
+    dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('dragover'); }));
+  dz.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dz.classList.remove('dragover');
+    onPackFileChange(e.dataTransfer.files);
+  });
+}
+setupPackDropzone();
+
 window.doImportPackList = async () => {
   const model    = document.getElementById('importModel').value.trim();
   const orderNo  = document.getElementById('importOrderNo').value.trim();
-  const file     = document.getElementById('importFile').files[0];
+  const file     = _packFile;
   const progress = document.getElementById('importProgress');
+
+  if (!file) { showToast('Arraste ou escolha um ficheiro .xlsx primeiro.'); return; }
 
   progress.className = 'import-progress visible';
 
@@ -2828,9 +2868,13 @@ window.doImportPackList = async () => {
     progress.className = 'import-progress visible success';
     progress.textContent = `✅ ${saved} peças guardadas no Firebase.`;
     showToast('Pack List importado!');
-    document.getElementById('importModel').value  = '';
-    document.getElementById('importOrderNo').value = '';
-    document.getElementById('importFile').value   = '';
+    document.getElementById('importModel').value   = '';
+    document.getElementById('importOrderNo').value  = '';
+    document.getElementById('importFile').value     = '';
+    _packFile = null;
+    const txt = document.getElementById('packDropText');
+    if (txt) txt.innerHTML = '<strong>Arraste o ficheiro aqui</strong><br><span>ou toque para procurar (.xlsx)</span>';
+    document.getElementById('packDropzone')?.classList.remove('has-file');
   } catch (e) {
     progress.className = 'import-progress visible error';
     progress.textContent = 'Erro: ' + e.message;
