@@ -7,6 +7,8 @@ let _reader      = null;   // instância BrowserMultiFormatReader
 let qrOpen       = false;
 let _torchTrack  = null;   // track de vídeo (para a lanterna)
 let _torchOn     = false;
+let _onResult    = null;   // callback de resultado (partilhado: scan + captura)
+let _handled     = false;  // evita processar duas vezes
 
 // ── Open QR Scanner ───────────────────────────────────────────
 export async function openQR(onResult, onError) {
@@ -23,7 +25,8 @@ export async function openQR(onResult, onError) {
   }
 
   qrOpen = true;
-  let _handled = false;
+  _handled  = false;
+  _onResult = onResult;
 
   try {
     // Hints: TRY_HARDER aumenta muito a taxa de leitura (mais esforço por frame)
@@ -52,7 +55,7 @@ export async function openQR(onResult, onError) {
         _flashDetected();             // feedback: vibração + moldura verde + texto
         setTimeout(() => {            // breve instante para o utilizador ver que reconheceu
           closeQR();
-          if (onResult) onResult(text);
+          if (_onResult) _onResult(text);
         }, 400);
       }
       // err em cada frame sem código (NotFoundException) é normal — ignora-se
@@ -65,6 +68,37 @@ export async function openQR(onResult, onError) {
     qrOpen = false;
     if (overlay) overlay.classList.remove('open');
     onError(e);
+  }
+}
+
+// ── Captura estática — decodifica uma foto parada em alta resolução ──
+// Muito mais robusto para códigos amassados/difíceis que o scan ao vivo.
+// Devolve true se leu, false se não conseguiu (para o chamador avisar).
+export function captureDecode() {
+  if (_handled) return true;
+  const video = document.getElementById('qrVideo');
+  if (!video || !video.videoWidth) return false;
+
+  // Resolução nativa completa (sem reduzir) → máximo detalhe
+  const canvas = document.createElement('canvas');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d', { willReadFrequently: true }).drawImage(video, 0, 0);
+
+  if (typeof ZXing === 'undefined') return false;
+  const hints = new Map();
+  try { hints.set(ZXing.DecodeHintType.TRY_HARDER, true); } catch { /* ignore */ }
+
+  const stillReader = new ZXing.BrowserMultiFormatReader(hints);
+  try {
+    const result = stillReader.decodeFromCanvas(canvas);
+    const text   = (typeof result.getText === 'function') ? result.getText() : result.text;
+    _handled = true;
+    _flashDetected();
+    setTimeout(() => { closeQR(); if (_onResult) _onResult(text); }, 400);
+    return true;
+  } catch {
+    return false; // não encontrou código nesta foto
   }
 }
 

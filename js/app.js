@@ -2,7 +2,7 @@
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
 import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA, markCARGenerated } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
-import { openQR, closeQR, parseQRData, toggleTorch } from './qr.js';
+import { openQR, closeQR, parseQRData, toggleTorch, captureDecode } from './qr.js';
 import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
 import { importPackList } from './packList.js';
 import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNavigate, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
@@ -2116,6 +2116,10 @@ window.openQRScanner = () => {
 
 window.closeQRScanner = closeQR;
 window.toggleQRTorch  = toggleTorch;
+window.captureQR = () => {
+  const ok = captureDecode();
+  if (!ok) showToast('⚠️ Não foi possível ler. Alise a etiqueta, aproxime e tente de novo.');
+};
 
 // ── Ler QR a meio do preenchimento manual ─────────────────────
 // Preenche só os campos da etiqueta (partNo, lote, qtd, pedido, nome, modelo)
