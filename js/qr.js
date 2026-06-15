@@ -74,10 +74,11 @@ export async function openQR(onResult, onError) {
 // ── Captura estática — decodifica uma foto parada em alta resolução ──
 // Muito mais robusto para códigos amassados/difíceis que o scan ao vivo.
 // Devolve true se leu, false se não conseguiu (para o chamador avisar).
-export function captureDecode() {
+export async function captureDecode() {
   if (_handled) return true;
   const video = document.getElementById('qrVideo');
   if (!video || !video.videoWidth) return false;
+  if (typeof ZXing === 'undefined') return false;
 
   // Resolução nativa completa (sem reduzir) → máximo detalhe
   const canvas = document.createElement('canvas');
@@ -85,20 +86,22 @@ export function captureDecode() {
   canvas.height = video.videoHeight;
   canvas.getContext('2d', { willReadFrequently: true }).drawImage(video, 0, 0);
 
-  if (typeof ZXing === 'undefined') return false;
   const hints = new Map();
   try { hints.set(ZXing.DecodeHintType.TRY_HARDER, true); } catch { /* ignore */ }
 
   const stillReader = new ZXing.BrowserMultiFormatReader(hints);
   try {
-    const result = stillReader.decodeFromCanvas(canvas);
-    const text   = (typeof result.getText === 'function') ? result.getText() : result.text;
+    const dataUrl = canvas.toDataURL('image/png');
+    const result  = await stillReader.decodeFromImageUrl(dataUrl);
+    const text    = (typeof result.getText === 'function') ? result.getText() : result.text;
     _handled = true;
     _flashDetected();
     setTimeout(() => { closeQR(); if (_onResult) _onResult(text); }, 400);
     return true;
   } catch {
     return false; // não encontrou código nesta foto
+  } finally {
+    try { stillReader.reset(); } catch { /* ignore */ }
   }
 }
 
