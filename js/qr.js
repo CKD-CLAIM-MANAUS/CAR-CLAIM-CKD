@@ -36,8 +36,11 @@ export async function openQR(onResult, onError) {
       if (result && !_handled) {
         _handled = true;
         const text = (typeof result.getText === 'function') ? result.getText() : result.text;
-        closeQR();
-        if (onResult) onResult(text);
+        _flashDetected();             // feedback: vibração + moldura verde + texto
+        setTimeout(() => {            // breve instante para o utilizador ver que reconheceu
+          closeQR();
+          if (onResult) onResult(text);
+        }, 400);
       }
       // err em cada frame sem código (NotFoundException) é normal — ignora-se
     });
@@ -46,6 +49,22 @@ export async function openQR(onResult, onError) {
     if (overlay) overlay.classList.remove('open');
     onError(e);
   }
+}
+
+// ── Feedback ao reconhecer um código ──────────────────────────
+function _flashDetected() {
+  const vf   = document.querySelector('#qrOverlay .qr-viewfinder');
+  const hint = document.querySelector('#qrOverlay .qr-hint');
+  if (vf)   vf.classList.add('qr-detected');
+  if (hint) { hint.textContent = '✓ Código reconhecido!'; hint.classList.add('qr-hint-ok'); }
+  try { if (navigator.vibrate) navigator.vibrate(120); } catch { /* ignore */ }
+}
+
+function _resetFeedback() {
+  const vf   = document.querySelector('#qrOverlay .qr-viewfinder');
+  const hint = document.querySelector('#qrOverlay .qr-hint');
+  if (vf)   vf.classList.remove('qr-detected');
+  if (hint) { hint.textContent = 'Aponte para o QR code da etiqueta da peça'; hint.classList.remove('qr-hint-ok'); }
 }
 
 // ── Close ─────────────────────────────────────────────────────
@@ -65,6 +84,8 @@ export function closeQR() {
     try { video.srcObject.getTracks().forEach(t => t.stop()); } catch { /* ignore */ }
     video.srcObject = null;
   }
+
+  _resetFeedback();
 }
 
 // ── Parse QR data — formato: orderNo&partNo&qty&lotNo ─────────
