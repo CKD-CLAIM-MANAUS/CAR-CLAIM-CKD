@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v23';
+const CACHE_NAME = 'car-garantia-v24';
 
 // Apenas assets estáticos que raramente mudam
 const STATIC_ASSETS = [
