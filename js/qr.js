@@ -1,143 +1,68 @@
 // ── qr.js ─────────────────────────────────────────────────────
-let qrStream = null;
-let qrAnimFrame = null;
-let qrOpen = false;
-let onResultCallback = null;
+// Leitura de QR/códigos com ZXing (@zxing/library, carregado via CDN
+// como global `ZXing`). Mais robusto que jsQR com códigos impressos,
+// em ângulo ou com foco imperfeito; também lê Data Matrix e barras.
+
+let _reader  = null;   // instância BrowserMultiFormatReader
+let qrOpen   = false;
 
 // ── Open QR Scanner ───────────────────────────────────────────
 export async function openQR(onResult, onError) {
-  if (qrOpen) {
-    closeQR();
-    await new Promise(r => setTimeout(r, 300));
+  if (qrOpen) { closeQR(); await new Promise(r => setTimeout(r, 300)); }
+
+  const overlay = document.getElementById('qrOverlay');
+  const video   = document.getElementById('qrVideo');
+  if (overlay) overlay.classList.add('open');
+
+  if (typeof ZXing === 'undefined') {
+    if (overlay) overlay.classList.remove('open');
+    onError(new Error('Biblioteca de leitura não carregada. Recarregue a página.'));
+    return;
   }
 
   qrOpen = true;
-  onResultCallback = onResult;
-
-  const overlay = document.getElementById('qrOverlay');
-  overlay.classList.add('open');
-
-  stopAllStreams();
+  let _handled = false;
 
   try {
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          // Resolução alta — QR de peça (pack list) são densos e precisam
-          // de detalhe suficiente para decodificar
-          width:  { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 }
-        },
-        audio: false
-      });
-    } catch {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    }
+    _reader = new ZXing.BrowserMultiFormatReader();
 
-    qrStream = stream;
-    const video = document.getElementById('qrVideo');
-    video.srcObject = null;
-    video.srcObject = stream;
+    // Câmara traseira; o ZXing gere o stream e faz o scan internamente
+    const constraints = {
+      audio: false,
+      video: { facingMode: { ideal: 'environment' } },
+    };
 
-    await new Promise((res, rej) => {
-      video.onloadedmetadata = () => { video.play().then(res).catch(rej); };
-      video.onerror = rej;
+    await _reader.decodeFromConstraints(constraints, video, (result, err) => {
+      if (result && !_handled) {
+        _handled = true;
+        const text = (typeof result.getText === 'function') ? result.getText() : result.text;
+        closeQR();
+        if (onResult) onResult(text);
+      }
+      // err em cada frame sem código (NotFoundException) é normal — ignora-se
     });
-
-    scanLoop(video);
-
   } catch (e) {
     qrOpen = false;
-    overlay.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
     onError(e);
   }
-}
-
-// ── Scan loop — corre a cada frame mas só processa 1 em cada 3 ─
-let frameCount = 0;
-const canvas = document.createElement('canvas');  // canvas reutilizável fora do DOM
-
-function scanLoop(video) {
-  const tick = () => {
-    if (!qrOpen) return;
-    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-      qrAnimFrame = requestAnimationFrame(tick);
-      return;
-    }
-
-    // Só processa 1 em cada 4 frames (resolução alta é mais pesada para jsQR)
-    frameCount++;
-    if (frameCount % 4 !== 0) {
-      qrAnimFrame = requestAnimationFrame(tick);
-      return;
-    }
-
-    // Usa resolução alta (até 1280 de largura) — QR de peça densos precisam
-    // de detalhe; abaixo disto o jsQR não os decodifica
-    const maxW   = 1280;
-    const scale  = video.videoWidth > maxW ? maxW / video.videoWidth : 1;
-    const scanW  = Math.round(video.videoWidth  * scale);
-    const scanH  = Math.round(video.videoHeight * scale);
-    canvas.width  = scanW;
-    canvas.height = scanH;
-
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(video, 0, 0, scanW, scanH);
-
-    const imageData = ctx.getImageData(0, 0, scanW, scanH);
-
-    if (typeof jsQR === 'undefined') {
-      qrAnimFrame = requestAnimationFrame(tick);
-      return;
-    }
-
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth'  // tenta normal e invertido — mais robusto
-    });
-
-    if (code && code.data) {
-      const result = code.data;
-      closeQR();
-      if (onResultCallback) onResultCallback(result);
-      return;
-    }
-
-    qrAnimFrame = requestAnimationFrame(tick);
-  };
-
-  qrAnimFrame = requestAnimationFrame(tick);
 }
 
 // ── Close ─────────────────────────────────────────────────────
 export function closeQR() {
   qrOpen = false;
-  frameCount = 0;
 
-  if (qrAnimFrame) {
-    cancelAnimationFrame(qrAnimFrame);
-    qrAnimFrame = null;
+  if (_reader) {
+    try { _reader.reset(); } catch { /* ignore */ }
+    _reader = null;
   }
-
-  stopAllStreams();
 
   const overlay = document.getElementById('qrOverlay');
   if (overlay) overlay.classList.remove('open');
 
   const video = document.getElementById('qrVideo');
-  if (video) video.srcObject = null;
-}
-
-function stopAllStreams() {
-  if (qrStream) {
-    qrStream.getTracks().forEach(t => t.stop());
-    qrStream = null;
-  }
-  const video = document.getElementById('qrVideo');
   if (video && video.srcObject) {
-    video.srcObject.getTracks().forEach(t => t.stop());
+    try { video.srcObject.getTracks().forEach(t => t.stop()); } catch { /* ignore */ }
     video.srcObject = null;
   }
 }
