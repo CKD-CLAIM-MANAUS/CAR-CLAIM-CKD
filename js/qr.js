@@ -3,8 +3,10 @@
 // como global `ZXing`). Mais robusto que jsQR com códigos impressos,
 // em ângulo ou com foco imperfeito; também lê Data Matrix e barras.
 
-let _reader  = null;   // instância BrowserMultiFormatReader
-let qrOpen   = false;
+let _reader      = null;   // instância BrowserMultiFormatReader
+let qrOpen       = false;
+let _torchTrack  = null;   // track de vídeo (para a lanterna)
+let _torchOn     = false;
 
 // ── Open QR Scanner ───────────────────────────────────────────
 export async function openQR(onResult, onError) {
@@ -55,11 +57,48 @@ export async function openQR(onResult, onError) {
       }
       // err em cada frame sem código (NotFoundException) é normal — ignora-se
     });
+
+    // Configura a lanterna se a câmara a suportar (ajuda com etiquetas
+    // brilhantes/amassadas e pouca luz no armazém)
+    setTimeout(() => _setupTorch(video), 350);
   } catch (e) {
     qrOpen = false;
     if (overlay) overlay.classList.remove('open');
     onError(e);
   }
+}
+
+// ── Lanterna (torch) ──────────────────────────────────────────
+function _setupTorch(video) {
+  const btn = document.getElementById('qrTorchBtn');
+  _torchTrack = null;
+  _torchOn    = false;
+  if (!btn) return;
+
+  const stream = video && video.srcObject;
+  const track  = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+
+  let supported = false;
+  try { supported = !!(track && track.getCapabilities && track.getCapabilities().torch); }
+  catch { supported = false; }
+
+  if (supported) {
+    _torchTrack = track;
+    btn.style.display = 'flex';
+    btn.classList.remove('on');
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+export async function toggleTorch() {
+  if (!_torchTrack) return;
+  try {
+    _torchOn = !_torchOn;
+    await _torchTrack.applyConstraints({ advanced: [{ torch: _torchOn }] });
+    const btn = document.getElementById('qrTorchBtn');
+    if (btn) btn.classList.toggle('on', _torchOn);
+  } catch { /* lanterna não suportada neste dispositivo */ }
 }
 
 // ── Feedback ao reconhecer um código ──────────────────────────
@@ -81,6 +120,13 @@ function _resetFeedback() {
 // ── Close ─────────────────────────────────────────────────────
 export function closeQR() {
   qrOpen = false;
+
+  // Desliga a lanterna antes de parar o stream
+  if (_torchTrack && _torchOn) {
+    try { _torchTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch { /* ignore */ }
+  }
+  _torchTrack = null;
+  _torchOn    = false;
 
   if (_reader) {
     try { _reader.reset(); } catch { /* ignore */ }

@@ -1127,6 +1127,28 @@ img { display: block; max-width: 100%; }
   color: #22C55E;
   font-weight: 700;
 }
+
+/* ── Botão de lanterna no scanner ────────────────────────────── */
+.qr-torch {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 24px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+.qr-torch.on {
+  background: #FBBF24;
+  color: #1A1A1A;
+  border-color: #FBBF24;
+}
 .qr-close {
   position: absolute;
   top: 20px;
