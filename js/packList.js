@@ -63,14 +63,23 @@ export async function importPackList({ file, model, orderNoOverride }, onProgres
     onProgress(`Processadas ${idx}/${dataSheets.length} abas... (${totalParts} peças)`);
   }
 
-  const total = Object.keys(batchData).length;
+  const entries = Object.entries(batchData);
+  const total   = entries.length;
   onProgress(`A guardar ${total} peças no Firebase...`);
 
+  // Escrita em lote — o Firestore aceita até 500 operações por batch.
+  // Muito mais rápido que gravar peça a peça (1 ida à rede por lote).
+  const BATCH_LIMIT = 500;
   let saved = 0;
-  for (const [key, data] of Object.entries(batchData)) {
-    await fb.setDoc(fb.doc(db, 'partsDB', key), data);
-    saved++;
-    if (saved % 50 === 0) onProgress(`Guardando... ${saved}/${total}`);
+  for (let i = 0; i < total; i += BATCH_LIMIT) {
+    const chunk = entries.slice(i, i + BATCH_LIMIT);
+    const batch = fb.writeBatch(db);
+    for (const [key, data] of chunk) {
+      batch.set(fb.doc(db, 'partsDB', key), data);
+    }
+    await batch.commit();
+    saved += chunk.length;
+    onProgress(`Guardando... ${saved}/${total}`);
   }
 
   return saved;
