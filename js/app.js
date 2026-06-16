@@ -2130,7 +2130,18 @@ window.openQRScanner = () => {
 window.closeQRScanner = closeQR;
 window.captureQR = () => {
   const ok = captureDecode();
-  if (!ok) showToast('⚠️ Não foi possível ler. Alise a etiqueta, aproxime e tente de novo.');
+  if (!ok) {
+    showToast('⚠️ Não foi possível ler. Alise a etiqueta, aproxime e tente de novo.');
+    const hint = document.querySelector('#qrOverlay .qr-hint');
+    if (hint) {
+      hint.textContent = '⚠️ Não foi possível ler — tente de novo';
+      hint.classList.add('qr-hint-error');
+      setTimeout(() => {
+        hint.textContent = 'Aponte para o QR code da etiqueta da peça';
+        hint.classList.remove('qr-hint-error');
+      }, 2500);
+    }
+  }
 };
 
 // ── Ler QR a meio do preenchimento manual ─────────────────────
