@@ -9,10 +9,8 @@
 //    de forma síncrona. Ideal para etiquetas amassadas/difíceis.
 
 let _reader     = null;   // BrowserMultiFormatReader (scan ao vivo)
-let _stream     = null;   // MediaStream activo (para captura e lanterna)
+let _stream     = null;   // MediaStream activo (para captura)
 let qrOpen      = false;
-let _torchTrack = null;
-let _torchOn    = false;
 let _onResult   = null;
 let _onError    = null;
 let _handled    = false;
@@ -51,8 +49,6 @@ export async function openQR(onResult, onError) {
 
     video.srcObject = _stream;
     await video.play().catch(() => {});
-
-    _setupTorch();
 
     // Scan ao vivo LEVE — reader sem TRY_HARDER, intervalo padrão (500ms)
     _reader = new ZXing.BrowserMultiFormatReader();
@@ -107,29 +103,6 @@ function _accept(result) {
   setTimeout(() => { closeQR(); if (_onResult) _onResult(text); }, 400);
 }
 
-// ── Lanterna ──────────────────────────────────────────────────
-function _setupTorch() {
-  const btn = document.getElementById('qrTorchBtn');
-  _torchTrack = null; _torchOn = false;
-  if (!btn) return;
-  const track = _stream && _stream.getVideoTracks ? _stream.getVideoTracks()[0] : null;
-  let supported = false;
-  try { supported = !!(track && track.getCapabilities && track.getCapabilities().torch); }
-  catch { supported = false; }
-  if (supported) { _torchTrack = track; btn.style.display = 'flex'; btn.classList.remove('on'); }
-  else           { btn.style.display = 'none'; }
-}
-
-export async function toggleTorch() {
-  if (!_torchTrack) return;
-  try {
-    _torchOn = !_torchOn;
-    await _torchTrack.applyConstraints({ advanced: [{ torch: _torchOn }] });
-    const btn = document.getElementById('qrTorchBtn');
-    if (btn) btn.classList.toggle('on', _torchOn);
-  } catch { /* não suportado */ }
-}
-
 // ── Feedback visual ───────────────────────────────────────────
 function _flashDetected() {
   const vf   = document.querySelector('#qrOverlay .qr-viewfinder');
@@ -149,11 +122,6 @@ function _resetFeedback() {
 // ── Close ─────────────────────────────────────────────────────
 export function closeQR() {
   qrOpen = false;
-
-  if (_torchTrack && _torchOn) {
-    try { _torchTrack.applyConstraints({ advanced: [{ torch: false }] }); } catch { /* ignore */ }
-  }
-  _torchTrack = null; _torchOn = false;
 
   if (_reader) { try { _reader.reset(); } catch { /* ignore */ } _reader = null; }
 
