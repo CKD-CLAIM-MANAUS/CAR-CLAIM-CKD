@@ -152,3 +152,27 @@ export async function migratePartsDB(onProgress) {
 
   return { parts: Object.keys(partsMap).length, lots: Object.keys(lotsMap).length, removed: oldKeys.length };
 }
+
+// ── Verificação de colisões de ID antes de migrar ───────────────
+// sid() troca qualquer caractere fora de [a-zA-Z0-9_-] por "_", então
+// partNo diferentes (ex: "ABC/123" vs "ABC.123") podem gerar o mesmo
+// ID e a migração guardaria só um deles, apagando o outro em silêncio.
+// Corre antes de migratePartsDB para detectar esses casos.
+export async function checkPartsDBCollisions(onProgress) {
+  onProgress('A ler base de peças actual...');
+  const snap = await fb.getDocs(fb.collection(db, 'partsDB'));
+
+  const groups = {}; // sid(partNo) → Set de partNo originais distintos
+
+  snap.docs.forEach(d => {
+    const partNo = d.data().partNo;
+    if (!partNo) return;
+    const key = sid(partNo);
+    if (!groups[key]) groups[key] = new Set();
+    groups[key].add(partNo);
+  });
+
+  return Object.entries(groups)
+    .filter(([, set]) => set.size > 1)
+    .map(([key, set]) => ({ key, partNos: [...set] }));
+}
