@@ -138,17 +138,6 @@ export function closeQR() {
   _resetFeedback();
 }
 
-// ── Captura frame actual como JPEG base64 (para OCR) ──────────
-export function captureFrame() {
-  const video = document.getElementById('qrVideo');
-  if (!video || !video.videoWidth) return null;
-  const canvas = document.createElement('canvas');
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d', { willReadFrequently: true }).drawImage(video, 0, 0);
-  return canvas.toDataURL('image/jpeg', 0.88);
-}
-
 // ── Parse QR data — formato: orderNo&partNo&qty&lotNo ─────────
 export function parseQRData(data) {
   const parts = data.split('&');
