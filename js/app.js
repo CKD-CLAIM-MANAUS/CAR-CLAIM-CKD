@@ -2167,13 +2167,14 @@ window.ocrLabel = async () => {
     const token = await auth.currentUser?.getIdToken(true);
     if (!token) throw new Error('Sessão expirada. Faça login novamente.');
 
-    const res = await fetch(_OCR_URL + '/ocr-label', {
+    const res  = await fetch(_OCR_URL + '/ocr-label', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body:    JSON.stringify({ image: frame })
     });
-    if (!res.ok) throw new Error('Servidor indisponível (' + res.status + ').');
-    const { text, error } = await res.json();
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'Servidor indisponível (' + res.status + ').');
+    const { text, error } = body;
     if (error) throw new Error(error);
     if (!text)  throw new Error('Nenhum texto detectado. Enquadre melhor a etiqueta.');
 
