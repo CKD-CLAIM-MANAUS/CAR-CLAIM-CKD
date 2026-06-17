@@ -8,6 +8,7 @@ from datetime import datetime
 import os, io, tempfile
 import urllib.request
 import urllib.parse
+import urllib.error
 import json
 import re
 import hmac
@@ -223,9 +224,20 @@ def ocr_label():
             text_anns = responses[0].get('textAnnotations', [])
             text = text_anns[0].get('description', '') if text_anns else ''
         return jsonify({'text': text})
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        print(f'OCR Vision API HTTP {e.code}: {body}')
+        try:
+            msg = json.loads(body).get('error', {}).get('message', body[:200])
+        except Exception:
+            msg = body[:200]
+        return jsonify({'error': f'Vision API ({e.code}): {msg}'}), 500
+    except urllib.error.URLError as e:
+        print(f'OCR URLError: {e.reason}')
+        return jsonify({'error': f'Sem ligação à Vision API: {e.reason}'}), 500
     except Exception as e:
         print(f'OCR error: {e}')
-        return jsonify({'error': 'Erro ao processar OCR.'}), 500
+        return jsonify({'error': f'Erro OCR: {str(e)}'}), 500
 
 
 # ── Export para Power BI / Power Apps ─────────────────────────
