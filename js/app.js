@@ -2,7 +2,7 @@
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
 import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA, markCARGenerated } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
-import { openQR, closeQR, parseQRData, captureDecode } from './qr.js';
+import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
 import { importPackList, migratePartsDB, checkPartsDBCollisions } from './packList.js';
 import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNavigate, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
@@ -2129,21 +2129,6 @@ window.openQRScanner = () => {
 };
 
 window.closeQRScanner = closeQR;
-window.captureQR = () => {
-  const ok = captureDecode();
-  if (!ok) {
-    showToast('⚠️ Não foi possível ler. Alise a etiqueta, aproxime e tente de novo.');
-    const hint = document.querySelector('#qrOverlay .qr-hint');
-    if (hint) {
-      hint.textContent = '⚠️ Não foi possível ler — tente de novo';
-      hint.classList.add('qr-hint-error');
-      setTimeout(() => {
-        hint.textContent = 'Aponte para o QR code da etiqueta da peça';
-        hint.classList.remove('qr-hint-error');
-      }, 2500);
-    }
-  }
-};
 
 // ── Ler QR a meio do preenchimento manual ─────────────────────
 // Preenche só os campos da etiqueta (partNo, lote, qtd, pedido, nome, modelo)

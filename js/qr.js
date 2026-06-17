@@ -4,12 +4,9 @@
 // Arquitetura (para não travar o telemóvel):
 //  • Scan ao vivo LEVE — sem TRY_HARDER, resolução moderada, intervalo padrão.
 //    Lê bem QR nítidos sem sobrecarregar a CPU.
-//  • Captura ROBUSTA — ao tocar em "Capturar", para o scan (liberta CPU),
-//    tira um frame em resolução nativa e decodifica em modo pesado (TRY_HARDER)
-//    de forma síncrona. Ideal para etiquetas amassadas/difíceis.
 
 let _reader     = null;   // BrowserMultiFormatReader (scan ao vivo)
-let _stream     = null;   // MediaStream activo (para captura)
+let _stream     = null;   // MediaStream activo
 let qrOpen      = false;
 let _onResult   = null;
 let _onError    = null;
@@ -63,38 +60,7 @@ export async function openQR(onResult, onError) {
   }
 }
 
-// ── Captura robusta (foto estática + TRY_HARDER) ──────────────
-// Decodificação pontual de um frame; NÃO mexe no scan ao vivo (que
-// continua a correr). Síncrona e rápida — sem parar a câmara.
-export function captureDecode() {
-  if (_handled) return true;
-  const video = document.getElementById('qrVideo');
-  if (!video || !video.videoWidth || typeof ZXing === 'undefined') return false;
-
-  // Frame em resolução nativa completa
-  const canvas = document.createElement('canvas');
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d', { willReadFrequently: true }).drawImage(video, 0, 0);
-
-  try {
-    const hints = new Map();
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-
-    const reader = new ZXing.MultiFormatReader();
-    reader.setHints(hints);
-    const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-    const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-    const result = reader.decode(bitmap);
-
-    _accept(result);
-    return true;
-  } catch {
-    return false; // não leu — o scan ao vivo continua a correr normalmente
-  }
-}
-
-// ── Aceita um resultado (scan ou captura) ─────────────────────
+// ── Aceita um resultado do scan ──────────────────────────────
 function _accept(result) {
   if (_handled) return;
   _handled = true;
