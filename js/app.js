@@ -2,7 +2,7 @@
 import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
 import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA, markCARGenerated } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
-import { openQR, closeQR, parseQRData, captureDecode } from './qr.js';
+import { openQR, closeQR, parseQRData, captureDecode, captureFrame } from './qr.js';
 import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
 import { importPackList, migratePartsDB, checkPartsDBCollisions } from './packList.js';
 import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNavigate, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
@@ -10,6 +10,9 @@ import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 import { getTrackingUrl, getCarrierLabel } from './tracking.js';
 import { saveDraftDB, loadDraftDB, clearDraftDB } from './draftStore.js';
+import { auth } from './firebase.js';
+
+const _OCR_URL = 'https://car-claim-manaus.onrender.com';
 
 // ── Paint URL detection — executa antes do auth ───────────────
 // QR das etiquetas de pintura codifica: APP_URL?paint=INCIDENT_ID
@@ -2141,6 +2144,71 @@ window.captureQR = () => {
         hint.classList.remove('qr-hint-error');
       }, 2500);
     }
+  }
+};
+
+// ── Leitura de texto (OCR) via Google Cloud Vision ────────────
+window.ocrLabel = async () => {
+  const frame = captureFrame();
+  if (!frame) { showToast('Câmara não está ativa.'); return; }
+
+  const hint = document.querySelector('#qrOverlay .qr-hint');
+  const btn  = document.getElementById('qrOcrBtn');
+  const setHint = (msg, cls) => {
+    if (!hint) return;
+    hint.textContent = msg;
+    hint.className   = 'qr-hint' + (cls ? ' ' + cls : '');
+  };
+
+  setHint('A ler texto da etiqueta...');
+  if (btn) btn.disabled = true;
+
+  try {
+    const token = await auth.currentUser?.getIdToken(true);
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
+    const res = await fetch(_OCR_URL + '/ocr-label', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body:    JSON.stringify({ image: frame })
+    });
+    if (!res.ok) throw new Error('Servidor indisponível (' + res.status + ').');
+    const { text, error } = await res.json();
+    if (error) throw new Error(error);
+    if (!text)  throw new Error('Nenhum texto detectado. Enquadre melhor a etiqueta.');
+
+    // Extrai campos pelos labels explícitos da etiqueta CFMOTO
+    const get = (re) => text.match(re)?.[1]?.trim();
+    const partNo   = get(/Part\s*NO[:\s]+([A-Z0-9][\w-]+)/i);
+    const lotNo    = get(/Sales\s*NO[:\s]+(\d+)/i);
+    const orderNo  = get(/Contract\s*No[:\s]+([\w-]+)/i);
+    const qty      = get(/Qty[:\s]+(\d+)/i);
+    const model    = get(/Model[:\s]+([^\n\r]+)/i)?.split(/\s{2,}/)[0];
+    const partName = get(/Part\s*Name[:\s]+([^\n\r]+)/i);
+
+    if (!partNo) throw new Error('Part NO não encontrado. Enquadre melhor a etiqueta.');
+
+    closeQR();
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val.trim(); };
+    setVal('fPartNo',   partNo);
+    setVal('fLotNo',    lotNo);
+    setVal('fOrderNo',  orderNo);
+    setVal('fNgQty',    qty);
+    setVal('fModel',    model);
+    setVal('fPartName', partName);
+    showPage('form');
+    showToast('✅ Etiqueta lida! A confirmar dados...');
+
+    // Complementa com lookup Firestore (mesmo fluxo do QR)
+    const partData = await lookupPart(partNo, lotNo);
+    _applyLookupToForm(partData, { partNo, lotNo, qty, orderNo });
+
+  } catch (e) {
+    setHint('⚠️ ' + e.message, 'qr-hint-error');
+    setTimeout(() => setHint('Aponte para o QR code da etiqueta da peça'), 3500);
+    showToast('⚠️ ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 };
 

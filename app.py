@@ -180,6 +180,54 @@ def sign_upload():
     })
 
 
+@app.route('/ocr-label', methods=['POST'])
+def ocr_label():
+    user_token = verify_token()
+    if not user_token:
+        return jsonify({'error': 'Não autorizado. Faça login novamente.'}), 401
+
+    vision_key = os.environ.get('VISION_API_KEY', '')
+    if not vision_key:
+        return jsonify({'error': 'OCR não configurado no servidor.'}), 503
+
+    data      = request.get_json(silent=True) or {}
+    image_b64 = data.get('image', '')
+    if not image_b64:
+        return jsonify({'error': 'Campo "image" obrigatório.'}), 400
+
+    # Remove prefixo data URL se presente (data:image/jpeg;base64,...)
+    if ',' in image_b64:
+        image_b64 = image_b64.split(',', 1)[1]
+
+    # Limite de segurança: ~5 MB base64 ≈ ~3,75 MB de imagem
+    if len(image_b64) > 5_000_000:
+        return jsonify({'error': 'Imagem demasiado grande.'}), 400
+
+    payload = json.dumps({
+        'requests': [{
+            'image':    {'content': image_b64},
+            'features': [{'type': 'TEXT_DETECTION', 'maxResults': 1}]
+        }]
+    }).encode('utf-8')
+
+    url = f'https://vision.googleapis.com/v1/images:annotate?key={vision_key}'
+    req = urllib.request.Request(url, data=payload,
+                                 headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+        responses  = result.get('responses', [{}])
+        annotation = responses[0].get('fullTextAnnotation') or {}
+        text       = annotation.get('text', '')
+        if not text:
+            text_anns = responses[0].get('textAnnotations', [])
+            text = text_anns[0].get('description', '') if text_anns else ''
+        return jsonify({'text': text})
+    except Exception as e:
+        print(f'OCR error: {e}')
+        return jsonify({'error': 'Erro ao processar OCR.'}), 500
+
+
 # ── Export para Power BI / Power Apps ─────────────────────────
 def _check_export_key():
     """Valida a chave de API (header X-API-Key ou query ?key=) de forma
