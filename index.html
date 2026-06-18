@@ -607,17 +607,14 @@
         <div class="import-progress" id="importProgress"></div>
       </div>
 
-      <!-- Migração (uma vez) — formato antigo → peças + lotes -->
+      <!-- Limpeza de lotes órfãos (chave em formato antigo) -->
       <div class="form-card" style="margin-bottom:12px">
-        <div class="form-card-title">🔄 Migrar base de peças</div>
-        <p class="section-desc">Converte a base antiga para o novo formato (peças sem cópias + lotes atrelados ao pedido). Corra uma vez.</p>
-        <button class="btn btn-full" id="checkCollisionsBtn" style="margin-bottom:8px" onclick="doCheckPartsDBCollisions()">
-          🔍 Verificar colisões antes de migrar
+        <div class="form-card-title">🧹 Limpar lotes órfãos</div>
+        <p class="section-desc">Remove lotes duplicados em formato antigo de chave (ex.: com zeros à esquerda) que sobram após reimportar a pack list.</p>
+        <button class="btn btn-full" id="cleanLotsBtn" onclick="doCleanOrphanLots()">
+          🧹 Limpar agora
         </button>
-        <button class="btn btn-full" id="migrateBtn" onclick="doMigratePartsDB()">
-          🔄 Migrar agora
-        </button>
-        <div class="import-progress" id="migrateProgress"></div>
+        <div class="import-progress" id="cleanLotsProgress"></div>
       </div>
 
       <hr class="divider">

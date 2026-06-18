@@ -4,7 +4,7 @@ import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, get
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
-import { importPackList, migratePartsDB, checkPartsDBCollisions } from './packList.js';
+import { importPackList, cleanOrphanLots } from './packList.js';
 import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNavigate, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
 import { renderDashboard, setDashPeriod } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
@@ -2883,48 +2883,23 @@ window.doImportPackList = async () => {
   }
 };
 
-// ── Verificação de colisões de ID antes de migrar ───────────────
-window.doCheckPartsDBCollisions = async () => {
-  if (!isAdmin) { showToast('Apenas admin pode verificar.'); return; }
-  const progress = document.getElementById('migrateProgress');
-  const btn      = document.getElementById('checkCollisionsBtn');
+// ── Limpeza de lotes órfãos (chave em formato antigo) ──────────
+window.doCleanOrphanLots = async () => {
+  if (!isAdmin) { showToast('Apenas admin pode limpar.'); return; }
+  const progress = document.getElementById('cleanLotsProgress');
+  const btn      = document.getElementById('cleanLotsBtn');
   if (btn) btn.disabled = true;
   if (progress) progress.className = 'import-progress visible';
 
   try {
-    const collisions = await checkPartsDBCollisions((msg) => { if (progress) progress.textContent = msg; });
-    if (progress) {
-      if (collisions.length === 0) {
-        progress.className = 'import-progress visible success';
-        progress.textContent = '✅ Nenhuma colisão encontrada. Pode migrar com segurança.';
-      } else {
-        progress.className = 'import-progress visible error';
-        progress.innerHTML = `⚠️ ${collisions.length} colisão(ões) — corrija estes partNo antes de migrar:<br>` +
-          collisions.map(c => `"${escHtml(c.key)}" ← ${c.partNos.map(escHtml).join(' | ')}`).join('<br>');
-      }
-    }
-  } catch (e) {
-    if (progress) { progress.className = 'import-progress visible error'; progress.textContent = 'Erro: ' + e.message; }
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-};
-
-// ── Migração da base de peças (formato antigo → peças + lotes) ──
-window.doMigratePartsDB = async () => {
-  if (!isAdmin) { showToast('Apenas admin pode migrar.'); return; }
-  const progress = document.getElementById('migrateProgress');
-  const btn      = document.getElementById('migrateBtn');
-  if (btn) btn.disabled = true;
-  if (progress) progress.className = 'import-progress visible';
-
-  try {
-    const r = await migratePartsDB((msg) => { if (progress) progress.textContent = msg; });
+    const removed = await cleanOrphanLots((msg) => { if (progress) progress.textContent = msg; });
     if (progress) {
       progress.className = 'import-progress visible success';
-      progress.textContent = `✅ Migração concluída: ${r.parts} peças, ${r.lots} lotes, ${r.removed} entradas antigas removidas.`;
+      progress.textContent = removed > 0
+        ? `✅ ${removed} lote(s) órfão(s) removido(s).`
+        : '✅ Nenhum lote órfão encontrado.';
     }
-    showToast('Base de peças migrada!');
+    showToast('Lotes órfãos limpos!');
   } catch (e) {
     if (progress) { progress.className = 'import-progress visible error'; progress.textContent = 'Erro: ' + e.message; }
   } finally {

@@ -99,88 +99,45 @@ export async function importPackList({ file, model, orderNoOverride }, onProgres
   return { parts: nParts, lots: nLots };
 }
 
-// ── Migração: formato antigo (partsDB/{partNo_lotNo}) → novo ───
-// Lê todas as entradas, cria partsDB/{partNo} e lotsDB/{lotNo},
-// e apaga as entradas antigas (chave com partNo_lotNo).
-export async function migratePartsDB(onProgress) {
-  onProgress('A ler base de peças actual...');
-  const snap = await fb.getDocs(fb.collection(db, 'partsDB'));
+// ── Limpeza de lotes órfãos da lotsDB ──────────────────────────
+// Após normalizar o lote (ignorar zeros à esquerda), reimportações
+// criam docs com ID = lotKey(lotNo). Docs antigos com ID noutro
+// formato (ex.: "0010266174") ficam órfãos. Esta função re-chaveia
+// para o formato normalizado (preservando o pedido) quando o doc
+// correcto ainda não existe, e remove sempre o órfão.
+export async function cleanOrphanLots(onProgress) {
+  onProgress('A ler lotes...');
+  const snap = await fb.getDocs(fb.collection(db, 'lotsDB'));
 
-  const partsMap = {};
-  const lotsMap  = {};
-  const oldKeys  = [];
+  const existingIds = new Set(snap.docs.map(d => d.id));
+  const ops = []; // ['set'|'del', id, data]
 
   snap.docs.forEach(d => {
     const data = d.data();
-    if (!data.partNo) return;
-
-    const newPartId = sid(data.partNo);
-    partsMap[newPartId] = {
-      partNo:   data.partNo,
-      partName: data.partName || '',
-      model:    data.model    || '',
-      updatedAt: Date.now(),
-    };
-
-    if (data.lotNo) {
-      lotsMap[lotKey(data.lotNo)] = {
-        lotNo:   data.lotNo,
-        orderNo: data.orderNo || '',
-        model:   data.model   || '',
-        importedAt: data.importedAt || Date.now(),
-        source:  data.source || 'migração',
-      };
-    }
-
-    // Entrada antiga = chave diferente da nova (tinha partNo_lotNo)
-    if (d.id !== newPartId) oldKeys.push(d.id);
+    if (!data.lotNo) return;
+    const goodId = lotKey(data.lotNo);
+    if (d.id === goodId) return;                 // já está no formato certo
+    if (!existingIds.has(goodId)) ops.push(['set', goodId, data]); // preserva o pedido
+    ops.push(['del', d.id, null]);               // remove o órfão
   });
 
-  const ops = [
-    ...Object.entries(partsMap).map(([id, data]) => ['set', 'partsDB', id, data]),
-    ...Object.entries(lotsMap).map(([id, data]) => ['set', 'lotsDB', id, data]),
-    ...oldKeys.map(id => ['del', 'partsDB', id, null]),
-  ];
+  const removed = ops.filter(o => o[0] === 'del').length;
+  if (removed === 0) { onProgress('Nenhum lote órfão encontrado.'); return 0; }
 
-  onProgress(`A migrar: ${Object.keys(partsMap).length} peças, ${Object.keys(lotsMap).length} lotes, ${oldKeys.length} antigas a remover...`);
-
+  onProgress(`A limpar ${removed} lote(s) órfão(s)...`);
   const BATCH_LIMIT = 500;
   let done = 0;
   for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
     const chunk = ops.slice(i, i + BATCH_LIMIT);
     const batch = fb.writeBatch(db);
-    for (const [action, col, id, data] of chunk) {
-      if (action === 'set') batch.set(fb.doc(db, col, id), data);
-      else                  batch.delete(fb.doc(db, col, id));
+    for (const [action, id, data] of chunk) {
+      if (action === 'set') batch.set(fb.doc(db, 'lotsDB', id), data);
+      else                  batch.delete(fb.doc(db, 'lotsDB', id));
     }
     await batch.commit();
     done += chunk.length;
-    onProgress(`A migrar... ${done}/${ops.length}`);
+    onProgress(`A processar... ${done}/${ops.length}`);
   }
 
-  return { parts: Object.keys(partsMap).length, lots: Object.keys(lotsMap).length, removed: oldKeys.length };
-}
-
-// ── Verificação de colisões de ID antes de migrar ───────────────
-// sid() troca qualquer caractere fora de [a-zA-Z0-9_-] por "_", então
-// partNo diferentes (ex: "ABC/123" vs "ABC.123") podem gerar o mesmo
-// ID e a migração guardaria só um deles, apagando o outro em silêncio.
-// Corre antes de migratePartsDB para detectar esses casos.
-export async function checkPartsDBCollisions(onProgress) {
-  onProgress('A ler base de peças actual...');
-  const snap = await fb.getDocs(fb.collection(db, 'partsDB'));
-
-  const groups = {}; // sid(partNo) → Set de partNo originais distintos
-
-  snap.docs.forEach(d => {
-    const partNo = d.data().partNo;
-    if (!partNo) return;
-    const key = sid(partNo);
-    if (!groups[key]) groups[key] = new Set();
-    groups[key].add(partNo);
-  });
-
-  return Object.entries(groups)
-    .filter(([, set]) => set.size > 1)
-    .map(([key, set]) => ({ key, partNos: [...set] }));
+  return removed;
 }
