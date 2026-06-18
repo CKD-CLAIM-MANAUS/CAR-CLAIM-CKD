@@ -2049,12 +2049,13 @@ function _applyLookupToForm(partData, parsed) {
     setVal('fModel',    partData.model);
   }
 
-  if (partData && partData.orderNo) {
-    // Pedido manual atrelado ao lote
-    setVal('fOrderNo', partData.orderNo);
+  // Pedido: prioriza o valor importado no lote (lotsDB); se não houver,
+  // usa o orderNo que já vem dentro do próprio QR (parsed.orderNo).
+  const orderNo = (partData && partData.orderNo) || (parsed && parsed.orderNo) || '';
+  if (orderNo) {
+    setVal('fOrderNo', orderNo);
     showToast('✅ Dados preenchidos automaticamente!');
   } else if (parsed && parsed.lotNo) {
-    // Lote ainda não está na base — pedido manual desconhecido
     showToast('⚠️ Lote não encontrado. Importe a pack list desta BL ou preencha o Nº Pedido à mão.');
   } else {
     showToast('QR lido! Confirme os dados.');
@@ -2867,7 +2868,7 @@ window.doImportPackList = async () => {
       (msg) => { progress.textContent = msg; }
     );
     progress.className = 'import-progress visible success';
-    progress.textContent = `✅ ${saved} peças guardadas no Firebase.`;
+    progress.textContent = `✅ ${saved.parts} peças e ${saved.lots} lotes guardados no Firebase.`;
     showToast('Pack List importado!');
     document.getElementById('importModel').value   = '';
     document.getElementById('importOrderNo').value  = '';

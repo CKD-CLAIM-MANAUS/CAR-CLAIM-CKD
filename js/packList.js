@@ -88,7 +88,7 @@ export async function importPackList({ file, model, orderNoOverride }, onProgres
     onProgress(`Guardando... ${done}/${ops.length}`);
   }
 
-  return nParts;
+  return { parts: nParts, lots: nLots };
 }
 
 // ── Migração: formato antigo (partsDB/{partNo_lotNo}) → novo ───
