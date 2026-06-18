@@ -9,6 +9,14 @@ function sid(s) {
   return String(s || '').replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
+// Chave normalizada do lote: lotes só-dígitos ignoram zeros à esquerda
+// (a pack list traz "0010266174" e o QR traz "10266174" — mesmo lote).
+function lotKey(lot) {
+  let s = String(lot || '').trim();
+  if (/^\d+$/.test(s)) s = s.replace(/^0+/, '') || '0';
+  return s.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
 export async function importPackList({ file, model, orderNoOverride }, onProgress) {
   if (!model) throw new Error('Preencha o modelo primeiro.');
   if (!file)  throw new Error('Seleccione o ficheiro Pack List.');
@@ -55,7 +63,7 @@ export async function importPackList({ file, model, orderNoOverride }, onProgres
 
       // Lote → pedido manual (uma entrada por lote)
       if (lotNo) {
-        lotsMap[sid(lotNo)] = {
+        lotsMap[lotKey(lotNo)] = {
           lotNo,
           orderNo,
           model:      modelUp,
@@ -115,7 +123,7 @@ export async function migratePartsDB(onProgress) {
     };
 
     if (data.lotNo) {
-      lotsMap[sid(data.lotNo)] = {
+      lotsMap[lotKey(data.lotNo)] = {
         lotNo:   data.lotNo,
         orderNo: data.orderNo || '',
         model:   data.model   || '',

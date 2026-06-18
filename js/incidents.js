@@ -308,6 +308,8 @@ export function isCARNumberInUse(carNum, excludeId = null, incidentType = 'norma
 export async function lookupPart(partNo, lotNo) {
   if (!partNo) return null;
   const sid = (s) => String(s || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  // Lote: ignora zeros à esquerda (pack list "0010266174" == QR "10266174")
+  const lotKey = (s) => { let v = String(s || '').trim(); if (/^\d+$/.test(v)) v = v.replace(/^0+/, '') || '0'; return v.replace(/[^a-zA-Z0-9_-]/g, '_'); };
   const result = {};
 
   // Peça → nome + modelo
@@ -328,7 +330,8 @@ export async function lookupPart(partNo, lotNo) {
   // Lote → pedido manual
   if (lotNo) {
     try {
-      const lSnap = await fb.getDoc(fb.doc(db, 'lotsDB', sid(lotNo)));
+      let lSnap = await fb.getDoc(fb.doc(db, 'lotsDB', lotKey(lotNo)));
+      if (!lSnap.exists()) lSnap = await fb.getDoc(fb.doc(db, 'lotsDB', sid(lotNo)));
       if (lSnap.exists()) {
         result.orderNo  = lSnap.data().orderNo || '';
         result.lotFound = true;
