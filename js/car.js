@@ -20,6 +20,11 @@ export async function generateCAR(inc, carNum) {
     ? new Date(inc.createdAt).toLocaleDateString('pt-BR')
     : new Date().toLocaleDateString('pt-BR');
 
+  // Pintura: a descrição padrão (longa) é guardada em inc.defect.
+  // No CAR ela deve ir como descrição PRINCIPAL (campo detected → célula A11);
+  // o tag curto (célula G9) fica "DEFECTIVE PAINT".
+  const isPaint = (inc.incidentType || 'normal') === 'paint';
+
   const payload = {
     carNum,
     partName:    inc.partName    || '',
@@ -28,8 +33,8 @@ export async function generateCAR(inc, carNum) {
     orderNo:     inc.orderNo     || '',
     lotNo:       inc.lotNo       || '',
     ngQty:       inc.ngQty       || 1,
-    defect:      inc.defect      || '',
-    detected:    inc.detected    || '',
+    defect:      isPaint ? 'DEFECTIVE PAINT' : (inc.defect || ''),
+    detected:    isPaint ? (inc.defect || inc.detected || '') : (inc.detected || ''),
     user:        inc.user        || '',
     replacement: inc.replacement || 'NEED',
     issueDate,
