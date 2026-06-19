@@ -1392,7 +1392,7 @@ function _showPaintActionConfirm(title, subtitle, confirmLabel, onConfirm) {
   document.getElementById('paintConfirmCancel').onclick = () => overlay.remove();
 }
 
-// ── Scan para enviar para pintoria (pending → sent) ───────────
+// ── Scan para enviar para pintura (pending → sent) ───────────
 window.doScanPaintSend = (id) => {
   openQR(
     (data) => {
@@ -1400,13 +1400,13 @@ window.doScanPaintSend = (id) => {
       const inc = incidents.find(i => i.id === id);
       closeQR();
       _showPaintActionConfirm(
-        '🎨 Enviar para Pintoria',
+        '🎨 Enviar para Pintura',
         `${inc?.partName || '—'} · ${inc?.carNum ? 'CAR ' + inc.carNum : 'SEM CAR'}`,
         '✅ Confirmar Envio',
         async () => {
           try {
-            await updateIncidentStatus(id, 'sent', currentUser, 'Enviado para pintoria via leitura de QR.');
-            showToast('🎨 Enviado para pintoria!');
+            await updateIncidentStatus(id, 'sent', currentUser, 'Enviado para pintura via leitura de QR.');
+            showToast('🎨 Enviado para pintura!');
             window.showDetail(id); renderList();
           } catch (e) { showToast('Erro: ' + e.message); }
         }
@@ -1424,12 +1424,12 @@ window.doScanPaintReturn = (id) => {
       const inc = incidents.find(i => i.id === id);
       closeQR();
       _showPaintActionConfirm(
-        '✅ Confirmar Retorno da Pintoria',
+        '✅ Confirmar Retorno da Pintura',
         `${inc?.partName || '—'} · Retrabalho concluído?`,
         '✅ Confirmar e Encerrar',
         async () => {
           try {
-            await updateIncidentStatus(id, 'done', currentUser, 'Peça retornou da pintoria — confirmado por leitura de QR.');
+            await updateIncidentStatus(id, 'done', currentUser, 'Peça retornou da pintura — confirmado por leitura de QR.');
             showToast('✅ Retrabalho de pintura encerrado!');
             window.showDetail(id); renderList();
           } catch (e) { showToast('Erro: ' + e.message); }
@@ -1445,8 +1445,8 @@ window.doAdminPaintAdvance = (id, targetStatus) => {
   if (!isAdmin) { showToast('⛔ Só o admin pode avançar sem QR.'); return; }
   const inc = incidents.find(i => i.id === id);
   if (!inc) return;
-  const labels = { sent: 'Enviar para Pintoria', done: 'Encerrar' };
-  const notes  = { sent: 'Enviado para pintoria (admin, sem QR).', done: 'Encerrado pelo admin sem leitura de QR.' };
+  const labels = { sent: 'Enviar para Pintura', done: 'Encerrar' };
+  const notes  = { sent: 'Enviado para pintura (admin, sem QR).', done: 'Encerrado pelo admin sem leitura de QR.' };
   _showPaintActionConfirm(
     `⚠️ ${labels[targetStatus] || 'Avançar'} sem QR`,
     `Admin · ${escHtml(inc.partName) || '—'} · sem leitura de etiqueta`,
@@ -1454,7 +1454,7 @@ window.doAdminPaintAdvance = (id, targetStatus) => {
     async () => {
       try {
         await updateIncidentStatus(id, targetStatus, currentUser, notes[targetStatus] || '');
-        showToast(targetStatus === 'sent' ? '🎨 Enviado para pintoria!' : '✅ Encerrado!');
+        showToast(targetStatus === 'sent' ? '🎨 Enviado para pintura!' : '✅ Encerrado!');
         window.showDetail(id); renderList();
       } catch (e) { showToast('Erro: ' + e.message); }
     }
@@ -1477,25 +1477,25 @@ function handlePendingPaint() {
     if (st === 'done') { showToast('✅ Este incidente já está encerrado.'); return; }
     if (st === 'pending') {
       _showPaintActionConfirm(
-        '🎨 Enviar para Pintoria',
+        '🎨 Enviar para Pintura',
         `${escHtml(inc.partName) || '—'} · QR lido — confirmar envio?`,
         '✅ Confirmar Envio',
         async () => {
           try {
-            await updateIncidentStatus(id, 'sent', currentUser, 'Enviado para pintoria via leitura de QR.');
-            showToast('🎨 Enviado para pintoria!');
+            await updateIncidentStatus(id, 'sent', currentUser, 'Enviado para pintura via leitura de QR.');
+            showToast('🎨 Enviado para pintura!');
             window.showDetail(id); renderList();
           } catch (e) { showToast('Erro: ' + e.message); }
         }
       );
     } else {
       _showPaintActionConfirm(
-        '✅ Confirmar Retorno da Pintoria',
+        '✅ Confirmar Retorno da Pintura',
         `${escHtml(inc.partName) || '—'} · Retrabalho concluído?`,
         '✅ Confirmar e Encerrar',
         async () => {
           try {
-            await updateIncidentStatus(id, 'done', currentUser, 'Peça retornou da pintoria — confirmado por leitura de QR.');
+            await updateIncidentStatus(id, 'done', currentUser, 'Peça retornou da pintura — confirmado por leitura de QR.');
             showToast('✅ Retrabalho de pintura encerrado!');
             window.showDetail(id); renderList();
           } catch (e) { showToast('Erro: ' + e.message); }
@@ -1518,7 +1518,7 @@ function _showPaintReturnBanner(id, inc) {
   banner.className = 'paint-return-banner';
   banner.innerHTML = `
     <div class="paint-return-banner-info">
-      <div class="paint-return-banner-title">🎨 Retorno da Pintoria detectado</div>
+      <div class="paint-return-banner-title">🎨 Retorno da Pintura detectado</div>
       <div class="paint-return-banner-name">${escHtml(inc.partName) || '—'}</div>
     </div>
     <button class="paint-return-btn" onclick="doPaintReturn('${id}')">${btnLabel}</button>
@@ -2126,25 +2126,25 @@ window.openQRScanner = () => {
             window.showDetail(paintId);
             if (st === 'pending') {
               _showPaintActionConfirm(
-                '🎨 Enviar para Pintoria',
+                '🎨 Enviar para Pintura',
                 `${escHtml(inc.partName) || '—'} · ${inc.carNum ? 'CAR ' + escHtml(inc.carNum) : 'SEM CAR'}`,
                 '✅ Confirmar Envio',
                 async () => {
                   try {
-                    await updateIncidentStatus(paintId, 'sent', currentUser, 'Enviado para pintoria via leitura de QR.');
-                    showToast('🎨 Enviado para pintoria!');
+                    await updateIncidentStatus(paintId, 'sent', currentUser, 'Enviado para pintura via leitura de QR.');
+                    showToast('🎨 Enviado para pintura!');
                     window.showDetail(paintId); renderList();
                   } catch (e) { showToast('Erro: ' + e.message); }
                 }
               );
             } else {
               _showPaintActionConfirm(
-                '✅ Confirmar Retorno da Pintoria',
+                '✅ Confirmar Retorno da Pintura',
                 `${escHtml(inc.partName) || '—'} · Retrabalho concluído?`,
                 '✅ Confirmar e Encerrar',
                 async () => {
                   try {
-                    await updateIncidentStatus(paintId, 'done', currentUser, 'Peça retornou da pintoria — confirmado por leitura de QR.');
+                    await updateIncidentStatus(paintId, 'done', currentUser, 'Peça retornou da pintura — confirmado por leitura de QR.');
                     showToast('✅ Retrabalho de pintura encerrado!');
                     window.showDetail(paintId); renderList();
                   } catch (e) { showToast('Erro: ' + e.message); }
@@ -2292,7 +2292,7 @@ function _showMarkSentConfirm(id, carNum) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// RELATÓRIO PINTORIA
+// RELATÓRIO PINTURA
 // ══════════════════════════════════════════════════════════════
 
 let _paintReportFilter = 'all'; // 'all' | 'pending' | 'sent'
@@ -2304,9 +2304,11 @@ function renderPaintReport() {
   const el = document.getElementById('paintReportSection');
   if (!el) return;
 
-  // Peças de pintura em aberto, dentro do intervalo de datas escolhido
+  // Data-base "conclusão" → mostra ENCERRADAS; senão, peças em aberto.
+  const showDone = _paintDateField === 'completedAt';
   const paintIncs = incidents.filter(i =>
-    (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
+    (i.incidentType || 'normal') === 'paint'
+    && (showDone ? i.status === 'done' : (i.status || 'pending') !== 'done')
     && _inDateRange(i[_paintDateField], _paintFrom, _paintTo)
   );
 
@@ -2314,11 +2316,12 @@ function renderPaintReport() {
   const countPending = paintIncs.filter(i => (i.status || 'pending') === 'pending').length;
   const countSent    = paintIncs.filter(i => i.status === 'sent').length;
 
-  const filtered = _paintReportFilter === 'all'     ? paintIncs
+  // Em modo encerradas não há sub-filtro de estado (todas estão 'done')
+  const filtered = (showDone || _paintReportFilter === 'all') ? paintIncs
                  : _paintReportFilter === 'pending'  ? paintIncs.filter(i => (i.status || 'pending') === 'pending')
                  : paintIncs.filter(i => i.status === 'sent');
 
-  // Ordena: na pintoria primeiro, depois aguardando, depois por data
+  // Ordena: na pintura primeiro, depois aguardando, depois por data
   const sorted = [...filtered].sort((a, b) => {
     const order = { sent: 0, pending: 1 };
     const oa = order[a.status] ?? 2;
@@ -2331,7 +2334,9 @@ function renderPaintReport() {
     const st      = inc.status || 'pending';
     const cfg     = PAINT_STATUS_CONFIG[st] || PAINT_STATUS_CONFIG.pending;
     const dateReg = fmtDate(inc.createdAt);
-    const dateSent = inc.sentAt ? fmtDate(inc.sentAt) : '—';
+    const dateLast = showDone
+      ? (inc.completedAt ? fmtDate(inc.completedAt) : '—')
+      : (inc.sentAt ? fmtDate(inc.sentAt) : '—');
     return `
       <tr class="pr-row" onclick="goToList(); window.showDetail('${inc.id}');">
         <td class="pr-td pr-num">${i + 1}</td>
@@ -2343,43 +2348,49 @@ function renderPaintReport() {
           <span class="badge ${cfg.badge}" style="white-space:nowrap">${cfg.icon} ${cfg.label}</span>
         </td>
         <td class="pr-td pr-date">${dateReg}</td>
-        <td class="pr-td pr-date">${dateSent}</td>
+        <td class="pr-td pr-date">${dateLast}</td>
       </tr>`;
   }).join('');
 
   const emptyRow = `
     <tr><td colspan="8" class="pr-empty">
-      ${_paintReportFilter === 'all'
-        ? 'Nenhuma peça de pintura em aberto.'
-        : 'Nenhuma peça neste filtro.'}
+      ${showDone
+        ? 'Nenhuma peça encerrada neste período.'
+        : (_paintReportFilter === 'all' ? 'Nenhuma peça de pintura em aberto.' : 'Nenhuma peça neste filtro.')}
     </td></tr>`;
 
   el.innerHTML = `
     <div class="pr-wrap">
       <!-- Totalizadores -->
       <div class="pr-stats">
+        ${showDone ? `
+        <div class="pr-stat-card">
+          <div class="pr-stat-value">${totalOpen}</div>
+          <div class="pr-stat-label">Encerradas no período</div>
+        </div>` : `
         <div class="pr-stat-card">
           <div class="pr-stat-value">${totalOpen}</div>
           <div class="pr-stat-label">Em aberto</div>
         </div>
         <div class="pr-stat-card pr-stat-paint">
           <div class="pr-stat-value">${countSent}</div>
-          <div class="pr-stat-label">Na Pintoria</div>
+          <div class="pr-stat-label">Na Pintura</div>
         </div>
         <div class="pr-stat-card pr-stat-pending">
           <div class="pr-stat-value">${countPending}</div>
           <div class="pr-stat-label">Aguardando Envio</div>
-        </div>
+        </div>`}
       </div>
 
       <!-- Filtros + export -->
       <div class="pr-toolbar">
         <div class="pr-chips">
+          ${showDone ? `<span class="chip active">✓ Encerradas (${totalOpen})</span>` : `
           <button class="chip${_paintReportFilter === 'all'     ? ' active' : ''}" onclick="setPaintReportFilter('all')">Todos (${totalOpen})</button>
-          <button class="chip${_paintReportFilter === 'sent'    ? ' active' : ''}" onclick="setPaintReportFilter('sent')">Na Pintoria (${countSent})</button>
-          <button class="chip${_paintReportFilter === 'pending' ? ' active' : ''}" onclick="setPaintReportFilter('pending')">Aguardando (${countPending})</button>
+          <button class="chip${_paintReportFilter === 'sent'    ? ' active' : ''}" onclick="setPaintReportFilter('sent')">Na Pintura (${countSent})</button>
+          <button class="chip${_paintReportFilter === 'pending' ? ' active' : ''}" onclick="setPaintReportFilter('pending')">Aguardando (${countPending})</button>`}
         </div>
-        <button class="btn btn-paint-label pr-label-btn" onclick="openBatchLabelModal()" ${totalOpen === 0 ? 'disabled' : ''}>
+        <button class="btn btn-paint-label pr-label-btn" onclick="openBatchLabelModal()" ${(showDone || totalOpen === 0) ? 'disabled' : ''}>
           🖨 Etiquetas em Lote
         </button>
         <button class="btn btn-success pr-export-btn" onclick="exportPaintExcel()" ${totalOpen === 0 ? 'disabled' : ''}>
@@ -2392,6 +2403,7 @@ function renderPaintReport() {
         <select class="field-input pr-datefield" onchange="setPaintDateField(this.value)">
           <option value="createdAt"${_paintDateField === 'createdAt' ? ' selected' : ''}>Por registo</option>
           <option value="sentAt"${_paintDateField === 'sentAt' ? ' selected' : ''}>Por envio</option>
+          <option value="completedAt"${_paintDateField === 'completedAt' ? ' selected' : ''}>Por conclusão (encerradas)</option>
         </select>
         <input class="field-input" type="date" value="${_paintFrom}" onchange="setPaintDate('from', this.value)" aria-label="De">
         <input class="field-input" type="date" value="${_paintTo}" onchange="setPaintDate('to', this.value)" aria-label="Até">
@@ -2415,7 +2427,7 @@ function renderPaintReport() {
               <th class="pr-th pr-qty">Qtd</th>
               <th class="pr-th pr-status">Status</th>
               <th class="pr-th pr-date">Registado</th>
-              <th class="pr-th pr-date">Enviado</th>
+              <th class="pr-th pr-date">${showDone ? 'Encerrado' : 'Enviado'}</th>
             </tr>
           </thead>
           <tbody>
@@ -2593,8 +2605,10 @@ function _xlGeneratedBy() {
 window.exportPaintExcel = async () => {
   if (typeof window.ExcelJS === 'undefined') { showToast('❌ ExcelJS não carregado. Recarregue a página.'); return; }
 
+  const showDone = _paintDateField === 'completedAt';
   const paintIncs = incidents.filter(i =>
-    (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
+    (i.incidentType || 'normal') === 'paint'
+    && (showDone ? i.status === 'done' : (i.status || 'pending') !== 'done')
     && _inDateRange(i[_paintDateField], _paintFrom, _paintTo)
   );
   if (!paintIncs.length) { showToast('Nenhuma peça de pintura no filtro.'); return; }
@@ -2605,21 +2619,24 @@ window.exportPaintExcel = async () => {
   });
 
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet('Pintoria em Aberto', {
+  const ws = wb.addWorksheet(showDone ? 'Pintura Encerradas' : 'Pintura em Aberto', {
     views: [{ state: 'frozen', ySplit: 4 }]  // congela título + cabeçalho
   });
 
   const HEADERS = ['Nº', 'Nº CAR', 'Nome da Peça', 'Código da Peça', 'Qtd',
-                   'Status', 'Registado por', 'Data Registo', 'Envio Pintoria', 'Observações'];
+                   'Status', 'Registado por', 'Data Registo',
+                   showDone ? 'Encerrado' : 'Envio Pintura', 'Observações'];
   const WIDTHS  = [5, 11, 30, 24, 6, 16, 20, 13, 13, 45];
   ws.columns = WIDTHS.map(w => ({ width: w }));
 
+  const _dbLabel = _paintDateField === 'sentAt' ? 'Envio'
+                 : _paintDateField === 'completedAt' ? 'Conclusão' : 'Registo';
   const _prRange = (_paintFrom || _paintTo)
-    ? `${_paintDateField === 'sentAt' ? 'Envio' : 'Registo'}: ${_paintFrom || '…'} a ${_paintTo || '…'}`
+    ? `${_dbLabel}: ${_paintFrom || '…'} a ${_paintTo || '…'}`
     : 'todas as datas';
   _xlAddTitleBlock(ws, HEADERS.length,
-    'CFMOTO da Amazônia — Peças na Pintoria',
-    `Pintura em aberto · ${_prRange} · ${_xlGeneratedBy()}`);
+    'CFMOTO da Amazônia — Peças na Pintura',
+    `${showDone ? 'Pintura encerradas' : 'Pintura em aberto'} · ${_prRange} · ${_xlGeneratedBy()}`);
 
   const headerRowNum = _xlAddHeaderRow(ws, HEADERS);
 
@@ -2635,7 +2652,7 @@ window.exportPaintExcel = async () => {
       cfg.label,
       inc.user || '—',
       inc.createdAt ? new Date(inc.createdAt) : '—',
-      inc.sentAt ? new Date(inc.sentAt) : '—',
+      (showDone ? inc.completedAt : inc.sentAt) ? new Date(showDone ? inc.completedAt : inc.sentAt) : '—',
       inc.defect || '—',
     ]);
     row.height = 18;
@@ -2643,7 +2660,7 @@ window.exportPaintExcel = async () => {
     row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
     row.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
     if (inc.createdAt) row.getCell(8).numFmt = 'dd/mm/yyyy';
-    if (inc.sentAt)    row.getCell(9).numFmt = 'dd/mm/yyyy';
+    if (showDone ? inc.completedAt : inc.sentAt) row.getCell(9).numFmt = 'dd/mm/yyyy';
     _xlStyleStatusCell(row.getCell(6), cfg.color);
   });
 
@@ -2656,10 +2673,12 @@ window.exportPaintExcel = async () => {
   const totalQty = sorted.reduce((s, i) => s + (parseInt(i.ngQty) || 0), 0);
   const naPint   = sorted.filter(i => i.status === 'sent').length;
   _xlAddTotalsRow(ws, HEADERS.length,
-    `TOTAIS: ${sorted.length} peças em aberto · ${naPint} na pintoria · ${sorted.length - naPint} aguardando envio · ${totalQty} unidades`);
+    showDone
+      ? `TOTAIS: ${sorted.length} peças encerradas · ${totalQty} unidades`
+      : `TOTAIS: ${sorted.length} peças em aberto · ${naPint} na pintura · ${sorted.length - naPint} aguardando envio · ${totalQty} unidades`);
 
   const date = new Date().toISOString().slice(0, 10);
-  await _xlDownload(wb, `Pintoria-Aberto-${date}.xlsx`);
+  await _xlDownload(wb, `${showDone ? 'Pintura-Encerradas' : 'Pintura-Aberto'}-${date}.xlsx`);
   showToast('📥 Excel exportado!');
 };
 
