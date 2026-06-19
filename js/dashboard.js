@@ -2,30 +2,60 @@
 import { incidents } from './incidents.js';
 import { escHtml } from './ui.js';
 
-let dashPeriod = 'month'; // 'month' | '3m' | 'all'
-let monthlyChartInstance = null; // instância Chart.js activa
+// ── Estado ─────────────────────────────────────────────────────
+let dashType  = 'all';   // 'all' | 'normal' | 'paint'
+let dashModel = 'all';   // 'all' | <modelo>
+let dashFrom  = '';      // 'YYYY-MM-DD' | ''  (vazio = sem limite)
+let dashTo    = '';      // 'YYYY-MM-DD' | ''
 
-// ── Filtro por período ─────────────────────────────────────────
-function getPeriodIncs(period) {
-  if (period === 'month') {
-    const start = new Date();
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-    return incidents.filter(i => i.createdAt >= start.getTime());
-  }
-  if (period === '3m') {
-    const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
-    return incidents.filter(i => i.createdAt >= cutoff);
-  }
-  return [...incidents];
+let _trendChart  = null; // Chart.js — tendência
+let _statusChart = null; // Chart.js — rosca de status
+
+// ── Helpers de data (limites do dia LOCAL — Manaus) ───────────
+function _dayStart(str) {
+  if (!str) return null;
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+}
+function _dayEnd(str) {
+  if (!str) return null;
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+}
+function _inRange(ts, fromStr, toStr) {
+  const from = _dayStart(fromStr);
+  const to   = _dayEnd(toStr);
+  if (from === null && to === null) return true;
+  if (!ts) return false;
+  if (from !== null && ts < from) return false;
+  if (to   !== null && ts > to)   return false;
+  return true;
+}
+function _fmt(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ── Conjunto filtrado (tipo + modelo + intervalo de datas) ────
+function getFilteredIncs() {
+  return incidents.filter(i => {
+    if (dashType !== 'all' && (i.incidentType || 'normal') !== dashType) return false;
+    if (dashModel !== 'all' && (i.model || '') !== dashModel) return false;
+    return _inRange(i.createdAt, dashFrom, dashTo);
+  });
+}
+
+function distinctModels() {
+  const set = new Set();
+  incidents.forEach(i => { const m = (i.model || '').trim(); if (m) set.add(m); });
+  return [...set].sort();
 }
 
 // ── KPIs ──────────────────────────────────────────────────────
 function calcKPIs(incs) {
-  const total        = incs.length;
-  const pending      = incs.filter(i => (i.status || 'pending') === 'pending').length;
-  const done         = incs.filter(i => i.status === 'done').length;
-  const inProgress   = incs.filter(i => ['sent', 'awaiting', 'eta_confirmed', 'received'].includes(i.status)).length;
+  const total          = incs.length;
+  const pending        = incs.filter(i => (i.status || 'pending') === 'pending').length;
+  const done           = incs.filter(i => i.status === 'done').length;
+  const inProgress     = incs.filter(i => ['sent', 'awaiting', 'eta_confirmed', 'received'].includes(i.status)).length;
   const totalDefective = incs.reduce((s, i) => s + (parseInt(i.ngQty) || 0), 0);
 
   const doneIncs = incs.filter(i => i.status === 'done' && i.createdAt && i.completedAt);
@@ -41,56 +71,66 @@ function calcKPIs(incs) {
   return { total, pending, done, inProgress, totalDefective, avgResolutionDays, avgSendDays };
 }
 
-// ── Dados mensais (sempre histórico completo, últimos 6 meses) ─
-function calcMonthlyData() {
-  const result = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i);
-    const year  = d.getFullYear();
-    const month = d.getMonth();
-    const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-    const count = incidents.filter(inc => {
-      if (!inc.createdAt) return false;
-      const dt = new Date(inc.createdAt);
-      return dt.getFullYear() === year && dt.getMonth() === month;
-    }).length;
-    result.push({ label, count });
+// ── Tendência: adapta granularidade ao intervalo escolhido ────
+// Período curto (≤ 62 dias) → por DIA; senão → por MÊS.
+function calcTrendData(incs) {
+  const now   = new Date();
+  const end   = dashTo   ? new Date(_dayEnd(dashTo))   : now;
+  const start = dashFrom ? new Date(_dayStart(dashFrom))
+                         : new Date(end.getTime() - 182 * 86400000); // ~6 meses por omissão
+  const spanDays = (end - start) / 86400000;
+
+  if (spanDays <= 62) {
+    const buckets = [];
+    const cur  = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    while (cur <= last) {
+      const s = cur.getTime(), e = s + 86399999;
+      const count = incs.filter(i => i.createdAt >= s && i.createdAt <= e).length;
+      buckets.push({ label: `${String(cur.getDate()).padStart(2, '0')}/${String(cur.getMonth() + 1).padStart(2, '0')}`, count });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return { buckets, granularity: 'dia' };
   }
-  return result;
+
+  const buckets = [];
+  const cur  = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  while (cur <= last) {
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const count = incs.filter(i => { const dt = new Date(i.createdAt); return dt.getFullYear() === y && dt.getMonth() === m; }).length;
+    const label = cur.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') + '/' + String(y).slice(-2);
+    buckets.push({ label, count });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return { buckets, granularity: 'mês' };
 }
 
-// ── Por modelo ────────────────────────────────────────────────
+// ── Agregações ────────────────────────────────────────────────
 function calcByModel(incs) {
   const map = {};
-  incs.forEach(i => {
-    const m = (i.model || 'N/D').trim();
-    map[m] = (map[m] || 0) + 1;
-  });
+  incs.forEach(i => { const m = (i.model || 'N/D').trim() || 'N/D'; map[m] = (map[m] || 0) + 1; });
   return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
 }
 
-// ── Top 5 peças com mais reclamações ─────────────────────────
 function calcTopParts(incs) {
   const map = {};
   incs.forEach(i => {
     const key = (i.partNo || '').trim() || (i.partName || 'N/D').trim();
-    if (!map[key]) {
-      map[key] = {
-        name:  (i.partName || i.partNo || 'N/D').trim(),
-        code:  (i.partNo || '').trim(),
-        count: 0,
-        qty:   0
-      };
-    }
+    if (!map[key]) map[key] = { name: (i.partName || i.partNo || 'N/D').trim(), code: (i.partNo || '').trim(), count: 0, qty: 0 };
     map[key].count++;
     map[key].qty += parseInt(i.ngQty) || 0;
   });
   return Object.values(map).sort((a, b) => b.count - a.count).slice(0, 5);
 }
 
-// ── HTML de linha de barra (anima de 0% → target) ─────────────
+function calcByUser(incs) {
+  const map = {};
+  incs.forEach(i => { const u = (i.user || '').trim() || 'N/D'; map[u] = (map[u] || 0) + 1; });
+  return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+}
+
+// ── Linha de barra (anima 0% → alvo) ──────────────────────────
 function barRow(name, sub, value, max, color) {
   const pct = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 4;
   return `
@@ -106,117 +146,114 @@ function barRow(name, sub, value, max, color) {
     </div>`;
 }
 
+const STATUS_COLORS = {
+  pending: '#F59E0B', sent: '#3B82F6', awaiting: '#8B5CF6',
+  eta_confirmed: '#06B6D4', received: '#84CC16', done: '#22C55E',
+};
+const STATUS_LABELS = {
+  pending: 'Pendente', sent: 'Enviado', awaiting: 'Aguardando',
+  eta_confirmed: 'ETA Conf.', received: 'Recebido', done: 'Encerrado',
+};
+
 // ── Render principal ──────────────────────────────────────────
 export function renderDashboard() {
   const el = document.getElementById('dashboardSection');
   if (!el) return;
 
-  const incs     = getPeriodIncs(dashPeriod);
+  const incs     = getFilteredIncs();
   const kpis     = calcKPIs(incs);
-  const monthly  = calcMonthlyData();
+  const trend    = calcTrendData(incs);
   const byModel  = calcByModel(incs);
   const topParts = calcTopParts(incs);
+  const byUser   = calcByUser(incs);
 
   const maxModel = byModel.length ? byModel[0][1] : 1;
   const maxPart  = topParts.length ? topParts[0].count : 1;
-
-  const STATUS_COLORS = {
-    pending:       '#F59E0B',
-    sent:          '#3B82F6',
-    awaiting:      '#8B5CF6',
-    eta_confirmed: '#06B6D4',
-    received:      '#84CC16',
-    done:          '#22C55E',
-  };
-  const STATUS_LABELS = {
-    pending:       'Pendente',
-    sent:          'Enviado',
-    awaiting:      'Aguardando',
-    eta_confirmed: 'ETA Conf.',
-    received:      'Recebido',
-    done:          'Encerrado',
-  };
+  const maxUser  = byUser.length ? byUser[0][1] : 1;
 
   const statusRows = Object.entries(STATUS_LABELS)
-    .map(([k, label]) => ({
-      key:   k,
-      label,
-      count: incs.filter(i => (i.status || 'pending') === k).length,
-      color: STATUS_COLORS[k],
-    }))
+    .map(([k, label]) => ({ key: k, label, count: incs.filter(i => (i.status || 'pending') === k).length, color: STATUS_COLORS[k] }))
     .filter(s => s.count > 0);
+
+  const models = distinctModels();
 
   el.innerHTML = `
 <div class="dash-wrap">
 
-  <!-- Filtro de período -->
-  <div class="dash-period-row">
-    <button class="dash-pill ${dashPeriod === 'month' ? 'active' : ''}" onclick="setDashPeriod('month')">Este mês</button>
-    <button class="dash-pill ${dashPeriod === '3m'    ? 'active' : ''}" onclick="setDashPeriod('3m')">3 meses</button>
-    <button class="dash-pill ${dashPeriod === 'all'   ? 'active' : ''}" onclick="setDashPeriod('all')">Tudo</button>
+  <!-- Filtros: tipo + modelo -->
+  <div class="dash-filters">
+    <select class="field-input" onchange="setDashType(this.value)">
+      <option value="all"${dashType === 'all' ? ' selected' : ''}>Todos os tipos</option>
+      <option value="normal"${dashType === 'normal' ? ' selected' : ''}>🔧 Normais</option>
+      <option value="paint"${dashType === 'paint' ? ' selected' : ''}>🎨 Pintura</option>
+    </select>
+    <select class="field-input" onchange="setDashModel(this.value)">
+      <option value="all"${dashModel === 'all' ? ' selected' : ''}>Todos os modelos</option>
+      ${models.map(m => `<option value="${escHtml(m)}"${dashModel === m ? ' selected' : ''}>${escHtml(m)}</option>`).join('')}
+    </select>
+  </div>
+
+  <!-- Intervalo de datas (por registo) -->
+  <div class="dash-daterow">
+    <input class="field-input" type="date" value="${dashFrom}" onchange="setDashDate('from', this.value)" aria-label="De">
+    <input class="field-input" type="date" value="${dashTo}" onchange="setDashDate('to', this.value)" aria-label="Até">
+  </div>
+  <div class="date-shortcuts">
+    <button type="button" class="chip" onclick="setDashRange('today')">Hoje</button>
+    <button type="button" class="chip" onclick="setDashRange('week')">Esta semana</button>
+    <button type="button" class="chip" onclick="setDashRange('month')">Este mês</button>
+    <button type="button" class="chip" onclick="setDashRange('3m')">3 meses</button>
+    <button type="button" class="chip" onclick="setDashRange('clear')">Tudo</button>
   </div>
 
   <!-- KPI cards -->
   <div class="dash-kpi-grid">
-    <div class="dash-kpi">
-      <div class="dash-kpi-val">${kpis.total}</div>
-      <div class="dash-kpi-lbl">Total</div>
-    </div>
-    <div class="dash-kpi" style="--kc:#F59E0B">
-      <div class="dash-kpi-val">${kpis.pending}</div>
-      <div class="dash-kpi-lbl">Pendentes</div>
-    </div>
-    <div class="dash-kpi" style="--kc:#3B82F6">
-      <div class="dash-kpi-val">${kpis.inProgress}</div>
-      <div class="dash-kpi-lbl">Em Curso</div>
-    </div>
-    <div class="dash-kpi" style="--kc:#22C55E">
-      <div class="dash-kpi-val">${kpis.done}</div>
-      <div class="dash-kpi-lbl">Encerrados</div>
-    </div>
-    <div class="dash-kpi" style="--kc:#E11D48">
-      <div class="dash-kpi-val">${kpis.totalDefective}</div>
-      <div class="dash-kpi-lbl">Peças NG</div>
-    </div>
+    <div class="dash-kpi"><div class="dash-kpi-val">${kpis.total}</div><div class="dash-kpi-lbl">Total</div></div>
+    <div class="dash-kpi" style="--kc:#F59E0B"><div class="dash-kpi-val">${kpis.pending}</div><div class="dash-kpi-lbl">Pendentes</div></div>
+    <div class="dash-kpi" style="--kc:#3B82F6"><div class="dash-kpi-val">${kpis.inProgress}</div><div class="dash-kpi-lbl">Em Curso</div></div>
+    <div class="dash-kpi" style="--kc:#22C55E"><div class="dash-kpi-val">${kpis.done}</div><div class="dash-kpi-lbl">Encerrados</div></div>
+    <div class="dash-kpi" style="--kc:#E11D48"><div class="dash-kpi-val">${kpis.totalDefective}</div><div class="dash-kpi-lbl">Peças NG</div></div>
   </div>
 
-  <!-- Gráfico Chart.js mensal -->
+  <!-- Gráfico de tendência (adapta dia/mês ao intervalo) -->
   <div class="dash-card">
-    <div class="dash-card-hd">📈 Incidentes por Mês <span class="dash-card-sub">(últimos 6 meses)</span></div>
-    <div class="dash-month-chart-wrap">
-      <canvas id="dashMonthlyChart"></canvas>
-    </div>
+    <div class="dash-card-hd">📈 Incidentes por ${trend.granularity}</div>
+    <div class="dash-month-chart-wrap"><canvas id="dashTrendChart"></canvas></div>
   </div>
 
-  <!-- Status + Top Peças (2 colunas) -->
+  <!-- Status: lista + rosca -->
   <div class="dash-grid-2">
-
     <div class="dash-card">
       <div class="dash-card-hd">📊 Por Estado</div>
       ${statusRows.length === 0
-        ? '<p class="dash-empty">Sem dados neste período</p>'
+        ? '<p class="dash-empty">Sem dados neste filtro</p>'
         : statusRows.map(s => `
           <div class="dash-st-row">
             <span class="dash-st-dot" style="background:${s.color}"></span>
             <span class="dash-st-name">${s.label}</span>
             <span class="dash-st-cnt">${s.count}</span>
-          </div>
-        `).join('')}
+          </div>`).join('')}
     </div>
+    <div class="dash-card">
+      <div class="dash-card-hd">🍩 Distribuição</div>
+      <div class="dash-doughnut-wrap">
+        ${statusRows.length === 0 ? '<p class="dash-empty">Sem dados</p>' : '<canvas id="dashStatusChart"></canvas>'}
+      </div>
+    </div>
+  </div>
 
+  <!-- Top Peças + Por Usuário -->
+  <div class="dash-grid-2">
     <div class="dash-card">
       <div class="dash-card-hd">🏆 Top Peças</div>
-      ${topParts.length === 0
-        ? '<p class="dash-empty">Sem dados</p>'
-        : topParts.map(p => barRow(
-            p.name.length > 18 ? p.name.slice(0, 18) + '…' : p.name,
-            p.code,
-            p.count,
-            maxPart,
-            '#FF6600'
-          )).join('')}
+      ${topParts.length === 0 ? '<p class="dash-empty">Sem dados</p>'
+        : topParts.map(p => barRow(p.name.length > 18 ? p.name.slice(0, 18) + '…' : p.name, p.code, p.count, maxPart, '#FF6600')).join('')}
     </div>
-
+    <div class="dash-card">
+      <div class="dash-card-hd">👤 Por Usuário</div>
+      ${byUser.length === 0 ? '<p class="dash-empty">Sem dados</p>'
+        : byUser.map(([u, c]) => barRow(u.length > 18 ? u.slice(0, 18) + '…' : u, '', c, maxUser, '#3B82F6')).join('')}
+    </div>
   </div>
 
   <!-- Por Modelo -->
@@ -240,95 +277,122 @@ export function renderDashboard() {
     </div>
   </div>
 
+  <!-- Exportar -->
+  <button class="btn btn-success btn-full dash-noexport" style="margin-top:4px" onclick="exportDashboardPDF()">
+    📄 Exportar Dashboard (PDF)
+  </button>
+
 </div>`;
 
-  // ── Pós-render: Chart.js + animação das barras ──────────────
-  renderMonthlyChart(monthly);
+  // ── Pós-render: gráficos + animação das barras ──────────────
+  renderTrendChart(trend.buckets);
+  renderStatusChart(statusRows);
 
-  // Duplo rAF para garantir que o DOM está pintado antes de animar
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    el.querySelectorAll('.dash-bar-fill[data-target]').forEach(bar => {
-      bar.style.width = bar.dataset.target + '%';
-    });
+    el.querySelectorAll('.dash-bar-fill[data-target]').forEach(bar => { bar.style.width = bar.dataset.target + '%'; });
   }));
 }
 
-// ── Chart.js — gráfico mensal ─────────────────────────────────
-function renderMonthlyChart(monthly) {
-  const canvas = document.getElementById('dashMonthlyChart');
+// ── Chart.js — tendência (barras) ─────────────────────────────
+function renderTrendChart(buckets) {
+  const canvas = document.getElementById('dashTrendChart');
   if (!canvas) return;
+  if (_trendChart) { _trendChart.destroy(); _trendChart = null; }
+  if (typeof window.Chart === 'undefined') { canvas.parentElement.innerHTML = '<p class="dash-empty">Chart.js não disponível</p>'; return; }
 
-  // Destrói instância anterior para evitar conflito de canvas
-  if (monthlyChartInstance) {
-    monthlyChartInstance.destroy();
-    monthlyChartInstance = null;
-  }
-
-  // Verifica se Chart.js está disponível (carregado via CDN)
-  if (typeof window.Chart === 'undefined') {
-    canvas.parentElement.innerHTML = '<p class="dash-empty">Chart.js não disponível</p>';
-    return;
-  }
-
-  const ctx = canvas.getContext('2d');
-  const labels = monthly.map(m => m.label.charAt(0).toUpperCase() + m.label.slice(1));
-  const data   = monthly.map(m => m.count);
-
-  monthlyChartInstance = new window.Chart(ctx, {
+  _trendChart = new window.Chart(canvas.getContext('2d'), {
     type: 'bar',
     data: {
-      labels,
-      datasets: [{
-        data,
-        backgroundColor: 'rgba(255,102,0,0.72)',
-        hoverBackgroundColor: '#FF6600',
-        borderRadius: 5,
-        borderSkipped: false,
-      }]
+      labels: buckets.map(b => b.label),
+      datasets: [{ data: buckets.map(b => b.count), backgroundColor: 'rgba(255,102,0,0.72)', hoverBackgroundColor: '#FF6600', borderRadius: 5, borderSkipped: false }],
     },
     options: {
-      responsive:          true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       animation: { duration: 650, easing: 'easeOutQuart' },
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor:  '#1A1A1A',
-          borderColor:      'rgba(255,102,0,0.35)',
-          borderWidth:      1,
-          titleColor:       'rgba(255,255,255,0.85)',
-          bodyColor:        '#FF8533',
-          padding:          10,
-          displayColors:    false,
-          callbacks: {
-            label: ctx => `${ctx.parsed.y} incidente${ctx.parsed.y !== 1 ? 's' : ''}`,
-          }
-        }
+          backgroundColor: '#1A1A1A', borderColor: 'rgba(255,102,0,0.35)', borderWidth: 1,
+          titleColor: 'rgba(255,255,255,0.85)', bodyColor: '#FF8533', padding: 10, displayColors: false,
+          callbacks: { label: ctx => `${ctx.parsed.y} incidente${ctx.parsed.y !== 1 ? 's' : ''}` },
+        },
       },
       scales: {
-        x: {
-          grid:   { display: false },
-          border: { display: false },
-          ticks:  { color: 'rgba(255,255,255,0.3)', font: { size: 10, family: 'DM Sans, sans-serif' } },
-        },
-        y: {
-          grid:   { color: 'rgba(255,255,255,0.05)' },
-          border: { display: false },
-          ticks:  {
-            color:     'rgba(255,255,255,0.3)',
-            font:      { size: 10, family: 'DM Sans, sans-serif' },
-            precision: 0,
-            stepSize:  1,
-          },
-          beginAtZero: true,
-        }
-      }
-    }
+        x: { grid: { display: false }, border: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10, family: 'DM Sans, sans-serif' }, maxRotation: 0, autoSkip: true } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, border: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10, family: 'DM Sans, sans-serif' }, precision: 0, stepSize: 1 }, beginAtZero: true },
+      },
+    },
   });
 }
 
-// ── Muda período e re-renderiza ───────────────────────────────
-export function setDashPeriod(period) {
-  dashPeriod = period;
+// ── Chart.js — rosca de status ────────────────────────────────
+function renderStatusChart(statusRows) {
+  const canvas = document.getElementById('dashStatusChart');
+  if (!canvas) return;
+  if (_statusChart) { _statusChart.destroy(); _statusChart = null; }
+  if (typeof window.Chart === 'undefined') return;
+
+  _statusChart = new window.Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: statusRows.map(s => s.label),
+      datasets: [{ data: statusRows.map(s => s.count), backgroundColor: statusRows.map(s => s.color), borderColor: '#0B1220', borderWidth: 2 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      animation: { duration: 650 },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10, family: 'DM Sans, sans-serif' }, boxWidth: 10, padding: 8 } },
+        tooltip: { backgroundColor: '#1A1A1A', padding: 10, displayColors: true, callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } },
+      },
+    },
+  });
+}
+
+// ── Handlers (expostos ao HTML via window em app.js) ──────────
+export function setDashType(v)  { dashType = v;  renderDashboard(); }
+export function setDashModel(v) { dashModel = v; renderDashboard(); }
+export function setDashDate(which, val) { if (which === 'from') dashFrom = val; else dashTo = val; renderDashboard(); }
+export function setDashRange(kind) {
+  const now = new Date();
+  if (kind === 'clear')      { dashFrom = ''; dashTo = ''; }
+  else if (kind === 'today') { const s = _fmt(now); dashFrom = s; dashTo = s; }
+  else if (kind === 'week')  { const day = (now.getDay() + 6) % 7; const mon = new Date(now); mon.setDate(now.getDate() - day); dashFrom = _fmt(mon); dashTo = _fmt(now); }
+  else if (kind === 'month') { const first = new Date(now.getFullYear(), now.getMonth(), 1); dashFrom = _fmt(first); dashTo = _fmt(now); }
+  else if (kind === '3m')    { const d = new Date(now); d.setMonth(d.getMonth() - 3); dashFrom = _fmt(d); dashTo = _fmt(now); }
   renderDashboard();
+}
+
+// ── Exportar dashboard como PDF (html2canvas + jsPDF) ─────────
+export async function exportDashboardPDF() {
+  const el = document.getElementById('dashboardSection');
+  if (!el) return;
+  if (typeof window.html2canvas === 'undefined' || !window.jspdf) {
+    alert('Ferramenta de exportação ainda a carregar. Tente de novo em alguns segundos.');
+    return;
+  }
+  try {
+    const canvas = await window.html2canvas(el, {
+      backgroundColor: '#0B1220', scale: 2, useCORS: true,
+      ignoreElements: (node) => node.classList && node.classList.contains('dash-noexport'),
+    });
+    const img = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pw = pdf.internal.pageSize.getWidth();
+    const ph = pdf.internal.pageSize.getHeight();
+    const imgH = canvas.height * pw / canvas.width;
+    let heightLeft = imgH, position = 0;
+    pdf.addImage(img, 'PNG', 0, position, pw, imgH);
+    heightLeft -= ph;
+    while (heightLeft > 0) {
+      position = heightLeft - imgH;
+      pdf.addPage();
+      pdf.addImage(img, 'PNG', 0, position, pw, imgH);
+      heightLeft -= ph;
+    }
+    pdf.save(`Dashboard-${new Date().toISOString().slice(0, 10)}.pdf`);
+  } catch (e) {
+    alert('Erro ao gerar o PDF: ' + e.message);
+  }
 }

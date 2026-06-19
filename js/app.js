@@ -6,7 +6,7 @@ import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
 import { importPackList } from './packList.js';
 import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNavigate, closeFullscreen, openModal, closeModal, fmtDate, renderDetailRow, showAuthError, hideAuthError, setAuthLoading, escHtml, sanitizeUrl } from './ui.js';
-import { renderDashboard, setDashPeriod } from './dashboard.js';
+import { renderDashboard, setDashType, setDashModel, setDashDate, setDashRange, exportDashboardPDF } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 import { getTrackingUrl, getCarrierLabel } from './tracking.js';
 import { saveDraftDB, loadDraftDB, clearDraftDB } from './draftStore.js';
@@ -525,8 +525,12 @@ window.showExcelTab = (tab) => {
   if (tab === 'paint')     renderPaintReport();
 };
 
-// ── Expõe setDashPeriod ao HTML ───────────────────────────────
-window.setDashPeriod = setDashPeriod;
+// ── Expõe handlers do dashboard ao HTML ───────────────────────
+window.setDashType  = setDashType;
+window.setDashModel = setDashModel;
+window.setDashDate  = setDashDate;
+window.setDashRange = setDashRange;
+window.exportDashboardPDF = exportDashboardPDF;
 
 // ── Listeners para guardar rascunho ao digitar ────────────────
 function attachDraftListeners() {
