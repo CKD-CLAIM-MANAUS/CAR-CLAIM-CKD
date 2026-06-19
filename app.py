@@ -15,6 +15,9 @@ import hmac
 import hashlib
 import time
 from PIL import Image as PILImage
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # ── Firebase Admin SDK ────────────────────────────────────────
 # Credenciais definidas como variável de ambiente no Railway
@@ -67,6 +70,30 @@ CORS(app,
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'])
 
+# Render fica atrás de proxy → usa o IP real do cliente (X-Forwarded-For)
+# para que o rate limiting seja por cliente, e não por IP do proxy.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+
+# Rate limiting — anti abuso/brute force/DoS.
+# Armazenamento em memória (adequado a 1 worker; usar Redis se escalar).
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=['300 per hour'],
+    storage_uri='memory://',
+)
+
+
+# ── Headers de segurança em todas as respostas ────────────────
+@app.after_request
+def _security_headers(resp):
+    resp.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    resp.headers['X-Content-Type-Options']    = 'nosniff'
+    resp.headers['X-Frame-Options']           = 'DENY'
+    resp.headers['Referrer-Policy']           = 'no-referrer'
+    resp.headers['Content-Security-Policy']   = "default-src 'none'; frame-ancestors 'none'"
+    return resp
+
 # ── Auth ──────────────────────────────────────────────────────
 def verify_token():
     """Verifica o Firebase ID token no header Authorization: Bearer <token>"""
@@ -79,7 +106,8 @@ def verify_token():
         return None
     token = header.split('Bearer ', 1)[1].strip()
     try:
-        return fb_auth.verify_id_token(token)
+        # check_revoked: rejeita token de utilizador desativado/revogado
+        return fb_auth.verify_id_token(token, check_revoked=True)
     except Exception as e:
         print(f'verify_token: token invalido — {e}')
         return None
@@ -162,6 +190,7 @@ def download_and_process(url, width, height):
 
 # ── Rotas ─────────────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
+@limiter.exempt
 def health():
     # Resposta mínima — não expõe versões nem estado interno ao público
     if not _firebase_initialized:
@@ -170,6 +199,7 @@ def health():
 
 
 @app.route('/sign-upload', methods=['POST'])
+@limiter.limit('60 per hour')
 def sign_upload():
     # Assina um upload Cloudinary. Só utilizadores autenticados (JWT Firebase)
     # obtêm assinatura — substitui o upload preset público (unsigned).
@@ -216,6 +246,7 @@ def _ms_to_iso(value):
 
 
 @app.route('/export-data', methods=['GET'])
+@limiter.limit('30 per hour')
 def export_data():
     # 1. Autenticação por chave de API
     if not _check_export_key():
@@ -283,6 +314,7 @@ def export_data():
 
 
 @app.route('/export-partslist', methods=['GET'])
+@limiter.limit('30 per hour')
 def export_partslist():
     # Exporta a base de peças (partsDB) — pack lists importadas.
     # Mesma chave de API do /export-data.
@@ -368,6 +400,7 @@ def admin_list_users():
 
 
 @app.route('/admin/users', methods=['POST'])
+@limiter.limit('30 per hour')
 def admin_create_user():
     tok = verify_admin()
     if not tok:
@@ -436,6 +469,9 @@ def admin_disable_user():
         return jsonify({'error': 'Não pode desativar a sua própria conta.'}), 400
     try:
         fb_auth.update_user(uid, disabled=disabled)
+        if disabled:
+            # Revoga tokens → o acesso cai de imediato (com check_revoked)
+            fb_auth.revoke_refresh_tokens(uid)
         return jsonify({'uid': uid, 'disabled': disabled})
     except Exception as e:
         print(f'admin_disable_user error: {e}')
@@ -466,6 +502,7 @@ def admin_delete_user():
 
 
 @app.route('/generate-car', methods=['POST'])
+@limiter.limit('60 per hour')
 def generate_car():
     # 1. Autenticação obrigatória
     user_token = verify_token()
