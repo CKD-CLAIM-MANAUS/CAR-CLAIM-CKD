@@ -49,6 +49,10 @@ CLOUDINARY_API_KEY    = os.environ.get('CLOUDINARY_API_KEY', '')
 CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', '')
 CLOUDINARY_FOLDER     = 'garantia-car'
 
+# ── Limites anti-DoS no processamento de imagem ───────────────
+MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024   # 15 MB por foto
+PILImage.MAX_IMAGE_PIXELS = 40_000_000  # ~40 MP; acima disso o Pillow levanta erro (decompression bomb)
+
 # Cliente Firestore (lazy) — só inicializa quando o endpoint é usado
 _fs_client = None
 def get_firestore():
@@ -133,7 +137,15 @@ def download_and_process(url, width, height):
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=15) as response:
-            img_data = response.read()
+            clen = response.headers.get('Content-Length')
+            if clen and int(clen) > MAX_DOWNLOAD_BYTES:
+                print(f'Imagem rejeitada: Content-Length {clen} > limite')
+                return None
+            # Lê no máximo MAX_DOWNLOAD_BYTES+1 para detectar excesso mesmo sem Content-Length
+            img_data = response.read(MAX_DOWNLOAD_BYTES + 1)
+        if len(img_data) > MAX_DOWNLOAD_BYTES:
+            print('Imagem rejeitada: excede limite de bytes')
+            return None
         print(f'Downloaded {len(img_data)} bytes')
         img = PILImage.open(io.BytesIO(img_data))
         if img.mode in ('RGBA', 'P', 'LA'):
@@ -183,11 +195,13 @@ def sign_upload():
 
 # ── Export para Power BI / Power Apps ─────────────────────────
 def _check_export_key():
-    """Valida a chave de API (header X-API-Key ou query ?key=) de forma
-    resistente a timing attacks. Devolve True se válida."""
+    """Valida a chave de API APENAS via header X-API-Key, de forma
+    resistente a timing attacks. Devolve True se válida.
+    A chave NÃO é aceite por query string (?key=) para não vazar em
+    logs de servidor/proxy, histórico do navegador e header Referer."""
     if not EXPORT_API_KEY:
         return False  # sem chave configurada → endpoint fechado
-    provided = request.headers.get('X-API-Key') or request.args.get('key', '')
+    provided = request.headers.get('X-API-Key', '')
     return hmac.compare_digest(str(provided), EXPORT_API_KEY)
 
 

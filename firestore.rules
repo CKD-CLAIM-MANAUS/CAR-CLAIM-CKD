@@ -28,11 +28,20 @@ service cloud.firestore {
       allow read:   if isAuth();
       allow create: if isAuth()
                     && request.resource.data.userId == request.auth.uid
-                    && 'partName' in request.resource.data;
+                    && request.resource.data.keys().hasOnly([
+                         'partNo','partName','model','orderNo','lotNo','ngQty','defect',
+                         'detected','carNum','incidentType','photos','user','userId',
+                         'updatedAt','status','createdAt','history'])
+                    && request.resource.data.partName is string
+                    && request.resource.data.partName.size() < 300
+                    && request.resource.data.photos is list
+                    && request.resource.data.history is list;
       allow update: if isAuth()
                     && (isOwner(resource.data.userId) || isAdmin())
                     && (!('userId' in request.resource.data)
-                        || request.resource.data.userId == resource.data.userId);
+                        || request.resource.data.userId == resource.data.userId)
+                    && (!('createdAt' in request.resource.data)
+                        || request.resource.data.createdAt == resource.data.createdAt);
       allow delete: if isAuth()
                     && (isOwner(resource.data.userId) || isAdmin());
     }
@@ -40,7 +49,8 @@ service cloud.firestore {
     // ── Numeração CAR ─────────────────────────────────────────
     match /carNumbers/{docId} {
       allow read:          if isAuth();
-      allow create:        if isAuth();
+      allow create:        if isAuth()
+                           && request.resource.data.keys().hasOnly(['year','num','createdAt']);
       allow update, delete: if isAdmin();
     }
 
@@ -59,13 +69,21 @@ service cloud.firestore {
     // ── Stock ─────────────────────────────────────────────────
     match /stock/{partId} {
       allow read:  if isAuth();
-      allow write: if isAuth();
+      allow write: if isAuth()
+                   && request.resource.data.keys().hasOnly([
+                        'partNo','partName','qty','updatedAt','updatedBy'])
+                   && request.resource.data.qty is number;
     }
 
     // ── Movimentos de stock ───────────────────────────────────
     match /stockMovements/{moveId} {
       allow read:   if isAuth();
-      allow create: if isAuth();
+      allow create: if isAuth()
+                    && request.resource.data.keys().hasOnly([
+                         'partNo','partName','type','qty','qtyBefore','qtyAfter',
+                         'incidentId','carNum','date','user','note'])
+                    && request.resource.data.qty is number
+                    && request.resource.data.type in ['in','out','adjust'];
       allow delete: if isAdmin();
     }
 
