@@ -3552,6 +3552,12 @@ img { display: block; max-width: 100%; }
 .btn-mini:active { background: rgba(255,255,255,0.14); }
 .btn-mini-danger { color: #fca5a5; border-color: rgba(239,68,68,0.35); }
 
+/* ── Filtros por intervalo de datas (relatórios) ───────────── */
+.date-range-row { display: flex; gap: 10px; }
+.date-shortcuts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.pr-daterow { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.pr-daterow .field-input { flex: 1; min-width: 120px; }
+
 /* ── Viewer (só leitura) — esconde entradas de escrita ────── */
 body.role-viewer #saveBtn,
 body.role-viewer #dnt-form,

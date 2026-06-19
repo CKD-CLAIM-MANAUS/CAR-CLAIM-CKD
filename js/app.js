@@ -2296,14 +2296,18 @@ function _showMarkSentConfirm(id, carNum) {
 // ══════════════════════════════════════════════════════════════
 
 let _paintReportFilter = 'all'; // 'all' | 'pending' | 'sent'
+let _paintDateField    = 'createdAt'; // 'createdAt' | 'sentAt'
+let _paintFrom         = '';
+let _paintTo           = '';
 
 function renderPaintReport() {
   const el = document.getElementById('paintReportSection');
   if (!el) return;
 
-  // Peças de pintura em aberto
+  // Peças de pintura em aberto, dentro do intervalo de datas escolhido
   const paintIncs = incidents.filter(i =>
     (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
+    && _inDateRange(i[_paintDateField], _paintFrom, _paintTo)
   );
 
   const totalOpen    = paintIncs.length;
@@ -2383,6 +2387,22 @@ function renderPaintReport() {
         </button>
       </div>
 
+      <!-- Filtro por datas -->
+      <div class="pr-daterow">
+        <select class="field-input pr-datefield" onchange="setPaintDateField(this.value)">
+          <option value="createdAt"${_paintDateField === 'createdAt' ? ' selected' : ''}>Por registo</option>
+          <option value="sentAt"${_paintDateField === 'sentAt' ? ' selected' : ''}>Por envio</option>
+        </select>
+        <input class="field-input" type="date" value="${_paintFrom}" onchange="setPaintDate('from', this.value)" aria-label="De">
+        <input class="field-input" type="date" value="${_paintTo}" onchange="setPaintDate('to', this.value)" aria-label="Até">
+      </div>
+      <div class="date-shortcuts">
+        <button type="button" class="chip" onclick="setPaintRange('today')">Hoje</button>
+        <button type="button" class="chip" onclick="setPaintRange('week')">Esta semana</button>
+        <button type="button" class="chip" onclick="setPaintRange('month')">Este mês</button>
+        <button type="button" class="chip" onclick="setPaintRange('clear')">Limpar</button>
+      </div>
+
       <!-- Tabela -->
       <div class="pr-table-wrap">
         <table class="pr-table">
@@ -2412,12 +2432,56 @@ window.setPaintReportFilter = (f) => {
   _paintReportFilter = f;
   renderPaintReport();
 };
+window.setPaintDateField = (f) => { _paintDateField = f; renderPaintReport(); };
+window.setPaintDate = (which, val) => { if (which === 'from') _paintFrom = val; else _paintTo = val; renderPaintReport(); };
+window.setPaintRange = (kind) => { const r = _rangeForShortcut(kind); _paintFrom = r.from; _paintTo = r.to; renderPaintReport(); };
 
 // ══════════════════════════════════════════════════════════════
 // EXPORTS EXCEL FORMATADOS (ExcelJS)
 // Identidade CFMOTO: título escuro, cabeçalho laranja, status com
 // cor, datas reais, zebra rows, autofilter, freeze e linha de totais
 // ══════════════════════════════════════════════════════════════
+
+// ── Helpers de intervalo de datas (limites do dia LOCAL — Manaus) ──
+function _dayStart(str) {
+  if (!str) return null;
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+}
+function _dayEnd(str) {
+  if (!str) return null;
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+}
+// ts dentro de [from, to]? Extremos opcionais. Sem datas → sem filtro.
+function _inDateRange(ts, fromStr, toStr) {
+  const from = _dayStart(fromStr);
+  const to   = _dayEnd(toStr);
+  if (from === null && to === null) return true;
+  if (!ts) return false;
+  if (from !== null && ts < from) return false;
+  if (to   !== null && ts > to)   return false;
+  return true;
+}
+// Date → 'YYYY-MM-DD' local (para <input type=date>)
+function _fmtDateInput(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+// Atalho → {from, to}
+function _rangeForShortcut(kind) {
+  const now = new Date();
+  if (kind === 'today') { const s = _fmtDateInput(now); return { from: s, to: s }; }
+  if (kind === 'week')  {
+    const day = (now.getDay() + 6) % 7;          // segunda = 0
+    const mon = new Date(now); mon.setDate(now.getDate() - day);
+    return { from: _fmtDateInput(mon), to: _fmtDateInput(now) };
+  }
+  if (kind === 'month') {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from: _fmtDateInput(first), to: _fmtDateInput(now) };
+  }
+  return { from: '', to: '' }; // 'clear'
+}
 
 const XL_BRAND = {
   orange:    'FFFF6600',
@@ -2531,8 +2595,9 @@ window.exportPaintExcel = async () => {
 
   const paintIncs = incidents.filter(i =>
     (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
+    && _inDateRange(i[_paintDateField], _paintFrom, _paintTo)
   );
-  if (!paintIncs.length) { showToast('Nenhuma peça de pintura em aberto.'); return; }
+  if (!paintIncs.length) { showToast('Nenhuma peça de pintura no filtro.'); return; }
 
   const sorted = [...paintIncs].sort((a, b) => {
     const order = { sent: 0, pending: 1 };
@@ -2549,9 +2614,12 @@ window.exportPaintExcel = async () => {
   const WIDTHS  = [5, 11, 30, 24, 6, 16, 20, 13, 13, 45];
   ws.columns = WIDTHS.map(w => ({ width: w }));
 
+  const _prRange = (_paintFrom || _paintTo)
+    ? `${_paintDateField === 'sentAt' ? 'Envio' : 'Registo'}: ${_paintFrom || '…'} a ${_paintTo || '…'}`
+    : 'todas as datas';
   _xlAddTitleBlock(ws, HEADERS.length,
     'CFMOTO da Amazônia — Peças na Pintoria',
-    `Relatório de retrabalho de pintura em aberto · ${_xlGeneratedBy()}`);
+    `Pintura em aberto · ${_prRange} · ${_xlGeneratedBy()}`);
 
   const headerRowNum = _xlAddHeaderRow(ws, HEADERS);
 
@@ -2762,6 +2830,13 @@ window.doBatchPrint = () => {
 };
 
 // ── Excel export ──────────────────────────────────────────────
+// Atalhos de data do export geral (Hoje / Esta semana / Este mês / Limpar)
+window.setExcelRange = (kind) => {
+  const r = _rangeForShortcut(kind);
+  document.getElementById('excelFrom').value = r.from;
+  document.getElementById('excelTo').value   = r.to;
+};
+
 function updateExcelStats() {
   const stats = getStats(incidents);
   document.getElementById('exSTotal').textContent   = stats.total;
@@ -2772,20 +2847,28 @@ function updateExcelStats() {
 window.exportExcel = async () => {
   if (typeof window.ExcelJS === 'undefined') { showToast('❌ ExcelJS não carregado. Recarregue a página.'); return; }
 
-  const filter = document.getElementById('excelFilter').value;
-  const period = document.getElementById('excelPeriod').value;
-  const now = Date.now();
+  const filter    = document.getElementById('excelFilter').value;
+  const dateField = document.getElementById('excelDateField').value;
+  const fromStr   = document.getElementById('excelFrom').value;
+  const toStr     = document.getElementById('excelTo').value;
+
+  if (fromStr && toStr && fromStr > toStr) {
+    showToast('⚠️ A data "De" é posterior à data "Até".'); return;
+  }
 
   const list = incidents.filter(inc => {
     const mf = filter === 'all' || inc.status === filter;
-    const mp = period === 'all' || (now - (inc.createdAt || 0)) <= parseInt(period) * 86400000;
-    return mf && mp;
+    const md = _inDateRange(inc[dateField], fromStr, toStr);
+    return mf && md;
   });
 
   if (!list.length) { showToast('Nenhum incidente para exportar.'); return; }
 
   const FILTER_LABELS = { all: 'Todos os incidentes', pending: 'Só pendentes', done: 'Só concluídos' };
-  const PERIOD_LABELS = { all: 'todo o período', '7': 'últimos 7 dias', '30': 'últimos 30 dias', '90': 'últimos 90 dias' };
+  const DATE_LABELS   = { createdAt: 'Registo', sentAt: 'Envio', completedAt: 'Conclusão' };
+  const rangeTxt = (fromStr || toStr)
+    ? `${DATE_LABELS[dateField]}: ${fromStr || '…'} a ${toStr || '…'}`
+    : 'todas as datas';
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Incidentes CAR', {
@@ -2801,7 +2884,7 @@ window.exportExcel = async () => {
 
   _xlAddTitleBlock(ws, HEADERS.length,
     'CFMOTO da Amazônia — Relatório de Garantia CAR',
-    `Filtro: ${FILTER_LABELS[filter] || filter} · Período: ${PERIOD_LABELS[period] || period} · ${_xlGeneratedBy()}`);
+    `Filtro: ${FILTER_LABELS[filter] || filter} · ${rangeTxt} · ${_xlGeneratedBy()}`);
 
   const headerRowNum = _xlAddHeaderRow(ws, HEADERS);
 

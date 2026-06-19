@@ -645,13 +645,28 @@
         </div>
 
         <div class="field">
-          <label class="field-label">Filtrar por período</label>
-          <select class="field-input" id="excelPeriod">
-            <option value="all">Todo o período</option>
-            <option value="7">Últimos 7 dias</option>
-            <option value="30">Últimos 30 dias</option>
-            <option value="90">Últimos 90 dias</option>
+          <label class="field-label">Filtrar por data</label>
+          <select class="field-input" id="excelDateField">
+            <option value="createdAt">Data de registo</option>
+            <option value="sentAt">Data de envio</option>
+            <option value="completedAt">Data de conclusão</option>
           </select>
+        </div>
+        <div class="date-range-row">
+          <div class="field" style="flex:1;margin:0">
+            <label class="field-label">De</label>
+            <input class="field-input" type="date" id="excelFrom">
+          </div>
+          <div class="field" style="flex:1;margin:0">
+            <label class="field-label">Até</label>
+            <input class="field-input" type="date" id="excelTo">
+          </div>
+        </div>
+        <div class="date-shortcuts">
+          <button type="button" class="chip" onclick="setExcelRange('today')">Hoje</button>
+          <button type="button" class="chip" onclick="setExcelRange('week')">Esta semana</button>
+          <button type="button" class="chip" onclick="setExcelRange('month')">Este mês</button>
+          <button type="button" class="chip" onclick="setExcelRange('clear')">Limpar</button>
         </div>
 
         <button class="btn btn-success btn-full btn-lg" style="margin-top:4px" onclick="exportExcel()">
