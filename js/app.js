@@ -298,9 +298,14 @@ function setDesktopTab(tabId) {
 }
 
 window.goToList  = () => { _currentDetailId = null; showPage('list'); setDesktopTab('list'); renderList(); checkForDraft(); };
-// Acorda o backend (Render free dorme após ~15 min) para o upload da
-// 1ª foto não esperar o "cold start" do servidor.
+// Acorda o backend (Render free dorme após ~15 min) para que o upload de
+// fotos e a geração do CAR não esperem o "cold start" do servidor.
+// Throttle: no máximo 1 ping por minuto (o Render fica acordado ~15 min).
+let _lastWarm = 0;
 function warmBackend() {
+  const now = Date.now();
+  if (now - _lastWarm < 60000) return;
+  _lastWarm = now;
   fetch('https://car-claim-manaus.onrender.com/health', { cache: 'no-store' }).catch(() => {});
 }
 
@@ -1019,6 +1024,7 @@ window.showDetail = (id) => {
   const inc = incidents.find(i => i.id === id);
   if (!inc) return;
 
+  warmBackend(); // pré-aquece o backend para a geração do CAR não pegar cold start
   _currentDetailId = id; // regista qual detalhe está aberto
 
   // Marca card seleccionado
