@@ -142,6 +142,7 @@ initAuth(
     // Viewer = só leitura → esconde as entradas de escrita (CSS)
     document.body.classList.toggle('role-viewer', isViewer);
 
+    if (!isViewer) warmBackend();   // pré-aquece o backend p/ upload de fotos
     hideSplash();
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('appScreen').classList.add('visible');
@@ -297,8 +298,15 @@ function setDesktopTab(tabId) {
 }
 
 window.goToList  = () => { _currentDetailId = null; showPage('list'); setDesktopTab('list'); renderList(); checkForDraft(); };
+// Acorda o backend (Render free dorme após ~15 min) para o upload da
+// 1ª foto não esperar o "cold start" do servidor.
+function warmBackend() {
+  fetch('https://car-claim-manaus.onrender.com/health', { cache: 'no-store' }).catch(() => {});
+}
+
 window.goToForm  = () => {
   if (isViewer) { showToast('👁 Acesso somente leitura.'); return; }
+  warmBackend();
   clearForm();
   showPage('form');
   setDesktopTab('form');
@@ -2055,6 +2063,8 @@ function renderPhotoGrid() {
   if (currentPhotos.length > 0) markDraftDirty();
   if (draftTimer !== null) saveDraft();
 }
+// Permite que o upload em 2º plano (camera.js) actualize a grelha de fotos
+window._refreshPhotoGrid = renderPhotoGrid;
 
 // Paste photos
 document.addEventListener('paste', (e) => {

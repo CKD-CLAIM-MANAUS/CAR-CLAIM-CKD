@@ -15,8 +15,8 @@ function showFileError(msg) {
 let cameraStream = null;
 
 // ── Compress image ────────────────────────────────────────────
-export async function compressImage(file, maxW = 1600, maxKB = 900) {
-  return new Promise((resolve) => {
+export async function compressImage(file, maxW = 1600) {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -26,22 +26,19 @@ export async function compressImage(file, maxW = 1600, maxKB = 900) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        let quality = 0.82;
-        const encode = () => {
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
-          const kb = (dataUrl.length * 3 / 4) / 1024;
-          if (kb > maxKB && quality > 0.60) { quality -= 0.05; encode(); return; }
-          const byteStr = atob(dataUrl.split(',')[1]);
-          const arr = new Uint8Array(byteStr.length);
-          for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
-          const blob = new Blob([arr], { type: 'image/jpeg' });
+        // Uma única codificação JPEG via toBlob — muito mais rápido que o
+        // antigo loop de toDataURL (que re-codificava a imagem várias vezes).
+        canvas.toBlob((blob) => {
+          if (!blob) { reject(new Error('Falha ao processar a imagem')); return; }
           const compFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+          const dataUrl  = URL.createObjectURL(blob); // preview leve (sem base64 gigante)
           resolve({ dataUrl, compFile });
-        };
-        encode();
+        }, 'image/jpeg', 0.8);
       };
+      img.onerror = () => reject(new Error('Falha ao ler a imagem'));
       img.src = e.target.result;
     };
+    reader.onerror = () => reject(new Error('Falha ao ler o ficheiro'));
     reader.readAsDataURL(file);
   });
 }
@@ -178,29 +175,26 @@ async function processOneFile(file, onPhoto) {
   }
 }
 
-// ── Upload imediato e adiciona à lista ────────────────────────
+// ── Preview instantâneo + upload em 2º plano ──────────────────
+// A foto aparece NA HORA (imagem local) e o upload corre em segundo
+// plano, sem travar. Se o upload não terminar antes de guardar, o
+// incidente é salvo na mesma (a foto sobe ao guardar — isNew:true).
 async function uploadAndAdd(file, localPreview, onPhoto) {
-  // Adiciona placeholder com estado "a enviar"
-  const tempId = 'temp_' + Date.now();
-
-  // Mostra toast de progresso
-  const toast = document.getElementById('toast');
-  if (toast) {
-    toast.textContent = '⏳ A enviar foto...';
-    toast.classList.add('visible');
-  }
+  const photo = { url: localPreview, localPreview, isNew: true, file, _uploading: true };
+  onPhoto(photo); // aparece imediatamente na grelha
 
   try {
     const result = await uploadPhoto(file);
-    if (toast) toast.classList.remove('visible');
-    onPhoto({ url: result.url, publicId: result.publicId, localPreview, isNew: false });
+    photo.url      = result.url;
+    photo.publicId = result.publicId;
+    photo.isNew    = false; // já no Cloudinary → não re-envia ao guardar
   } catch (e) {
-    if (toast) {
-      toast.textContent = '❌ Erro no upload. Tenta novamente.';
-      setTimeout(() => toast.classList.remove('visible'), 3000);
-    }
-    // Adiciona mesmo assim com flag isNew para tentar upload ao guardar
-    onPhoto({ url: localPreview, localPreview, isNew: true, file });
+    // Falhou agora — mantém isNew:true e sobe ao guardar o incidente
+    console.warn('Upload em 2º plano falhou:', e.message);
+  } finally {
+    photo._uploading = false;
+    // Atualiza a grelha (estado final da foto)
+    if (window._refreshPhotoGrid) window._refreshPhotoGrid();
   }
 }
 
