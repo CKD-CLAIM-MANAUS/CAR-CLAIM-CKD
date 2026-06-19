@@ -3521,6 +3521,41 @@ img { display: block; max-width: 100%; }
   background: var(--blue-50);
   color: var(--blue-300);
 }
+
+/* ── Gestão de utilizadores — ações (admin) ───────────────── */
+.user-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  width: 100%;
+}
+.user-role-select {
+  background: var(--bg-card, #1e293b);
+  color: var(--ink-100, #e2e8f0);
+  border: 1px solid var(--border, #334155);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-mini {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-mini:active { background: rgba(255,255,255,0.14); }
+.btn-mini-danger { color: #fca5a5; border-color: rgba(239,68,68,0.35); }
+
+/* ── Viewer (só leitura) — esconde entradas de escrita ────── */
+body.role-viewer #saveBtn,
+body.role-viewer #dnt-form,
+body.role-viewer [data-page="form"] { display: none !important; }
 .user-list-empty {
   font-size: 13px;
   color: var(--ink-300);

@@ -6,9 +6,22 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Papel do utilizador (users/{uid}.role); '' se não tiver perfil.
+    function getRole() {
+      return (isAuth()
+              && exists(/databases/$(database)/documents/users/$(request.auth.uid)))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : '';
+    }
+
     function isAdmin() {
-      return isAuth() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return getRole() == 'admin';
+    }
+
+    // Pode escrever = autenticado e NÃO é viewer (só-leitura).
+    // Utilizadores sem perfil mantêm permissão de escrita (compatibilidade).
+    function canWrite() {
+      return isAuth() && getRole() != 'viewer';
     }
 
     function isOwner(userId) {
@@ -26,7 +39,7 @@ service cloud.firestore {
     // Impede impersonação e garante rastreabilidade
     match /incidents/{incidentId} {
       allow read:   if isAuth();
-      allow create: if isAuth()
+      allow create: if canWrite()
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.keys().hasOnly([
                          'partNo','partName','model','orderNo','lotNo','ngQty','defect',
@@ -36,20 +49,20 @@ service cloud.firestore {
                     && request.resource.data.partName.size() < 300
                     && request.resource.data.photos is list
                     && request.resource.data.history is list;
-      allow update: if isAuth()
+      allow update: if canWrite()
                     && (isOwner(resource.data.userId) || isAdmin())
                     && (!('userId' in request.resource.data)
                         || request.resource.data.userId == resource.data.userId)
                     && (!('createdAt' in request.resource.data)
                         || request.resource.data.createdAt == resource.data.createdAt);
-      allow delete: if isAuth()
+      allow delete: if canWrite()
                     && (isOwner(resource.data.userId) || isAdmin());
     }
 
     // ── Numeração CAR ─────────────────────────────────────────
     match /carNumbers/{docId} {
       allow read:          if isAuth();
-      allow create:        if isAuth()
+      allow create:        if canWrite()
                            && request.resource.data.keys().hasOnly(['year','num','createdAt']);
       allow update, delete: if isAdmin();
     }
@@ -69,7 +82,7 @@ service cloud.firestore {
     // ── Stock ─────────────────────────────────────────────────
     match /stock/{partId} {
       allow read:  if isAuth();
-      allow write: if isAuth()
+      allow write: if canWrite()
                    && request.resource.data.keys().hasOnly([
                         'partNo','partName','qty','updatedAt','updatedBy'])
                    && request.resource.data.qty is number;
@@ -78,7 +91,7 @@ service cloud.firestore {
     // ── Movimentos de stock ───────────────────────────────────
     match /stockMovements/{moveId} {
       allow read:   if isAuth();
-      allow create: if isAuth()
+      allow create: if canWrite()
                     && request.resource.data.keys().hasOnly([
                          'partNo','partName','type','qty','qtyBefore','qtyAfter',
                          'incidentId','carNum','date','user','note'])

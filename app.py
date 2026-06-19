@@ -320,6 +320,151 @@ def export_partslist():
         print(f'Error in export_partslist: {e}')
         return jsonify({'error': 'Erro ao exportar peças.'}), 500
 
+# ── Admin: gestão de utilizadores (Firebase Admin SDK) ────────
+VALID_ROLES = ('admin', 'user', 'viewer')
+
+
+def verify_admin():
+    """Devolve o token decodificado se o chamador for admin; senão None.
+    O papel é lido do Firestore (users/{uid}.role) pelo Admin SDK."""
+    tok = verify_token()
+    if not tok:
+        return None
+    fs = get_firestore()
+    if fs is None:
+        return None
+    try:
+        snap = fs.collection('users').document(tok['uid']).get()
+        if snap.exists and (snap.to_dict() or {}).get('role') == 'admin':
+            return tok
+    except Exception as e:
+        print(f'verify_admin error: {e}')
+    return None
+
+
+@app.route('/admin/users', methods=['GET'])
+def admin_list_users():
+    if not verify_admin():
+        return jsonify({'error': 'Apenas administradores.'}), 403
+    fs = get_firestore()
+    try:
+        profiles = {d.id: (d.to_dict() or {}) for d in fs.collection('users').stream()}
+        users = []
+        for u in fb_auth.list_users().iterate_all():
+            p = profiles.get(u.uid, {})
+            users.append({
+                'uid':       u.uid,
+                'email':     u.email or p.get('email', ''),
+                'name':      p.get('name') or (u.display_name or ''),
+                'role':      p.get('role', 'user'),
+                'disabled':  bool(u.disabled),
+                'createdAt': p.get('createdAt'),
+            })
+        users.sort(key=lambda x: (x['name'] or x['email'] or '').lower())
+        return jsonify({'users': users})
+    except Exception as e:
+        print(f'admin_list_users error: {e}')
+        return jsonify({'error': 'Erro ao listar utilizadores.'}), 500
+
+
+@app.route('/admin/users', methods=['POST'])
+def admin_create_user():
+    tok = verify_admin()
+    if not tok:
+        return jsonify({'error': 'Apenas administradores.'}), 403
+    data     = request.get_json(silent=True) or {}
+    name     = sanitize_str(data.get('name', ''), 100)
+    email    = sanitize_str(data.get('email', ''), 200).lower()
+    password = str(data.get('password', ''))
+    role     = data.get('role', 'user')
+    if role not in VALID_ROLES:
+        return jsonify({'error': 'Papel inválido.'}), 400
+    if not email or '@' not in email:
+        return jsonify({'error': 'Email inválido.'}), 400
+    if len(password) < 6:
+        return jsonify({'error': 'A senha deve ter pelo menos 6 caracteres.'}), 400
+    try:
+        u = fb_auth.create_user(email=email, password=password,
+                                display_name=(name or None))
+        get_firestore().collection('users').document(u.uid).set({
+            'name': name, 'email': email, 'role': role,
+            'createdAt': int(time.time() * 1000), 'createdBy': tok['uid'],
+        })
+        return jsonify({'uid': u.uid, 'email': email, 'name': name, 'role': role})
+    except fb_auth.EmailAlreadyExistsError:
+        return jsonify({'error': 'Este email já está registado.'}), 409
+    except ValueError as e:
+        return jsonify({'error': f'Dados inválidos: {e}'}), 400
+    except Exception as e:
+        print(f'admin_create_user error: {e}')
+        return jsonify({'error': 'Erro ao criar utilizador.'}), 500
+
+
+@app.route('/admin/users/role', methods=['POST'])
+def admin_set_role():
+    tok = verify_admin()
+    if not tok:
+        return jsonify({'error': 'Apenas administradores.'}), 403
+    data = request.get_json(silent=True) or {}
+    uid  = sanitize_str(data.get('uid', ''), 128)
+    role = data.get('role', '')
+    if role not in VALID_ROLES:
+        return jsonify({'error': 'Papel inválido.'}), 400
+    if not uid:
+        return jsonify({'error': 'uid obrigatório.'}), 400
+    if uid == tok['uid'] and role != 'admin':
+        return jsonify({'error': 'Não pode remover o seu próprio acesso de admin.'}), 400
+    try:
+        get_firestore().collection('users').document(uid).set({'role': role}, merge=True)
+        return jsonify({'uid': uid, 'role': role})
+    except Exception as e:
+        print(f'admin_set_role error: {e}')
+        return jsonify({'error': 'Erro ao alterar papel.'}), 500
+
+
+@app.route('/admin/users/disable', methods=['POST'])
+def admin_disable_user():
+    tok = verify_admin()
+    if not tok:
+        return jsonify({'error': 'Apenas administradores.'}), 403
+    data     = request.get_json(silent=True) or {}
+    uid      = sanitize_str(data.get('uid', ''), 128)
+    disabled = bool(data.get('disabled', True))
+    if not uid:
+        return jsonify({'error': 'uid obrigatório.'}), 400
+    if uid == tok['uid']:
+        return jsonify({'error': 'Não pode desativar a sua própria conta.'}), 400
+    try:
+        fb_auth.update_user(uid, disabled=disabled)
+        return jsonify({'uid': uid, 'disabled': disabled})
+    except Exception as e:
+        print(f'admin_disable_user error: {e}')
+        return jsonify({'error': 'Erro ao atualizar utilizador.'}), 500
+
+
+@app.route('/admin/users/delete', methods=['POST'])
+def admin_delete_user():
+    tok = verify_admin()
+    if not tok:
+        return jsonify({'error': 'Apenas administradores.'}), 403
+    data = request.get_json(silent=True) or {}
+    uid  = sanitize_str(data.get('uid', ''), 128)
+    if not uid:
+        return jsonify({'error': 'uid obrigatório.'}), 400
+    if uid == tok['uid']:
+        return jsonify({'error': 'Não pode excluir a sua própria conta.'}), 400
+    try:
+        fb_auth.delete_user(uid)
+        try:
+            get_firestore().collection('users').document(uid).delete()
+        except Exception:
+            pass
+        return jsonify({'uid': uid, 'deleted': True})
+    except Exception as e:
+        print(f'admin_delete_user error: {e}')
+        return jsonify({'error': 'Erro ao excluir utilizador.'}), 500
+
+
 @app.route('/generate-car', methods=['POST'])
 def generate_car():
     # 1. Autenticação obrigatória

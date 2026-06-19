@@ -1,5 +1,5 @@
 // ── app.js ────────────────────────────────────────────────────
-import { initAuth, login, createUser, loadUsers, logout, getUserInitials, getUserFirstName, currentUser, isAdmin } from './auth.js';
+import { initAuth, login, logout, getUserInitials, getUserFirstName, currentUser, isAdmin, isViewer, adminListUsers, adminCreateUser, adminSetRole, adminDisableUser, adminDeleteUser } from './auth.js';
 import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA, markCARGenerated } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
@@ -131,11 +131,16 @@ initAuth(
     document.getElementById('modalEmail').textContent     = user.email;
     document.getElementById('modalRole').innerHTML        = admin
       ? '<span class="admin-badge">👑 ADMIN</span>'
-      : '<span style="font-size:12px;color:var(--ink-300)">Utilizador</span>';
+      : isViewer
+        ? '<span style="font-size:12px;color:var(--ink-300)">👁 Visualizador (só leitura)</span>'
+        : '<span style="font-size:12px;color:var(--ink-300)">Utilizador</span>';
 
     // Mostra botão de gerir utilizadores só para admin
     const adminBtn = document.getElementById('adminUserBtn');
     if (adminBtn) adminBtn.style.display = admin ? 'block' : 'none';
+
+    // Viewer = só leitura → esconde as entradas de escrita (CSS)
+    document.body.classList.toggle('role-viewer', isViewer);
 
     hideSplash();
     document.getElementById('authScreen').style.display = 'none';
@@ -196,27 +201,35 @@ async function renderUsersList() {
   if (!el) return;
   el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
   try {
-    const users = await loadUsers();
-    if (!users.length) {
+    const { users } = await adminListUsers();
+    if (!users || !users.length) {
       el.innerHTML = '<div class="user-list-empty">Nenhum utilizador</div>';
       return;
     }
+    const opt = (cur) => ['admin', 'user', 'viewer'].map(r =>
+      `<option value="${r}"${cur === r ? ' selected' : ''}>${r === 'admin' ? '👑 Admin' : r === 'viewer' ? '👁 Viewer' : '👤 User'}</option>`).join('');
     el.innerHTML = users.map(u => {
-      const initials  = escHtml((u.name || u.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2));
-      const roleClass = u.role === 'admin' ? 'admin' : 'user';
-      const roleLabel = u.role === 'admin' ? '👑 Admin' : 'User';
+      const initials = escHtml((u.name || u.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2));
+      const uid      = escHtml(u.uid);
+      const nm       = (u.name || u.email || '').replace(/['"\\]/g, '');
+      const inactive = u.disabled
+        ? '<span class="user-list-role" style="background:rgba(239,68,68,0.2);color:#fca5a5">Inativo</span>' : '';
       return `
-      <div class="user-list-item">
+      <div class="user-list-item" style="flex-wrap:wrap">
         <div class="user-list-avatar">${initials}</div>
         <div class="user-list-info">
-          <div class="user-list-name">${escHtml(u.name) || '—'}</div>
+          <div class="user-list-name">${escHtml(u.name) || '—'} ${inactive}</div>
           <div class="user-list-email">${escHtml(u.email) || ''}</div>
+          <div class="user-actions">
+            <select class="user-role-select" onchange="adminChangeRole('${uid}', this.value)">${opt(u.role)}</select>
+            <button class="btn-mini" onclick="adminToggleDisable('${uid}', ${u.disabled ? 'true' : 'false'})">${u.disabled ? '✅ Reativar' : '⏸ Desativar'}</button>
+            <button class="btn-mini btn-mini-danger" onclick="adminRemoveUser('${uid}', '${escHtml(nm)}')">🗑</button>
+          </div>
         </div>
-        <span class="user-list-role ${roleClass}">${roleLabel}</span>
       </div>`;
     }).join('');
-  } catch {
-    el.innerHTML = '<div class="user-list-error">Erro ao carregar utilizadores.</div>';
+  } catch (e) {
+    el.innerHTML = `<div class="user-list-error">Erro ao carregar utilizadores: ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -224,6 +237,7 @@ window.doCreateUser = async () => {
   const name  = document.getElementById('newUserName').value.trim();
   const email = document.getElementById('newUserEmail').value.trim();
   const pass  = document.getElementById('newUserPass').value.trim();
+  const role  = document.getElementById('newUserRole')?.value || 'user';
   const errEl = document.getElementById('createUserError');
   const btn   = document.getElementById('createUserBtn');
 
@@ -232,24 +246,13 @@ window.doCreateUser = async () => {
   btn.textContent = '⏳ A criar...';
 
   try {
-    const result = await createUser(name, email, pass);
+    // Criação via backend (Admin SDK) — NÃO desloga o admin actual
+    await adminCreateUser(name, email, pass, role);
     document.getElementById('newUserName').value  = '';
     document.getElementById('newUserEmail').value = '';
     document.getElementById('newUserPass').value  = '';
-
-    if (result.requiresRelogin) {
-      // Firebase fez logout do admin ao criar o novo utilizador
-      // Mostra mensagem clara antes de redirecionar para login
-      closeModal('usersModal');
-      showToast(`✅ ${name} criado! Faça login novamente.`);
-      setTimeout(() => {
-        document.getElementById('appScreen').classList.remove('visible');
-        document.getElementById('authScreen').style.display = 'flex';
-      }, 2000);
-    } else {
-      showToast(`✅ ${name} adicionado com sucesso!`);
-      await renderUsersList();
-    }
+    showToast(`✅ ${name || email} criado com sucesso!`);
+    await renderUsersList();
   } catch (e) {
     errEl.textContent   = e.message;
     errEl.style.display = 'block';
@@ -257,6 +260,32 @@ window.doCreateUser = async () => {
 
   btn.disabled = false;
   btn.textContent = '➕ Criar utilizador';
+};
+
+// ── Admin: ações na lista de utilizadores ─────────────────────
+window.adminChangeRole = async (uid, role) => {
+  try {
+    await adminSetRole(uid, role);
+    showToast('✅ Papel atualizado.');
+  } catch (e) { showToast('⚠️ ' + e.message); }
+  await renderUsersList();
+};
+
+window.adminToggleDisable = async (uid, disabled) => {
+  try {
+    await adminDisableUser(uid, !disabled);
+    showToast(disabled ? '✅ Utilizador reativado.' : '⏸ Utilizador desativado.');
+  } catch (e) { showToast('⚠️ ' + e.message); }
+  await renderUsersList();
+};
+
+window.adminRemoveUser = async (uid, name) => {
+  if (!confirm(`Excluir definitivamente "${name}"?\nEsta ação não pode ser desfeita.`)) return;
+  try {
+    await adminDeleteUser(uid);
+    showToast('🗑 Utilizador excluído.');
+  } catch (e) { showToast('⚠️ ' + e.message); }
+  await renderUsersList();
 };
 
 // ── Navigation ────────────────────────────────────────────────
@@ -269,6 +298,7 @@ function setDesktopTab(tabId) {
 
 window.goToList  = () => { _currentDetailId = null; showPage('list'); setDesktopTab('list'); renderList(); checkForDraft(); };
 window.goToForm  = () => {
+  if (isViewer) { showToast('👁 Acesso somente leitura.'); return; }
   clearForm();
   showPage('form');
   setDesktopTab('form');
@@ -1926,6 +1956,7 @@ window.editIncident = (id) => {
 };
 
 window.saveForm = async () => {
+  if (isViewer) { showToast('👁 Acesso somente leitura.'); return; }
   const partName = document.getElementById('fPartName').value.trim();
   if (!partName) { showToast('Preencha o nome da peça'); return; }
   if (currentPhotos.length === 0) {

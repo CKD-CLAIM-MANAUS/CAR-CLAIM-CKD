@@ -3,6 +3,10 @@ import { db, auth, fb, fbAuth } from './firebase.js';
 
 export let currentUser = null;
 export let isAdmin = false;
+export let isViewer = false;
+
+// Base do backend (Render) — mesmos endpoints da geração de CAR/upload
+const API_URL = 'https://car-claim-manaus.onrender.com';
 
 // ── Session timeout — 8 horas ────────────────────────────────
 const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 horas
@@ -64,9 +68,12 @@ export function initAuth(onLogin, onLogout) {
       currentUser = user;
       try {
         const snap = await fb.getDoc(fb.doc(db, 'users', user.uid));
-        isAdmin = snap.exists() && snap.data().role === 'admin';
+        const role = snap.exists() ? (snap.data().role || 'user') : 'user';
+        isAdmin  = role === 'admin';
+        isViewer = role === 'viewer';
       } catch {
-        isAdmin = false;
+        isAdmin  = false;
+        isViewer = false;
       }
 
       // Verifica se a sessão não expirou
@@ -164,3 +171,48 @@ export function getUserFirstName(user) {
   const name = user.displayName || user.email || '';
   return name.split(' ')[0];
 }
+
+// ── Admin: gestão de utilizadores via backend (Admin SDK) ─────
+// Os endpoints exigem que o chamador seja admin (validado no servidor).
+// Vantagem: cria/gere utilizadores SEM deslogar o admin actual.
+async function adminFetch(path, options = {}) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+  const res = await fetch(API_URL + path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token,
+      ...(options.headers || {}),
+    },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || ('Erro (' + res.status + ').'));
+  return body;
+}
+
+export const adminListUsers = () => adminFetch('/admin/users');
+
+export const adminCreateUser = (name, email, password, role) =>
+  adminFetch('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password, role }),
+  });
+
+export const adminSetRole = (uid, role) =>
+  adminFetch('/admin/users/role', {
+    method: 'POST',
+    body: JSON.stringify({ uid, role }),
+  });
+
+export const adminDisableUser = (uid, disabled) =>
+  adminFetch('/admin/users/disable', {
+    method: 'POST',
+    body: JSON.stringify({ uid, disabled }),
+  });
+
+export const adminDeleteUser = (uid) =>
+  adminFetch('/admin/users/delete', {
+    method: 'POST',
+    body: JSON.stringify({ uid }),
+  });
