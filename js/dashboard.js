@@ -175,6 +175,25 @@ export function renderDashboard() {
     .map(([k, label]) => ({ key: k, label, count: incs.filter(i => (i.status || 'pending') === k).length, color: STATUS_COLORS[k] }))
     .filter(s => s.count > 0);
 
+  // KPIs separados por tipo (para a sub-linha 🔧 Normal · 🎨 Pintura)
+  const kn = calcKPIs(incs.filter(i => (i.incidentType || 'normal') === 'normal'));
+  const kp = calcKPIs(incs.filter(i => (i.incidentType || 'normal') === 'paint'));
+
+  // Detalhe de Pintura — SEMPRE só pintura (respeita modelo + datas, ignora o filtro de tipo)
+  const paintDetail = incidents.filter(i =>
+    (i.incidentType || 'normal') === 'paint'
+    && (dashModel === 'all' || (i.model || '') === dashModel)
+    && _inRange(i.createdAt, dashFrom, dashTo)
+  );
+  const PAINT_STATES = [
+    { code: 'pending', label: 'Aguardando Envio', color: '#F59E0B' },
+    { code: 'sent',    label: 'Na Pintura',       color: '#8B5CF6' },
+    { code: 'done',    label: 'Encerrado',        color: '#22C55E' },
+  ].map(s => ({ ...s, count: paintDetail.filter(i => (i.status || 'pending') === s.code).length }));
+
+  // Argumentos do drill (datas/modelo atuais) para os onclick
+  const drillArgs = (t, code) => `'${t}','${code}','${dashFrom}','${dashTo}','${escHtml(dashModel)}'`;
+
   const models = distinctModels();
 
   el.innerHTML = `
@@ -208,11 +227,11 @@ export function renderDashboard() {
 
   <!-- KPI cards -->
   <div class="dash-kpi-grid">
-    <div class="dash-kpi"><div class="dash-kpi-val">${kpis.total}</div><div class="dash-kpi-lbl">Total</div></div>
-    <div class="dash-kpi" style="--kc:#F59E0B"><div class="dash-kpi-val">${kpis.pending}</div><div class="dash-kpi-lbl">Pendentes</div></div>
-    <div class="dash-kpi" style="--kc:#3B82F6"><div class="dash-kpi-val">${kpis.inProgress}</div><div class="dash-kpi-lbl">Em Curso</div></div>
-    <div class="dash-kpi" style="--kc:#22C55E"><div class="dash-kpi-val">${kpis.done}</div><div class="dash-kpi-lbl">Encerrados</div></div>
-    <div class="dash-kpi" style="--kc:#E11D48"><div class="dash-kpi-val">${kpis.totalDefective}</div><div class="dash-kpi-lbl">Peças NG</div></div>
+    <div class="dash-kpi"><div class="dash-kpi-val">${kpis.total}</div><div class="dash-kpi-lbl">Total</div>${dashType === 'all' ? `<div class="dash-kpi-split">🔧 ${kn.total} · 🎨 ${kp.total}</div>` : ''}</div>
+    <div class="dash-kpi" style="--kc:#F59E0B"><div class="dash-kpi-val">${kpis.pending}</div><div class="dash-kpi-lbl">Pendentes</div>${dashType === 'all' ? `<div class="dash-kpi-split">🔧 ${kn.pending} · 🎨 ${kp.pending}</div>` : ''}</div>
+    <div class="dash-kpi" style="--kc:#3B82F6"><div class="dash-kpi-val">${kpis.inProgress}</div><div class="dash-kpi-lbl">Em Curso</div>${dashType === 'all' ? `<div class="dash-kpi-split">🔧 ${kn.inProgress} · 🎨 ${kp.inProgress}</div>` : ''}</div>
+    <div class="dash-kpi" style="--kc:#22C55E"><div class="dash-kpi-val">${kpis.done}</div><div class="dash-kpi-lbl">Encerrados</div>${dashType === 'all' ? `<div class="dash-kpi-split">🔧 ${kn.done} · 🎨 ${kp.done}</div>` : ''}</div>
+    <div class="dash-kpi" style="--kc:#E11D48"><div class="dash-kpi-val">${kpis.totalDefective}</div><div class="dash-kpi-lbl">Peças NG</div>${dashType === 'all' ? `<div class="dash-kpi-split">🔧 ${kn.totalDefective} · 🎨 ${kp.totalDefective}</div>` : ''}</div>
   </div>
 
   <!-- Gráfico de tendência (adapta dia/mês ao intervalo) -->
@@ -224,11 +243,11 @@ export function renderDashboard() {
   <!-- Status: lista + rosca -->
   <div class="dash-grid-2">
     <div class="dash-card">
-      <div class="dash-card-hd">📊 Por Estado</div>
+      <div class="dash-card-hd">📊 Por Estado <span class="dash-card-sub">(clique p/ ver/exportar)</span></div>
       ${statusRows.length === 0
         ? '<p class="dash-empty">Sem dados neste filtro</p>'
         : statusRows.map(s => `
-          <div class="dash-st-row">
+          <div class="dash-st-row dash-st-click" onclick="openStateDrill(${drillArgs(dashType, s.key)})">
             <span class="dash-st-dot" style="background:${s.color}"></span>
             <span class="dash-st-name">${s.label}</span>
             <span class="dash-st-cnt">${s.count}</span>
@@ -240,6 +259,19 @@ export function renderDashboard() {
         ${statusRows.length === 0 ? '<p class="dash-empty">Sem dados</p>' : '<canvas id="dashStatusChart"></canvas>'}
       </div>
     </div>
+  </div>
+
+  <!-- Pintura detalhada por estado (sempre só pintura) -->
+  <div class="dash-card">
+    <div class="dash-card-hd">🎨 Pintura — por estado <span class="dash-card-sub">(clique p/ ver/exportar)</span></div>
+    ${PAINT_STATES.every(s => s.count === 0)
+      ? '<p class="dash-empty">Sem peças de pintura no filtro</p>'
+      : PAINT_STATES.map(s => `
+        <div class="dash-st-row dash-st-click" onclick="openStateDrill(${drillArgs('paint', s.code)})">
+          <span class="dash-st-dot" style="background:${s.color}"></span>
+          <span class="dash-st-name">${s.label}</span>
+          <span class="dash-st-cnt">${s.count}</span>
+        </div>`).join('')}
   </div>
 
   <!-- Top Peças + Por Usuário -->

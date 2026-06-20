@@ -3564,6 +3564,19 @@ img { display: block; max-width: 100%; }
 .dash-daterow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .dash-daterow .field-input { flex: 1; min-width: 120px; }
 .dash-doughnut-wrap { position: relative; height: 200px; }
+.dash-kpi-split { font-size: 10px; color: var(--ink-300); margin-top: 3px; white-space: nowrap; }
+.dash-st-click { cursor: pointer; border-radius: 8px; transition: background .12s; }
+.dash-st-click:hover { background: rgba(255,255,255,0.05); }
+.dash-st-click:active { background: rgba(255,255,255,0.09); }
+
+/* Drill-down — lista de incidentes por estado */
+.drill-list { display: flex; flex-direction: column; gap: 6px; max-height: 55vh; overflow-y: auto; }
+.drill-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px; background: var(--bg-card, #1e293b); border-radius: 8px; cursor: pointer; }
+.drill-row:active { background: rgba(255,255,255,0.06); }
+.drill-row-main { display: flex; flex-direction: column; min-width: 0; }
+.drill-row-name { font-size: 13px; font-weight: 600; color: var(--ink-100, #e2e8f0); }
+.drill-row-meta { font-size: 11px; color: var(--ink-300, rgba(255,255,255,0.45)); }
+.drill-row-date { font-size: 11px; color: var(--ink-300, rgba(255,255,255,0.45)); white-space: nowrap; }
 
 /* ── Viewer (só leitura) — esconde entradas de escrita ────── */
 body.role-viewer #saveBtn,

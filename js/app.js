@@ -2966,6 +2966,83 @@ window.exportExcel = async () => {
   showToast('📥 Excel exportado!');
 };
 
+// ══════════════════════════════════════════════════════════════
+// DRILL-DOWN POR ESTADO (a partir do Dashboard) — ver + exportar
+// ══════════════════════════════════════════════════════════════
+let _drillList  = [];
+let _drillTitle = '';
+
+window.openStateDrill = (type, status, from, to, model) => {
+  const isPaint = type === 'paint';
+  _drillList = incidents.filter(i => {
+    if (type !== 'all' && (i.incidentType || 'normal') !== type) return false;
+    if ((i.status || 'pending') !== status) return false;
+    if (model && model !== 'all' && (i.model || '') !== model) return false;
+    return _inDateRange(i.createdAt, from, to);
+  });
+  const cfg   = isPaint ? (PAINT_STATUS_CONFIG[status] || {}) : (STATUS_CONFIG[status] || {});
+  _drillTitle = `${isPaint ? '🎨 ' : ''}${cfg.label || status}`;
+
+  const titleEl = document.getElementById('drillTitle');
+  if (titleEl) titleEl.textContent = `${_drillTitle} — ${_drillList.length} incidente(s)`;
+
+  const listEl = document.getElementById('drillList');
+  if (listEl) {
+    listEl.innerHTML = _drillList.length === 0
+      ? '<div class="user-list-empty">Nenhum incidente neste estado.</div>'
+      : _drillList.map(inc => `
+        <div class="drill-row" onclick="closeModal('stateDrillModal'); goToList(); window.showDetail('${inc.id}');">
+          <div class="drill-row-main">
+            <span class="drill-row-name">${escHtml(inc.partName) || '—'}</span>
+            <span class="drill-row-meta">${inc.carNum ? 'CAR ' + escHtml(inc.carNum) + ' · ' : ''}${escHtml(inc.partNo) || ''}</span>
+          </div>
+          <span class="drill-row-date">${fmtDate(inc.createdAt)}</span>
+        </div>`).join('');
+  }
+  const expBtn = document.getElementById('drillExportBtn');
+  if (expBtn) expBtn.disabled = _drillList.length === 0;
+  openModal('stateDrillModal');
+};
+
+window.closeStateDrill = (e) => {
+  if (!e || e.target === document.getElementById('stateDrillModal')) closeModal('stateDrillModal');
+};
+
+window.exportStateDrillExcel = async () => {
+  if (typeof window.ExcelJS === 'undefined') { showToast('❌ ExcelJS não carregado. Recarregue a página.'); return; }
+  if (!_drillList.length) return;
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Incidentes', { views: [{ state: 'frozen', ySplit: 4 }] });
+  const HEADERS = ['Nº', 'Nº CAR', 'Tipo', 'Status', 'Código', 'Nome da Peça', 'Modelo', 'Qtd NG', 'Registo', 'Registado por'];
+  const WIDTHS  = [5, 11, 10, 16, 24, 28, 13, 8, 13, 20];
+  ws.columns = WIDTHS.map(w => ({ width: w }));
+
+  _xlAddTitleBlock(ws, HEADERS.length, `CFMOTO — ${_drillTitle}`, `${_drillList.length} incidente(s) · ${_xlGeneratedBy()}`);
+  const headerRowNum = _xlAddHeaderRow(ws, HEADERS);
+
+  _drillList.forEach((inc, i) => {
+    const isPaint = (inc.incidentType || 'normal') === 'paint';
+    const cfg = isPaint ? (PAINT_STATUS_CONFIG[inc.status] || PAINT_STATUS_CONFIG.pending) : (STATUS_CONFIG[inc.status] || STATUS_CONFIG.pending);
+    const row = ws.addRow([
+      i + 1, inc.carNum || '—', isPaint ? 'Pintura' : 'Normal', cfg.label,
+      inc.partNo || '', inc.partName || '', inc.model || '',
+      parseInt(inc.ngQty) || 0, inc.createdAt ? new Date(inc.createdAt) : '', inc.user || '',
+    ]);
+    row.height = 18;
+    _xlStyleDataRow(row, i % 2 === 1);
+    row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell(8).alignment = { vertical: 'middle', horizontal: 'center' };
+    if (inc.createdAt) row.getCell(9).numFmt = 'dd/mm/yyyy';
+    _xlStyleStatusCell(row.getCell(4), cfg.color);
+  });
+
+  ws.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum + _drillList.length, column: HEADERS.length } };
+  const safe = _drillTitle.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+  await _xlDownload(wb, `Incidentes-${safe}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  showToast('📥 Excel exportado!');
+};
+
 // ── Pack List Import ──────────────────────────────────────────
 // ── Pack List: ficheiro escolhido (por arrasto ou picker) ─────
 let _packFile = null;
