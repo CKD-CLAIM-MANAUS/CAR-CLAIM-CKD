@@ -1192,19 +1192,30 @@ function getBatchEligible() {
   return incidents.filter(i => (i.status || 'pending') !== 'done');
 }
 
-function renderBatchList(incs, search = '') {
+// Selecionados persistem entre buscas (Set de IDs de incidente)
+const _batchSelected = new Set();
+
+function _batchFilter(q) {
+  const s = (q || '').toLowerCase().trim();
+  const incs = getBatchEligible();
+  return s
+    ? incs.filter(i =>
+        (i.partName || '').toLowerCase().includes(s) ||
+        (i.partNo   || '').toLowerCase().includes(s) ||
+        (i.model    || '').toLowerCase().includes(s) ||
+        (i.orderNo  || '').toLowerCase().includes(s))
+    : incs;
+}
+
+function _currentBatchQuery() {
+  return document.getElementById('batchSearch')?.value || '';
+}
+
+function renderBatchList(q = '') {
   const listEl = document.getElementById('batchIncidentList');
   if (!listEl) return;
 
-  const q        = (search || '').toLowerCase().trim();
-  const filtered = q
-    ? incs.filter(i =>
-        (i.partName || '').toLowerCase().includes(q) ||
-        (i.partNo   || '').toLowerCase().includes(q) ||
-        (i.model    || '').toLowerCase().includes(q) ||
-        (i.orderNo  || '').toLowerCase().includes(q))
-    : incs;
-
+  const filtered = _batchFilter(q);
   if (!filtered.length) {
     listEl.innerHTML = `<div class="batch-empty">Nenhum incidente encontrado${q ? ` para "${q}"` : ''}.</div>`;
     return;
@@ -1223,14 +1234,15 @@ function renderBatchList(incs, search = '') {
     const st      = i.status || 'pending';
     const stCfg   = STATUS_CONFIG[st] || STATUS_CONFIG.pending;
     const isPend  = st === 'pending';
+    const checked = _batchSelected.has(i.id) ? ' checked' : '';
     const trackBadge  = i.tracking
       ? `<span class="batch-tracking-badge">📦 ${escHtml(i.tracking)}</span>` : '';
     const advBadge = isPend
       ? `<span class="batch-advance-badge">⚡ auto-avançado</span>` : '';
     return `
       <label class="batch-item${isPend ? ' batch-item-pending' : ''}">
-        <input type="checkbox" class="batch-cb" value="${i.id}" checked
-               onchange="updateBatchCount()">
+        <input type="checkbox" class="batch-cb" value="${i.id}"${checked}
+               onchange="toggleBatchItem('${i.id}', this.checked)">
         <div class="batch-item-info">
           <div class="batch-item-name-row">
             <span class="batch-item-name">${escHtml(i.partName) || '—'}</span>
@@ -1247,19 +1259,47 @@ function renderBatchList(incs, search = '') {
   }).join('');
 }
 
+// Painel de selecionados (chips) + contador + texto do botão
+function _refreshBatchSelected() {
+  const ids = [..._batchSelected];
+  const pendingCnt = ids.filter(id => {
+    const inc = incidents.find(i => i.id === id);
+    return inc && (inc.status || 'pending') === 'pending';
+  }).length;
+
+  const countEl = document.getElementById('batchSelectedCount');
+  if (countEl) countEl.textContent = ids.length
+    ? `${ids.length} selecionado${ids.length > 1 ? 's' : ''}${pendingCnt ? ` · ${pendingCnt} ⚡` : ''}`
+    : 'Nenhum selecionado';
+
+  const btn = document.getElementById('batchConfirmBtn');
+  if (btn) btn.textContent = ids.length ? `✓ Confirmar ETA em ${ids.length}` : '✓ Confirmar ETA';
+
+  const panel = document.getElementById('batchSelectedPanel');
+  if (panel) {
+    if (!ids.length) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
+    panel.style.display = '';
+    panel.innerHTML = ids.map(id => {
+      const inc = incidents.find(i => i.id === id);
+      if (!inc) return '';
+      const label = escHtml(inc.partNo || inc.partName || id) + (inc.carNum ? ' · CAR ' + escHtml(inc.carNum) : '');
+      return `<span class="batch-chip">${label}<button type="button" onclick="removeBatchItem('${id}')" aria-label="remover">✕</button></span>`;
+    }).join('');
+  }
+}
+
 window.openBatchETA = () => {
-  const eligible = getBatchEligible();
+  _batchSelected.clear();                       // começa tudo desmarcado
   const searchEl = document.getElementById('batchSearch');
   if (searchEl) searchEl.value = '';
 
-  if (!eligible.length) {
+  if (!getBatchEligible().length) {
     const listEl = document.getElementById('batchIncidentList');
-    listEl.innerHTML = `
-      <div class="batch-empty">Não há incidentes em aberto.</div>`;
+    if (listEl) listEl.innerHTML = `<div class="batch-empty">Não há incidentes em aberto.</div>`;
   } else {
-    renderBatchList(eligible);
+    renderBatchList('');
   }
-  updateBatchCount();
+  _refreshBatchSelected();
   openModal('batchETAModal');
 };
 
@@ -1268,36 +1308,25 @@ window.closeBatchETA = (e) => {
 };
 
 window.batchSearch = () => {
-  const q = document.getElementById('batchSearch')?.value || '';
-  renderBatchList(getBatchEligible(), q);
-  updateBatchCount();
+  renderBatchList(_currentBatchQuery());        // seleções persistem (vêm do Set)
 };
 
 window.batchSelectAll = (checked) => {
-  document.querySelectorAll('.batch-cb').forEach(cb => { cb.checked = checked; });
-  updateBatchCount();
+  if (checked) _batchFilter(_currentBatchQuery()).forEach(i => _batchSelected.add(i.id)); // só os visíveis
+  else _batchSelected.clear();                  // Nenhum = limpa tudo
+  renderBatchList(_currentBatchQuery());
+  _refreshBatchSelected();
 };
 
-window.updateBatchCount = () => {
-  const allCbs     = document.querySelectorAll('.batch-cb');
-  const checkedCbs = [...document.querySelectorAll('.batch-cb:checked')];
-  const total      = allCbs.length;
-  const selected   = checkedCbs.length;
+window.toggleBatchItem = (id, checked) => {
+  if (checked) _batchSelected.add(id); else _batchSelected.delete(id);
+  _refreshBatchSelected();
+};
 
-  const pendingCnt = checkedCbs.filter(cb => {
-    const inc = incidents.find(i => i.id === cb.value);
-    return inc && (inc.status || 'pending') === 'pending';
-  }).length;
-
-  const el = document.getElementById('batchSelectedCount');
-  if (el) {
-    el.textContent = `${selected} de ${total} selecionados`;
-    if (pendingCnt) el.textContent += ` · ${pendingCnt} serão auto-avançados ⚡`;
-  }
-  const btn = document.getElementById('batchConfirmBtn');
-  if (btn) btn.textContent = selected > 0
-    ? `✓ Confirmar ETA em ${selected} incidente${selected > 1 ? 's' : ''}`
-    : '✓ Confirmar ETA';
+window.removeBatchItem = (id) => {
+  _batchSelected.delete(id);
+  renderBatchList(_currentBatchQuery());
+  _refreshBatchSelected();
 };
 
 window.doBatchConfirmETA = async () => {
@@ -1309,8 +1338,8 @@ window.doBatchConfirmETA = async () => {
   if (!tracking) { showToast('⚠️ Insere o número de tracking'); return; }
   if (!etaRaw)   { showToast('⚠️ Selecciona a data ETA');       return; }
 
-  const selected = [...document.querySelectorAll('.batch-cb:checked')].map(cb => cb.value);
-  if (!selected.length) { showToast('⚠️ Selecciona pelo menos 1 incidente'); return; }
+  const selected = [..._batchSelected];
+  if (!selected.length) { showToast('⚠️ Selecione pelo menos 1 incidente'); return; }
 
   const d   = new Date(etaRaw + 'T00:00:00');
   const eta = d.toLocaleDateString('pt-BR');
@@ -1324,6 +1353,7 @@ window.doBatchConfirmETA = async () => {
       selected.map(id => batchAdvanceToETA(id, currentUser, eta, tracking))
     );
     closeModal('batchETAModal');
+    _batchSelected.clear();
     showToast(`✅ ${selected.length} incidente${selected.length > 1 ? 's' : ''} confirmados · ${tracking}`);
     if (trackingEl) trackingEl.value = '';
     if (etaEl)      etaEl.value      = '';
@@ -1331,7 +1361,7 @@ window.doBatchConfirmETA = async () => {
   } catch (e) {
     showToast('❌ Erro: ' + e.message);
   } finally {
-    if (btn) { btn.disabled = false; updateBatchCount(); }
+    if (btn) { btn.disabled = false; _refreshBatchSelected(); }
   }
 };
 

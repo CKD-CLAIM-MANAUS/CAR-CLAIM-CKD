@@ -3578,6 +3578,11 @@ img { display: block; max-width: 100%; }
 .drill-row-meta { font-size: 11px; color: var(--ink-300, rgba(255,255,255,0.45)); }
 .drill-row-date { font-size: 11px; color: var(--ink-300, rgba(255,255,255,0.45)); white-space: nowrap; }
 
+/* Confirmar Envio em Lote — chips dos selecionados */
+.batch-selected-panel { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; max-height: 100px; overflow-y: auto; }
+.batch-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.35); border-radius: 14px; padding: 3px 6px 3px 10px; font-size: 11px; font-family: var(--font-mono, monospace); }
+.batch-chip button { background: rgba(255,255,255,0.14); border: none; color: #fff; border-radius: 50%; width: 16px; height: 16px; line-height: 1; font-size: 10px; cursor: pointer; padding: 0; }
+
 /* ── Viewer (só leitura) — esconde entradas de escrita ────── */
 body.role-viewer #saveBtn,
 body.role-viewer #dnt-form,
