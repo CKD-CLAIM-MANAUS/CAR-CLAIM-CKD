@@ -310,14 +310,9 @@ export function renderDashboard() {
   </div>
 
   <!-- Exportar -->
-  <div class="dash-noexport" style="margin-top:4px">
-    <button class="btn btn-success btn-full" onclick="exportFullExcel('${dashType}','${escHtml(dashModel)}','${dashFrom}','${dashTo}')">
-      📥 Exportar tudo (Excel detalhado)
-    </button>
-    <button class="btn btn-full" style="margin-top:8px" onclick="exportDashboardPDF()">
-      📄 Exportar Dashboard (PDF)
-    </button>
-  </div>
+  <button class="btn btn-success btn-full" style="margin-top:4px" onclick="exportFullExcel('${dashType}','${escHtml(dashModel)}','${dashFrom}','${dashTo}')">
+    📥 Exportar tudo (Excel detalhado)
+  </button>
 
 </div>`;
 
@@ -398,47 +393,4 @@ export function setDashRange(kind) {
   else if (kind === 'month') { const first = new Date(now.getFullYear(), now.getMonth(), 1); dashFrom = _fmt(first); dashTo = _fmt(now); }
   else if (kind === '3m')    { const d = new Date(now); d.setMonth(d.getMonth() - 3); dashFrom = _fmt(d); dashTo = _fmt(now); }
   renderDashboard();
-}
-
-// ── Exportar dashboard como PDF (html2canvas + jsPDF) ─────────
-export async function exportDashboardPDF() {
-  const el = document.getElementById('dashboardSection');
-  if (!el) return;
-  if (typeof window.html2canvas === 'undefined' || !window.jspdf) {
-    alert('Ferramenta de exportação ainda a carregar. Tente de novo em alguns segundos.');
-    return;
-  }
-  try {
-    const canvas = await window.html2canvas(el, {
-      backgroundColor: '#0B1220', scale: 1.5, useCORS: true,
-      ignoreElements: (node) => node.classList && node.classList.contains('dash-noexport'),
-    });
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
-    const pw = pdf.internal.pageSize.getWidth();
-    const ph = pdf.internal.pageSize.getHeight();
-
-    // Fatia o canvas por página e grava JPEG comprimido — evita PDF gigante
-    // (uma única imagem PNG da tela inteira gerava arquivos de dezenas de MB).
-    const pageH = Math.floor(canvas.width * ph / pw); // altura de 1 página, em px do canvas
-    let y = 0, first = true;
-    while (y < canvas.height) {
-      const sliceH = Math.min(pageH, canvas.height - y);
-      const slice  = document.createElement('canvas');
-      slice.width  = canvas.width;
-      slice.height = sliceH;
-      const sctx = slice.getContext('2d');
-      sctx.fillStyle = '#0B1220';
-      sctx.fillRect(0, 0, slice.width, slice.height);
-      sctx.drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      const img = slice.toDataURL('image/jpeg', 0.9);
-      if (!first) pdf.addPage();
-      pdf.addImage(img, 'JPEG', 0, 0, pw, sliceH * pw / canvas.width);
-      first = false;
-      y += sliceH;
-    }
-    pdf.save(`Dashboard-${new Date().toISOString().slice(0, 10)}.pdf`);
-  } catch (e) {
-    alert('Erro ao gerar o PDF: ' + e.message);
-  }
 }
