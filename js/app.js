@@ -2877,12 +2877,17 @@ window.exportFullExcel = async (type, model, fromStr, toStr) => {
     views: [{ state: 'frozen', ySplit: 4 }]  // congela título + cabeçalho
   });
 
+  // Colunas de foto: uma por foto (Foto 1, Foto 2, ...) até o máximo do conjunto
+  const maxPhotos = Math.max(0, ...list.map(i => (i.photos || []).length), 0);
+  const photoHeaders = Array.from({ length: maxPhotos }, (_, k) => `Foto ${k + 1}`);
   const HEADERS = ['Nº', 'Nº CAR', 'Status', 'Código da Peça', 'Nome da Peça',
                    'Modelo', 'Nº Pedido', 'Lote', 'Qtd NG', 'Descrição do Defeito',
                    'Como Detectado', 'Registado por', 'Registo', 'Envio', 'ETA',
-                   'Recepção', 'Conclusão', 'Fotos'];
-  const WIDTHS  = [5, 11, 15, 24, 26, 13, 18, 13, 8, 38, 30, 18, 12, 12, 12, 12, 12, 12];
+                   'Recepção', 'Conclusão', ...photoHeaders];
+  const WIDTHS  = [5, 11, 15, 24, 26, 13, 18, 13, 8, 38, 30, 18, 12, 12, 12, 12, 12,
+                   ...photoHeaders.map(() => 9)];
   ws.columns = WIDTHS.map(w => ({ width: w }));
+  const PHOTO_COL0 = 18; // 1ª coluna de foto
 
   _xlAddTitleBlock(ws, HEADERS.length,
     'CFMOTO da Amazônia — Relatório de Garantia CAR',
@@ -2911,7 +2916,10 @@ window.exportFullExcel = async (type, model, fromStr, toStr) => {
       inc.eta || '',
       inc.receivedAt  ? new Date(inc.receivedAt)  : '',
       inc.completedAt ? new Date(inc.completedAt) : '',
-      photos.length ? `Ver (${photos.length})` : '—',
+      ...Array.from({ length: maxPhotos }, (_, k) => {
+        const p = photos[k];
+        return (p && p.url) ? { text: `Foto ${k + 1}`, hyperlink: p.url } : '';
+      }),
     ]);
     row.height = 18;
     _xlStyleDataRow(row, i % 2 === 1);
@@ -2920,12 +2928,13 @@ window.exportFullExcel = async (type, model, fromStr, toStr) => {
     [13, 14, 16, 17].forEach(c => { if (row.getCell(c).value instanceof Date) row.getCell(c).numFmt = 'dd/mm/yyyy'; });
     _xlStyleStatusCell(row.getCell(3), cfg.color);
 
-    // Fotos como hyperlink clicável para a primeira foto
-    if (photos.length && photos[0].url) {
-      const cell = row.getCell(18);
-      cell.value = { text: `Ver (${photos.length})`, hyperlink: photos[0].url };
-      cell.font  = { size: 10, color: { argb: 'FF1A56CC' }, underline: true };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    // Cada foto num link próprio (azul sublinhado)
+    for (let k = 0; k < maxPhotos; k++) {
+      if (photos[k] && photos[k].url) {
+        const cell = row.getCell(PHOTO_COL0 + k);
+        cell.font = { size: 10, color: { argb: 'FF1A56CC' }, underline: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      }
     }
   });
 
