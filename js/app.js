@@ -322,7 +322,7 @@ window.goToForm  = () => {
   startDraftTimer();
   attachDraftListeners();
 };
-window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); updateExcelStats(); renderDashboard(); };
+window.goToExcel = () => { showPage('excel'); setDesktopTab('excel'); renderDashboard(); };
 window.goToStock = () => { showPage('stock'); setDesktopTab('stock'); renderStockPage(); };
 
 // ══════════════════════════════════════════════════════════════
@@ -2854,44 +2854,23 @@ window.doBatchPrint = () => {
 
 // ── Excel export ──────────────────────────────────────────────
 // Atalhos de data do export geral (Hoje / Esta semana / Este mês / Limpar)
-window.setExcelRange = (kind) => {
-  const r = _rangeForShortcut(kind);
-  document.getElementById('excelFrom').value = r.from;
-  document.getElementById('excelTo').value   = r.to;
-};
-
-function updateExcelStats() {
-  const stats = getStats(incidents);
-  document.getElementById('exSTotal').textContent   = stats.total;
-  document.getElementById('exSPending').textContent = stats.pending;
-  document.getElementById('exSDone').textContent    = stats.done;
-}
-
-window.exportExcel = async () => {
+// Export completo (18 colunas) — chamado pelo Dashboard com os filtros de lá
+window.exportFullExcel = async (type, model, fromStr, toStr) => {
   if (typeof window.ExcelJS === 'undefined') { showToast('❌ ExcelJS não carregado. Recarregue a página.'); return; }
 
-  const filter    = document.getElementById('excelFilter').value;
-  const dateField = document.getElementById('excelDateField').value;
-  const fromStr   = document.getElementById('excelFrom').value;
-  const toStr     = document.getElementById('excelTo').value;
-
-  if (fromStr && toStr && fromStr > toStr) {
-    showToast('⚠️ A data "De" é posterior à data "Até".'); return;
-  }
-
   const list = incidents.filter(inc => {
-    const mf = filter === 'all' || inc.status === filter;
-    const md = _inDateRange(inc[dateField], fromStr, toStr);
-    return mf && md;
+    if (type && type !== 'all' && (inc.incidentType || 'normal') !== type) return false;
+    if (model && model !== 'all' && (inc.model || '') !== model) return false;
+    return _inDateRange(inc.createdAt, fromStr, toStr);
   });
 
-  if (!list.length) { showToast('Nenhum incidente para exportar.'); return; }
+  if (!list.length) { showToast('Nenhum incidente no filtro.'); return; }
 
-  const FILTER_LABELS = { all: 'Todos os incidentes', pending: 'Só pendentes', done: 'Só concluídos' };
-  const DATE_LABELS   = { createdAt: 'Registo', sentAt: 'Envio', completedAt: 'Conclusão' };
+  const TYPE_LABELS = { all: 'Todos os tipos', normal: 'Normais', paint: 'Pintura' };
   const rangeTxt = (fromStr || toStr)
-    ? `${DATE_LABELS[dateField]}: ${fromStr || '…'} a ${toStr || '…'}`
+    ? `Registo: ${fromStr || '…'} a ${toStr || '…'}`
     : 'todas as datas';
+  const filterTxt = `Tipo: ${TYPE_LABELS[type] || type || 'Todos'}${(model && model !== 'all') ? ' · Modelo: ' + model : ''}`;
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Incidentes CAR', {
@@ -2907,7 +2886,7 @@ window.exportExcel = async () => {
 
   _xlAddTitleBlock(ws, HEADERS.length,
     'CFMOTO da Amazônia — Relatório de Garantia CAR',
-    `Filtro: ${FILTER_LABELS[filter] || filter} · ${rangeTxt} · ${_xlGeneratedBy()}`);
+    `${filterTxt} · ${rangeTxt} · ${_xlGeneratedBy()}`);
 
   const headerRowNum = _xlAddHeaderRow(ws, HEADERS);
 

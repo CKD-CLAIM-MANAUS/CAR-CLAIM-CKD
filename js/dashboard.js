@@ -310,9 +310,14 @@ export function renderDashboard() {
   </div>
 
   <!-- Exportar -->
-  <button class="btn btn-success btn-full dash-noexport" style="margin-top:4px" onclick="exportDashboardPDF()">
-    📄 Exportar Dashboard (PDF)
-  </button>
+  <div class="dash-noexport" style="margin-top:4px">
+    <button class="btn btn-success btn-full" onclick="exportFullExcel('${dashType}','${escHtml(dashModel)}','${dashFrom}','${dashTo}')">
+      📥 Exportar tudo (Excel detalhado)
+    </button>
+    <button class="btn btn-full" style="margin-top:8px" onclick="exportDashboardPDF()">
+      📄 Exportar Dashboard (PDF)
+    </button>
+  </div>
 
 </div>`;
 

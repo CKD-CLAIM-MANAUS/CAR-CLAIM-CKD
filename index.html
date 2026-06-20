@@ -555,7 +555,7 @@
       <!-- Sub-tabs: Dashboard / Relatórios / Pintura -->
       <div class="sub-tabs-row">
         <button class="sub-tab active" id="st-dashboard" onclick="showExcelTab('dashboard')">📊 Dashboard</button>
-        <button class="sub-tab" id="st-reports"  onclick="showExcelTab('reports')">📋 Relatórios</button>
+        <button class="sub-tab" id="st-reports"  onclick="showExcelTab('reports')">📦 Pack List</button>
         <button class="sub-tab" id="st-paint"    onclick="showExcelTab('paint')">🎨 Pintura</button>
       </div>
 
@@ -607,71 +607,6 @@
         </button>
 
         <div class="import-progress" id="importProgress"></div>
-      </div>
-
-      <hr class="divider">
-
-      <!-- Export Excel -->
-      <div class="form-card">
-        <div class="form-card-title">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M4 16v1a2 2 0 002 2h8a2 2 0 002-2v-1M8 12l4 4 4-4M12 4v12"/>
-          </svg>
-          Exportar Relatório Excel
-        </div>
-
-        <div class="stats-row" style="margin-bottom:14px">
-          <div class="stat-card">
-            <div class="stat-value blue" id="exSTotal">—</div>
-            <div class="stat-label">Total</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value amber" id="exSPending">—</div>
-            <div class="stat-label">Pendentes</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value green" id="exSDone">—</div>
-            <div class="stat-label">Concluídos</div>
-          </div>
-        </div>
-
-        <div class="field">
-          <label class="field-label">Filtrar por status</label>
-          <select class="field-input" id="excelFilter">
-            <option value="all">Todos os incidentes</option>
-            <option value="pending">Só pendentes</option>
-            <option value="done">Só concluídos</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label class="field-label">Filtrar por data</label>
-          <select class="field-input" id="excelDateField">
-            <option value="createdAt">Data de registo</option>
-            <option value="sentAt">Data de envio</option>
-            <option value="completedAt">Data de conclusão</option>
-          </select>
-        </div>
-        <div class="date-range-row">
-          <div class="field" style="flex:1;margin:0">
-            <label class="field-label">De</label>
-            <input class="field-input" type="date" id="excelFrom">
-          </div>
-          <div class="field" style="flex:1;margin:0">
-            <label class="field-label">Até</label>
-            <input class="field-input" type="date" id="excelTo">
-          </div>
-        </div>
-        <div class="date-shortcuts">
-          <button type="button" class="chip" onclick="setExcelRange('today')">Hoje</button>
-          <button type="button" class="chip" onclick="setExcelRange('week')">Esta semana</button>
-          <button type="button" class="chip" onclick="setExcelRange('month')">Este mês</button>
-          <button type="button" class="chip" onclick="setExcelRange('clear')">Limpar</button>
-        </div>
-
-        <button class="btn btn-success btn-full btn-lg" style="margin-top:4px" onclick="exportExcel()">
-          📥 Exportar Excel
-        </button>
       </div>
 
       </div><!-- /reportsSection -->
