@@ -54,7 +54,13 @@ service cloud.firestore {
                     && (!('userId' in request.resource.data)
                         || request.resource.data.userId == resource.data.userId)
                     && (!('createdAt' in request.resource.data)
-                        || request.resource.data.createdAt == resource.data.createdAt);
+                        || request.resource.data.createdAt == resource.data.createdAt)
+                    // 'eta_confirmed' é exclusivo do admin (confirmação de ETA da China).
+                    // Não-admin pode editar um incidente que JÁ está nesse status,
+                    // mas não pode TRANSICIONAR para ele.
+                    && (isAdmin()
+                        || request.resource.data.status != 'eta_confirmed'
+                        || resource.data.status == 'eta_confirmed');
       allow delete: if canWrite()
                     && (isOwner(resource.data.userId) || isAdmin());
     }

@@ -61,14 +61,16 @@ export async function uploadPhoto(file) {
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!sigRes.ok) throw new Error('Falha ao autorizar o upload da foto');
-  const { signature, timestamp, apiKey, folder, cloudName } = await sigRes.json();
+  const { signature, timestamp, apiKey, folder, allowedFormats, cloudName } = await sigRes.json();
 
   // 2. Upload assinado ao Cloudinary
+  // allowed_formats tem de ser enviado tal como foi assinado pelo servidor.
   const fd = new FormData();
   fd.append('file', file);
   fd.append('api_key', apiKey);
   fd.append('timestamp', timestamp);
   fd.append('folder', folder);
+  if (allowedFormats) fd.append('allowed_formats', allowedFormats);
   fd.append('signature', signature);
   const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
     method: 'POST', body: fd

@@ -214,16 +214,21 @@ def sign_upload():
         return jsonify({'error': 'Cloudinary não configurado.'}), 503
 
     timestamp = int(time.time())
+    # Restringe os formatos aceites no servidor (assinado) — impede subir
+    # SVG/HTML/ficheiros arbitrários para a pasta. Inclui formatos do telemóvel.
+    allowed_formats = 'jpg,jpeg,png,webp,gif,heic,heif'
     # Parâmetros a assinar, por ordem alfabética (regra do Cloudinary)
-    to_sign   = f'folder={CLOUDINARY_FOLDER}&timestamp={timestamp}'
+    to_sign   = (f'allowed_formats={allowed_formats}'
+                 f'&folder={CLOUDINARY_FOLDER}&timestamp={timestamp}')
     signature = hashlib.sha1((to_sign + CLOUDINARY_API_SECRET).encode('utf-8')).hexdigest()
 
     return jsonify({
-        'signature': signature,
-        'timestamp': timestamp,
-        'apiKey':    CLOUDINARY_API_KEY,
-        'folder':    CLOUDINARY_FOLDER,
-        'cloudName': CLOUDINARY_CLOUD,
+        'signature':      signature,
+        'timestamp':      timestamp,
+        'apiKey':         CLOUDINARY_API_KEY,
+        'folder':         CLOUDINARY_FOLDER,
+        'allowedFormats': allowed_formats,
+        'cloudName':      CLOUDINARY_CLOUD,
     })
 
 
