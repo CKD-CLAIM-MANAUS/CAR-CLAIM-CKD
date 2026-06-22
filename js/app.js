@@ -1392,7 +1392,7 @@ window.doDelete = async (id) => {
 // Ao escanear o QR → app abre → regista retorno automaticamente
 // ══════════════════════════════════════════════════════════════
 
-const PAINT_APP_URL = 'https://ckd-claim-manaus.github.io/CAR-CLAIM-CKD/';
+const PAINT_APP_URL = 'https://car-claim-ckd.pages.dev/';
 
 // ── Valida QR: retorna true se o URL codifica este incidente ──
 function _validatePaintQR(data, expectedId) {
