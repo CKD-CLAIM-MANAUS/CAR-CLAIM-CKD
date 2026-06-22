@@ -1,17 +1,18 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v52';
+const CACHE_NAME = 'car-garantia-v53';
 
-// Apenas assets estáticos que raramente mudam
+// Assets estáticos — caminhos RELATIVOS ao scope do SW, para funcionar tanto
+// no GitHub Pages (/CAR-CLAIM-CKD/) como no Cloudflare Pages (raiz /).
 const STATIC_ASSETS = [
-  '/CAR-CLAIM-CKD/',
-  '/CAR-CLAIM-CKD/index.html',
-  '/CAR-CLAIM-CKD/css/app.css',
-  '/CAR-CLAIM-CKD/logo.png',
-  '/CAR-CLAIM-CKD/manifest.json',
+  './',
+  './index.html',
+  './css/app.css',
+  './logo.png',
+  './manifest.json',
 ];
 
 // Ficheiros JS — nunca pre-cached, sempre rede primeiro
-const JS_PATTERN = /\/CAR-CLAIM-CKD\/js\/.*\.js$/;
+const JS_PATTERN = /\/js\/.*\.js$/;
 
 // ── Install ───────────────────────────────────────────────────
 self.addEventListener('install', (event) => {

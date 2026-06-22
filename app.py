@@ -38,7 +38,11 @@ else:
     print('Firebase Admin: variavel FIREBASE_ADMIN_CREDENTIALS em falta')
 
 # ── App & CORS ────────────────────────────────────────────────
-ALLOWED_ORIGIN  = os.environ.get('ALLOWED_ORIGIN', 'https://ckd-claim-manaus.github.io')
+# Aceita várias origens separadas por vírgula (GitHub Pages + Cloudflare Pages)
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get(
+    'ALLOWED_ORIGIN',
+    'https://ckd-claim-manaus.github.io,https://car-claim-ckd.pages.dev'
+).split(',') if o.strip()]
 CLOUDINARY_BASE = 'https://res.cloudinary.com/dos2jsgzg/'
 TEMPLATE_PATH   = os.path.join(os.path.dirname(__file__), 'template.xlsx')
 
@@ -66,7 +70,7 @@ def get_firestore():
 
 app = Flask(__name__)
 CORS(app,
-     origins=[ALLOWED_ORIGIN],
+     origins=ALLOWED_ORIGINS,
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'])
 
