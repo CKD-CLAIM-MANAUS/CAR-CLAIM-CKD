@@ -15,13 +15,17 @@ import { auth } from './firebase.js';
 // ── Paint URL detection — executa antes do auth ───────────────
 // QR das etiquetas de pintura codifica: APP_URL?paint=INCIDENT_ID
 // Ao abrir o URL num telemóvel, o app detecta e trata o retorno da peça.
-let _pendingPaintId = null;
+let _pendingPaintId    = null;
+let _pendingIncidentId = null;
 (function () {
   const params  = new URLSearchParams(window.location.search);
   const paintId = params.get('paint');
-  if (paintId) {
-    _pendingPaintId = paintId;
-    // Limpa o ?paint= da URL sem recarregar a página
+  // Etiqueta de peça (CAR normal): ?incident=ID → só abre o detalhe (rastreio)
+  const incId   = params.get('incident');
+  if (paintId)    _pendingPaintId    = paintId;
+  if (incId)      _pendingIncidentId = incId;
+  if (paintId || incId) {
+    // Limpa o parâmetro da URL sem recarregar a página
     window.history.replaceState({}, '', window.location.pathname);
   }
 })();
@@ -150,7 +154,8 @@ initAuth(
     // Verifica rascunho e QR pendente após o primeiro snapshot carregar
     startRealtimeSync(() => {
       checkForDraft();
-      if (_pendingPaintId) handlePendingPaint();
+      if (_pendingPaintId)    handlePendingPaint();
+      if (_pendingIncidentId) handlePendingIncident();
     });
   },
   () => {
@@ -876,10 +881,10 @@ function buildDetailHTML(inc) {
     }
   }
 
-  // Botão de etiqueta — só para pintura
+  // Botão de etiqueta — pintura usa fluxo de retorno; peça normal usa rastreio
   const paintLabelBtn = isPaint
     ? `<button class="btn btn-paint-label" onclick="printPaintLabel('${inc.id}')">🖨 Etiqueta</button>`
-    : '';
+    : `<button class="btn btn-paint-label" onclick="printCarLabel('${inc.id}')">🖨 Etiqueta</button>`;
 
   // ── ETA display
   const trackUrl     = inc.tracking ? getTrackingUrl(inc.tracking) : '';
@@ -1538,6 +1543,23 @@ function handlePendingPaint() {
   }, isDesktop() ? 0 : 120);
 }
 
+// ── Trata ?incident= pendente — etiqueta de peça (CAR normal) ──
+// Só abre o detalhe para rastreio (sem alterar status).
+function handlePendingIncident() {
+  if (!_pendingIncidentId) return;
+  const id = _pendingIncidentId;
+  _pendingIncidentId = null;
+
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) { showToast('⚠️ Incidente não encontrado'); return; }
+
+  if (!isDesktop()) goToList();
+  setTimeout(() => {
+    window.showDetail(id);
+    showToast('🔎 Incidente aberto via etiqueta.');
+  }, isDesktop() ? 0 : 120);
+}
+
 // ── Banner amarelo de confirmação de retorno ──────────────────
 function _showPaintReturnBanner(id, inc) {
   document.getElementById('paintReturnBanner')?.remove();
@@ -1589,6 +1611,14 @@ window.printPaintLabel = (id) => {
 
   // Preenche campos de texto (elementos já existem no DOM — sem innerHTML)
   const byId = (i) => document.getElementById(i);
+  // Reset do modal partilhado para o modo PINTURA
+  if (byId('labelModalTitle')) byId('labelModalTitle').textContent = '🖨 Etiqueta de Pintura';
+  if (byId('labelModalSub'))   byId('labelModalSub').textContent   = 'Imprima e cole na peça antes de enviar para a pintura';
+  const pBadge = byId('labelBadge');
+  if (pBadge) { pBadge.textContent = '🎨 PINTURA'; pBadge.style.display = ''; }
+  const pMeta = byId('labelMeta');
+  if (pMeta) { pMeta.textContent = ''; pMeta.style.display = 'none'; }
+  if (byId('labelScanHint')) byId('labelScanHint').textContent = 'Ao escanear o QR, o retorno da peça é registado automaticamente';
   if (byId('labelCarNum'))  byId('labelCarNum').textContent  = carLabel;
   if (byId('labelPartName')) byId('labelPartName').textContent = partName;
   if (byId('labelDate'))    byId('labelDate').textContent    = dateStr;
@@ -1616,6 +1646,65 @@ window.printPaintLabel = (id) => {
         <div class="label-text-col">
           <div class="label-car-num">${escHtml(carLabel)}</div>
           <div class="label-part-name">${escHtml(partName)}</div>
+          <div class="label-date">${escHtml(dateStr)}</div>
+        </div>
+      </div>`;
+  }
+
+  openModal('paintLabelModal');
+};
+
+// ── Etiqueta de PEÇA (CAR normal) — QR de rastreio ───────────
+// QR codifica APP_URL?incident=ID → ao ler, abre o detalhe (rastreio).
+// Mostra: Nº CAR + nome da peça + lote/pedido + data.
+window.printCarLabel = (id) => {
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) return;
+
+  const qrUrl    = `${PAINT_APP_URL}?incident=${encodeURIComponent(id)}`;
+  const carLabel = inc.carNum ? `CAR ${inc.carNum}` : 'SEM CAR';
+  const partName = (inc.partName || '—').toUpperCase().slice(0, 32);
+  const dateStr  = new Date(inc.createdAt || Date.now()).toLocaleDateString('pt-BR');
+  const metaBits = [];
+  if (inc.lotNo)   metaBits.push('Lote ' + inc.lotNo);
+  if (inc.orderNo) metaBits.push('Pedido ' + inc.orderNo);
+  const metaStr  = metaBits.join(' · ');
+
+  const byId = (i) => document.getElementById(i);
+  // Modal partilhado em modo PEÇA
+  if (byId('labelModalTitle')) byId('labelModalTitle').textContent = '🖨 Etiqueta da Peça';
+  if (byId('labelModalSub'))   byId('labelModalSub').textContent   = 'Imprima e cole na peça com defeito para rastreio';
+  const badge = byId('labelBadge');
+  if (badge) { badge.textContent = inc.partNo ? '#' + inc.partNo : ''; badge.style.display = inc.partNo ? '' : 'none'; }
+  const meta = byId('labelMeta');
+  if (meta) { meta.textContent = metaStr; meta.style.display = metaStr ? '' : 'none'; }
+  if (byId('labelScanHint')) byId('labelScanHint').textContent = 'Ao escanear o QR, o detalhe do incidente abre para rastreio';
+  if (byId('labelCarNum'))   byId('labelCarNum').textContent   = carLabel;
+  if (byId('labelPartName')) byId('labelPartName').textContent = partName;
+  if (byId('labelDate'))     byId('labelDate').textContent     = dateStr;
+
+  // Gera QR no canvas que já está no DOM
+  const canvas = byId('paintLabelQR');
+  let qrDataUrl = '';
+  if (canvas) {
+    canvas.width  = 280;
+    canvas.height = 280;
+    if (_drawQRToCanvas(canvas, qrUrl)) qrDataUrl = canvas.toDataURL('image/png');
+  }
+
+  // Área de impressão (canvas não migra via innerHTML → usa img)
+  const printEl = byId('paintPrintArea');
+  if (printEl) {
+    const qrHtml = qrDataUrl
+      ? `<img class="label-qr-img" src="${qrDataUrl}">`
+      : `<div class="label-qr-placeholder">QR</div>`;
+    printEl.innerHTML = `
+      <div class="paint-label-print-area">
+        <div class="label-qr-col">${qrHtml}</div>
+        <div class="label-text-col">
+          <div class="label-car-num">${escHtml(carLabel)}</div>
+          <div class="label-part-name">${escHtml(partName)}</div>
+          ${metaStr ? `<div class="label-meta">${escHtml(metaStr)}</div>` : ''}
           <div class="label-date">${escHtml(dateStr)}</div>
         </div>
       </div>`;
@@ -2148,6 +2237,18 @@ window.openQRScanner = () => {
       // ── Detecta QR de etiqueta de pintura ─────────────────
       try {
         const url     = new URL(data);
+        // Etiqueta de peça (CAR normal): ?incident=ID → só abre o detalhe
+        const incId   = url.searchParams.get('incident');
+        if (incId) {
+          const inc = incidents.find(i => i.id === incId);
+          if (!inc) { showToast('⚠️ Incidente não encontrado'); return; }
+          if (!isDesktop()) goToList();
+          setTimeout(() => {
+            window.showDetail(incId);
+            showToast('🔎 Incidente aberto via etiqueta.');
+          }, isDesktop() ? 0 : 120);
+          return;
+        }
         const paintId = url.searchParams.get('paint');
         if (paintId) {
           const inc = incidents.find(i => i.id === paintId);
@@ -2219,8 +2320,13 @@ window.scanQRIntoForm = () => {
     async (data) => {
       // Etiqueta de pintura não se aplica ao preenchimento de um incidente
       try {
-        if (new URL(data).searchParams.get('paint')) {
+        const sp = new URL(data).searchParams;
+        if (sp.get('paint')) {
           showToast('⚠️ Essa é uma etiqueta de pintura, não de peça.');
+          return;
+        }
+        if (sp.get('incident')) {
+          showToast('⚠️ Essa é uma etiqueta de rastreio. Use o scanner principal para abrir o incidente.');
           return;
         }
       } catch { /* não é URL — segue para pack list */ }
@@ -2423,9 +2529,6 @@ function renderPaintReport() {
           <button class="chip${_paintReportFilter === 'sent'    ? ' active' : ''}" onclick="setPaintReportFilter('sent')">Na Pintura (${countSent})</button>
           <button class="chip${_paintReportFilter === 'pending' ? ' active' : ''}" onclick="setPaintReportFilter('pending')">Aguardando (${countPending})</button>`}
         </div>
-        <button class="btn btn-paint-label pr-label-btn" onclick="openBatchLabelModal()" ${(showDone || totalOpen === 0) ? 'disabled' : ''}>
-          🖨 Etiquetas em Lote
-        </button>
         <button class="btn btn-success pr-export-btn" onclick="exportPaintExcel()" ${totalOpen === 0 ? 'disabled' : ''}>
           📥 Exportar Excel
         </button>
@@ -2713,172 +2816,6 @@ window.exportPaintExcel = async () => {
   const date = new Date().toISOString().slice(0, 10);
   await _xlDownload(wb, `${showDone ? 'Pintura-Encerradas' : 'Pintura-Aberto'}-${date}.xlsx`);
   showToast('📥 Excel exportado!');
-};
-
-// ══════════════════════════════════════════════════════════════
-// BATCH LABEL PRINT — Impressão de etiquetas em lote (Opção C)
-// Modo Térmica: 58×40mm, uma etiqueta por página
-// Modo A4: grade 2×3, 6 etiquetas por folha A4, com marcas de corte
-// ══════════════════════════════════════════════════════════════
-
-let _batchPrintMode = 'thermal'; // 'thermal' | 'a4'
-
-window.openBatchLabelModal = () => {
-  const paintIncs = incidents.filter(i =>
-    (i.incidentType || 'normal') === 'paint' && (i.status || 'pending') !== 'done'
-  );
-  if (!paintIncs.length) { showToast('Nenhuma peça de pintura em aberto.'); return; }
-
-  _renderBatchLabelList(paintIncs);
-  _applyBatchMode(_batchPrintMode);
-  updateBatchLabelCount();
-  openModal('batchLabelModal');
-};
-
-window.closeBatchLabelModal = (e) => {
-  if (!e || e.target === document.getElementById('batchLabelModal'))
-    closeModal('batchLabelModal');
-};
-
-function _renderBatchLabelList(paintIncs) {
-  const el = document.getElementById('batchLabelList');
-  if (!el) return;
-
-  const sorted = [...paintIncs].sort((a, b) => {
-    const order = { sent: 0, pending: 1 };
-    return (order[a.status] ?? 2) - (order[b.status] ?? 2);
-  });
-
-  el.innerHTML = sorted.map(inc => {
-    const st  = inc.status || 'pending';
-    const cfg = PAINT_STATUS_CONFIG[st] || PAINT_STATUS_CONFIG.pending;
-    return `
-      <label class="batch-label-item">
-        <input type="checkbox" class="batch-label-cb" value="${inc.id}" checked
-               onchange="updateBatchLabelCount()">
-        <div class="batch-label-item-info">
-          <div class="batch-label-item-name">${escHtml(inc.partName) || '—'}</div>
-          <div class="batch-label-item-meta">
-            ${inc.carNum ? `CAR ${escHtml(inc.carNum)} · ` : ''}${escHtml(inc.partNo) || '—'}
-          </div>
-        </div>
-        <span class="batch-status-pill"
-              style="background:${cfg.color}20;color:${cfg.color};border-color:${cfg.color}40">
-          ${cfg.icon} ${cfg.label}
-        </span>
-      </label>`;
-  }).join('');
-}
-
-window.setBatchPrintMode = (mode) => {
-  _batchPrintMode = mode;
-  _applyBatchMode(mode);
-};
-
-function _applyBatchMode(mode) {
-  document.getElementById('batchModeThermal')?.classList.toggle('active', mode === 'thermal');
-  document.getElementById('batchModeA4')?.classList.toggle('active', mode === 'a4');
-  const hint = document.getElementById('batchModeHint');
-  if (hint) hint.textContent = mode === 'thermal'
-    ? '🖨 Uma etiqueta por página — compatível com impressoras térmicas 58mm (NIIMBOT, Phomemo, genéricas)'
-    : '📄 6 etiquetas por folha A4 com marcas de corte — compatível com folhas autocolantes Pimaco';
-}
-
-window.batchLabelToggleAll = (checked) => {
-  document.querySelectorAll('.batch-label-cb').forEach(cb => cb.checked = checked);
-  updateBatchLabelCount();
-};
-
-window.updateBatchLabelCount = () => {
-  const total    = document.querySelectorAll('.batch-label-cb').length;
-  const selected = document.querySelectorAll('.batch-label-cb:checked').length;
-  const el  = document.getElementById('batchLabelCount');
-  const btn = document.getElementById('batchLabelPrintBtn');
-  if (el)  el.textContent  = `${selected} de ${total} seleccionados`;
-  if (btn) btn.disabled    = selected === 0;
-};
-
-// Gera o HTML interno de uma etiqueta (QR via canvas temporário → data URL)
-function _buildLabelHTML(inc) {
-  const qrUrl    = `${PAINT_APP_URL}?paint=${encodeURIComponent(inc.id)}`;
-  const carLabel = inc.carNum ? `CAR ${inc.carNum}` : 'SEM CAR';
-  const partName = (inc.partName || '—').toUpperCase().slice(0, 40);
-  const dateStr  = new Date(inc.createdAt || Date.now()).toLocaleDateString('pt-BR');
-
-  // Canvas temporário para gerar QR sem tocar no DOM existente
-  const tmp = document.createElement('canvas');
-  tmp.width = tmp.height = 280;
-  const ok       = _drawQRToCanvas(tmp, qrUrl);
-  const qrDataUrl = ok ? tmp.toDataURL('image/png') : '';
-
-  const qrHtml = qrDataUrl
-    ? `<img class="label-qr-img" src="${qrDataUrl}" alt="QR">`
-    : `<div class="label-qr-placeholder">QR</div>`;
-
-  return `
-    <div class="paint-label-print-area">
-      <div class="label-qr-col">${qrHtml}</div>
-      <div class="label-text-col">
-        <div class="label-car-num">${escHtml(carLabel)}</div>
-        <div class="label-part-name">${escHtml(partName)}</div>
-        <div class="label-paint-badge">🎨 PINTURA</div>
-        <div class="label-date">${escHtml(dateStr)}</div>
-      </div>
-    </div>`;
-}
-
-window.doBatchPrint = () => {
-  const selectedIds = [...document.querySelectorAll('.batch-label-cb:checked')].map(cb => cb.value);
-  if (!selectedIds.length) { showToast('⚠️ Selecciona pelo menos 1 etiqueta'); return; }
-
-  const selected = selectedIds.map(id => incidents.find(i => i.id === id)).filter(Boolean);
-  const printEl  = document.getElementById('batchLabelPrintArea');
-  if (!printEl) return;
-
-  if (_batchPrintMode === 'thermal') {
-    // ── Modo térmico: uma etiqueta por "página" ───────────────
-    printEl.dataset.mode = 'thermal';
-    printEl.innerHTML = selected.map((inc, idx) =>
-      `<div class="batch-thermal-label${idx < selected.length - 1 ? ' batch-page-break' : ''}">${_buildLabelHTML(inc)}</div>`
-    ).join('');
-  } else {
-    // ── Modo A4: grade 2 colunas × 3 linhas = 6 por página ───
-    printEl.dataset.mode = 'a4';
-    const pages = [];
-    for (let i = 0; i < selected.length; i += 6) {
-      const chunk = selected.slice(i, i + 6);
-      // Preenche células vazias para manter o grid completo
-      while (chunk.length < 6) chunk.push(null);
-      pages.push(`
-        <div class="batch-a4-page${i + 6 < selected.length ? ' batch-page-break' : ''}">
-          ${chunk.map(inc => `
-            <div class="batch-a4-cell">
-              ${inc ? _buildLabelHTML(inc) : ''}
-            </div>`).join('')}
-        </div>`);
-    }
-    printEl.innerHTML = pages.join('');
-  }
-
-  // Injeta @page dinâmico conforme o modo
-  const styleId = 'batchPrintPageStyle';
-  document.getElementById(styleId)?.remove();
-  const style = document.createElement('style');
-  style.id = styleId;
-  style.textContent = _batchPrintMode === 'thermal'
-    ? '@page { size: 58mm 40mm; margin: 0; }'
-    : '@page { size: A4 portrait; margin: 6mm; }';
-  document.head.appendChild(style);
-
-  // Limpa após imprimir
-  window.addEventListener('afterprint', () => {
-    document.getElementById(styleId)?.remove();
-    printEl.innerHTML = '';
-    printEl.removeAttribute('data-mode');
-  }, { once: true });
-
-  closeModal('batchLabelModal');
-  setTimeout(() => window.print(), 150);
 };
 
 // ── Excel export ──────────────────────────────────────────────
