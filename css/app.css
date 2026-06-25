@@ -167,7 +167,6 @@ img { display: block; max-width: 100%; }
   background: var(--border-md);
 }
 
-.auth-brand-text { }
 .auth-brand-name {
   font-size: 15px;
   font-weight: 700;
