@@ -13,7 +13,9 @@ let _dbPromise = null;
 function _openDB() {
   if (_dbPromise) return _dbPromise;
   _dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    let req;
+    try { req = indexedDB.open(DB_NAME, DB_VERSION); }
+    catch (e) { reject(e); return; }
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -22,8 +24,26 @@ function _openDB() {
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror   = () => reject(req.error);
+    req.onblocked = () => reject(new Error('IndexedDB bloqueado por outra aba'));
   });
+  // Não deixa um promise rejeitado em cache — permite nova tentativa na próxima chamada
+  _dbPromise.catch(() => { _dbPromise = null; });
   return _dbPromise;
+}
+
+// ── Armazenamento persistente ─────────────────────────────────
+// Pede ao navegador para NÃO despejar o IndexedDB. Sem isto, navegadores
+// modernos podem apagar os rascunhos quando o app fecha (sobretudo em
+// PWA/telemóvel sob pressão de armazenamento). Best-effort, sem prompt no
+// Chrome (decide por heurística de uso); idempotente.
+export async function requestPersistentStorage() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return false;
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
 }
 
 // Guarda o objecto draft (campos + fotos com blobs) sob a chave 'current'

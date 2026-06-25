@@ -9,7 +9,7 @@ import { showToast, showPage, openFullscreen, openLightbox, closeLightbox, lbNav
 import { renderDashboard, setDashType, setDashModel, setDashDate, setDashRange } from './dashboard.js';
 import { loadStock, recordStockMovement, getStockHistory } from './stock.js';
 import { getTrackingUrl, getCarrierLabel } from './tracking.js';
-import { saveDraftDB, loadDraftDB, clearDraftDB } from './draftStore.js';
+import { saveDraftDB, loadDraftDB, clearDraftDB, requestPersistentStorage } from './draftStore.js';
 import { auth } from './firebase.js';
 
 // ── Paint URL detection — executa antes do auth ───────────────
@@ -147,6 +147,8 @@ initAuth(
     document.body.classList.toggle('role-viewer', isViewer);
 
     if (!isViewer) warmBackend();   // pré-aquece o backend p/ upload de fotos
+    // Pede armazenamento persistente para os rascunhos sobreviverem ao fecho do app
+    if (!isViewer) requestPersistentStorage();
     hideSplash();
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('appScreen').classList.add('visible');
