@@ -15,7 +15,34 @@ function showFileError(msg) {
 let cameraStream = null;
 
 // ── Compress image ────────────────────────────────────────────
-export async function compressImage(file, maxW = 1600) {
+// Caminho rápido: createImageBitmap decodifica FORA da main thread (o decode
+// da foto é a parte mais cara e o que mais travava a UI) e já aplica a
+// orientação EXIF. Fallback para FileReader+Image em browsers/formatos sem
+// suporte (ex.: HEIC no Chrome).
+export async function compressImage(file, maxW = 1280) {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    let w = bitmap.width, h = bitmap.height;
+    if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    if (bitmap.close) bitmap.close(); // liberta a memória do bitmap decodificado
+
+    const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.8));
+    if (!blob) throw new Error('toBlob vazio');
+    const compFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+    const dataUrl  = URL.createObjectURL(blob); // preview leve (sem base64 gigante)
+    return { dataUrl, compFile };
+  } catch {
+    // Sem createImageBitmap ou formato não decodificável por ele → método antigo
+    return _compressImageLegacy(file, maxW);
+  }
+}
+
+// Método antigo (FileReader + Image) — rede de segurança
+function _compressImageLegacy(file, maxW = 1280) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -26,12 +53,10 @@ export async function compressImage(file, maxW = 1600) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        // Uma única codificação JPEG via toBlob — muito mais rápido que o
-        // antigo loop de toDataURL (que re-codificava a imagem várias vezes).
         canvas.toBlob((blob) => {
           if (!blob) { reject(new Error('Falha ao processar a imagem')); return; }
           const compFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
-          const dataUrl  = URL.createObjectURL(blob); // preview leve (sem base64 gigante)
+          const dataUrl  = URL.createObjectURL(blob);
           resolve({ dataUrl, compFile });
         }, 'image/jpeg', 0.8);
       };

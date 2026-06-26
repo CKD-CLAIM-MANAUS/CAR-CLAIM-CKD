@@ -320,10 +320,13 @@ export async function lookupPart(partNo, lotNo) {
       result.partName = d.partName || '';
       result.model    = d.model    || '';
     } else {
-      // Fallback p/ entradas antigas (chave partNo_lotNo) ainda não migradas
-      const allSnap = await fb.getDocs(fb.collection(db, 'partsDB'));
-      const match = allSnap.docs.find(x => x.data().partNo === partNo);
-      if (match) { const d = match.data(); result.partName = d.partName || ''; result.model = d.model || ''; }
+      // Fallback p/ entradas antigas (chave diferente) ainda não migradas.
+      // Consulta indexada por partNo (índice automático) — em vez de baixar
+      // a coleção inteira e filtrar no cliente.
+      const qSnap = await fb.getDocs(
+        fb.query(fb.collection(db, 'partsDB'), fb.where('partNo', '==', partNo), fb.limit(1))
+      );
+      if (!qSnap.empty) { const d = qSnap.docs[0].data(); result.partName = d.partName || ''; result.model = d.model || ''; }
     }
   } catch { /* ignore */ }
 
