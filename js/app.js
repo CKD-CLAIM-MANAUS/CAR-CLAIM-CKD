@@ -1,6 +1,6 @@
 // ── app.js ────────────────────────────────────────────────────
 import { initAuth, login, logout, getUserInitials, getUserFirstName, currentUser, isAdmin, isViewer, adminListUsers, adminCreateUser, adminSetRole, adminDisableUser, adminDeleteUser } from './auth.js';
-import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getNextCARNumber, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA, markCARGenerated } from './incidents.js';
+import { loadIncidents, saveIncident, markDone, markPending, deleteIncident, getCARCounter, isCARNumberInUse, lookupPart, filterIncidents, getStats, incidents, STATUS_CONFIG, STATUS_FLOW, PAINT_STATUS_CONFIG, PAINT_STATUS_FLOW, updateIncidentStatus, addIncidentNote, subscribeToIncidents, unsubscribeFromIncidents, batchAdvanceToETA, markCARGenerated } from './incidents.js';
 import { openCamera, processFiles } from './camera.js';
 import { openQR, closeQR, parseQRData } from './qr.js';
 import { generateCAR, downloadBlob, downloadBlobSmart, getMissingFields, getSavePickerPref, setSavePickerPref, isSavePickerSupported } from './car.js';
@@ -324,8 +324,8 @@ window.goToForm  = () => {
   setDesktopTab('form');
   // Pré-selecciona o tipo de acordo com a tab activa
   setIncidentType(currentTypeTab);
-  // Pré-preenche o campo Nº CAR com o próximo número sugerido
-  _prefillCARNumber();
+  // O Nº CAR já NÃO é pré-preenchido aqui — é pedido na geração do Excel,
+  // para não consumir/queimar números em incidentes que acabam apagados.
   startDraftTimer();
   attachDraftListeners();
 };
@@ -1839,16 +1839,13 @@ window.onQtyChange      = () => { if (currentIncidentType === 'paint') updatePai
 
 // ── CAR Number helpers ────────────────────────────────────────
 
-// Pré-preenche o campo fCarNum com o próximo número sugerido
-// e mostra a dica "Último usado: 005/26" abaixo do campo
-function _prefillCARNumber() {
+// Actualiza a dica enquanto o utilizador edita o campo Nº CAR.
+// O campo já não é pré-preenchido; só mostra dica/conflito se o utilizador
+// optar por digitar um número à mão (caso contrário é pedido na geração).
+window.onCARNumInput = () => {
   const input = document.getElementById('fCarNum');
   if (!input) return;
-
-  const { lastFull, nextNum } = getCARCounter();
-  input.value = String(nextNum).padStart(3, '0');
-
-  // Mostra/actualiza dica abaixo do campo
+  // Cria a dica sob demanda (já não vem do prefill)
   let hint = document.getElementById('carNumHint');
   if (!hint) {
     hint = document.createElement('div');
@@ -1856,14 +1853,6 @@ function _prefillCARNumber() {
     hint.style.cssText = 'font-size:11px;color:var(--ink-300,rgba(255,255,255,0.4));margin-top:4px;';
     input.parentElement.appendChild(hint);
   }
-  hint.textContent = lastFull ? `Último usado: ${lastFull}` : 'Nenhum CAR registado ainda';
-}
-
-// Actualiza a dica enquanto o utilizador edita o campo
-window.onCARNumInput = () => {
-  const input   = document.getElementById('fCarNum');
-  const hint    = document.getElementById('carNumHint');
-  if (!input || !hint) return;
 
   const val      = input.value.trim();
   const conflict = val ? isCARNumberInUse(val, editingId, currentIncidentType) : null;
@@ -2360,31 +2349,85 @@ window.doGenerateCAR = async (id) => {
   const inc = incidents.find(i => i.id === id);
   if (!inc) { showToast('Incidente não encontrado'); return; }
 
-  const year       = new Date().getFullYear().toString().slice(-2);
-  const manualNum  = inc.carNum ? inc.carNum.trim() : null;
-
-  // ── Validação: verifica se o número já está em uso por outro incidente
+  const manualNum = inc.carNum ? inc.carNum.trim() : null;
   if (manualNum) {
-    const conflict = isCARNumberInUse(manualNum, id, inc.incidentType || 'normal');
-    if (conflict) {
-      showToast(`⚠️ CAR ${manualNum.padStart(3,'0')}/${year} já está em uso por: "${conflict.partName || conflict.partNo || ''}". Edite o incidente e altere o número.`);
-      return;
-    }
+    // Já tem número (digitado no formulário) → usa direto
+    _runGenerateCAR(id, manualNum);
+  } else {
+    // Sem número → pede AGORA, antes de gerar, pré-preenchido com o sugerido.
+    // Assim a numeração só é consumida por incidentes que viram relatório.
+    const { nextNum } = getCARCounter();
+    _showCARNumberPrompt(id, String(nextNum).padStart(3, '0'));
+  }
+};
+
+// ── Pede o Nº CAR antes de gerar (pré-preenchido com o próximo sugerido) ──
+function _showCARNumberPrompt(id, suggested) {
+  document.getElementById('carNumPrompt')?.remove();
+  const { lastFull } = getCARCounter();
+  const year = new Date().getFullYear().toString().slice(-2);
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'carNumPrompt';
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = `
+    <div class="confirm-box">
+      <div class="confirm-icon">📄</div>
+      <div class="confirm-title">Nº CAR do relatório</div>
+      <div class="confirm-subtitle">Confirme ou ajuste o número antes de gerar o Excel.${lastFull ? ` Último usado: <strong>${escHtml(lastFull)}</strong>.` : ''}</div>
+      <div class="field" style="margin:14px 0 4px">
+        <input class="field-input" id="carNumPromptInput" type="text" inputmode="numeric"
+               value="${escHtml(suggested)}"
+               style="text-align:center;font-family:var(--font-mono);font-size:18px;letter-spacing:1px"
+               placeholder="ex: 006">
+        <div class="field-optional" style="text-align:center;margin-top:6px">será gravado como NNN/${escHtml(year)}</div>
+      </div>
+      <div class="confirm-btns">
+        <button class="btn btn-primary confirm-btn-main" id="carNumPromptOk">📄 Gerar CAR Excel</button>
+        <button class="btn confirm-btn-sec" id="carNumPromptCancel">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const input = document.getElementById('carNumPromptInput');
+  input.focus(); input.select();
+
+  const submit = () => {
+    const val = input.value.trim();
+    if (!val) { showToast('Informe o Nº CAR.'); return; }
+    overlay.remove();
+    _runGenerateCAR(id, val);
+  };
+  document.getElementById('carNumPromptOk').onclick     = submit;
+  document.getElementById('carNumPromptCancel').onclick = () => overlay.remove();
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+}
+
+// ── Gera o CAR Excel com um número já decidido ───────────────
+async function _runGenerateCAR(id, numStr) {
+  const inc = incidents.find(i => i.id === id);
+  if (!inc) { showToast('Incidente não encontrado'); return; }
+
+  const year     = new Date().getFullYear().toString().slice(-2);
+  const cleanNum = String(numStr || '').trim();
+  if (!cleanNum) { showToast('Informe o Nº CAR.'); return; }
+
+  // Conflito com outro incidente do mesmo tipo?
+  const conflict = isCARNumberInUse(cleanNum, id, inc.incidentType || 'normal');
+  if (conflict) {
+    showToast(`⚠️ CAR ${cleanNum.padStart(3,'0')}/${year} já está em uso por: "${conflict.partName || conflict.partNo || ''}". Escolha outro número.`);
+    return;
   }
 
   showToast('⏳ A gerar CAR Excel...');
-
   try {
-    const carNum = manualNum
-      ? (manualNum.padStart(3, '0') + '/' + year)
-      : await getNextCARNumber();
-
-    const blob = await generateCAR(inc, carNum);
-    const code = carNum.replace('/', '_');
-    const label = (inc.partName || inc.partNo || 'PART').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 30);
+    const carNum = cleanNum.padStart(3, '0') + '/' + year;
+    const blob   = await generateCAR(inc, carNum);
+    const code   = carNum.replace('/', '_');
+    const label  = (inc.partName || inc.partNo || 'PART').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 30);
     await downloadBlobSmart(blob, `CAR_No_${code}_${label}.xlsx`);
 
-    // ── Marca que o relatório de reembolso (CAR) foi gerado
+    // ── Marca que o relatório de reembolso (CAR) foi gerado (grava o número)
     try { await markCARGenerated(id, carNum); } catch (e) { console.warn('markCARGenerated:', e); }
 
     // ── Pergunta se quer marcar como Enviado (só se ainda estiver Pendente)
@@ -2396,7 +2439,7 @@ window.doGenerateCAR = async (id) => {
   } catch (e) {
     showToast('Erro: ' + e.message);
   }
-};
+}
 
 // ── Confirmação pós-geração CAR: marcar como Enviado? ─────────
 function _showMarkSentConfirm(id, carNum) {
