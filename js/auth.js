@@ -120,7 +120,7 @@ export async function login(email, password) {
 // SEM guardar a senha em sessionStorage
 export async function createUser(name, email, password) {
   if (!name || !email || !password) throw new Error('Preencha todos os campos.');
-  if (password.length < 6) throw new Error('A senha deve ter pelo menos 6 caracteres.');
+  if (password.length < 8) throw new Error('A senha deve ter pelo menos 8 caracteres.');
 
   const adminUser = currentUser;
   const adminUid  = adminUser.uid;

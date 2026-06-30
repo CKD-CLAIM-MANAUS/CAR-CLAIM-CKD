@@ -135,6 +135,15 @@ def sanitize_int(value, default=1, min_val=0, max_val=9999):
     except (TypeError, ValueError):
         return default
 
+def excel_safe(value):
+    """Previne injeção de fórmula (CSV/Excel injection): se o texto começar
+    com =, +, -, @ (ou tab/CR), o Excel/openpyxl tratariam como fórmula.
+    Prefixa com ' para forçar interpretação como texto literal."""
+    s = '' if value is None else str(value)
+    if s and s[0] in ('=', '+', '-', '@', '\t', '\r'):
+        return "'" + s
+    return s
+
 # ── Tradução ──────────────────────────────────────────────────
 def translate_to_english(text):
     if not text:
@@ -423,8 +432,8 @@ def admin_create_user():
         return jsonify({'error': 'Papel inválido.'}), 400
     if not email or '@' not in email:
         return jsonify({'error': 'Email inválido.'}), 400
-    if len(password) < 6:
-        return jsonify({'error': 'A senha deve ter pelo menos 6 caracteres.'}), 400
+    if len(password) < 8:
+        return jsonify({'error': 'A senha deve ter pelo menos 8 caracteres.'}), 400
     try:
         u = fb_auth.create_user(email=email, password=password,
                                 display_name=(name or None))
@@ -562,20 +571,21 @@ def generate_car():
         wb = openpyxl.load_workbook(TEMPLATE_PATH)
         ws = wb['CAR']
 
-        ws['U2'] = 'IRU No. ' + car_num
-        ws['U4'] = user
-        ws['U5'] = issue_date
-        ws['G6'] = part_no
-        ws['U6'] = part_name
-        ws['AE4'] = part_name
-        ws['AE6'] = part_no
-        ws['G7'] = order_no
-        ws['U7'] = order_no
-        ws['D8'] = model
+        # Todas as células de texto passam por excel_safe (anti formula injection)
+        ws['U2'] = excel_safe('IRU No. ' + car_num)
+        ws['U4'] = excel_safe(user)
+        ws['U5'] = excel_safe(issue_date)
+        ws['G6'] = excel_safe(part_no)
+        ws['U6'] = excel_safe(part_name)
+        ws['AE4'] = excel_safe(part_name)
+        ws['AE6'] = excel_safe(part_no)
+        ws['G7'] = excel_safe(order_no)
+        ws['U7'] = excel_safe(order_no)
+        ws['D8'] = excel_safe(model)
         ws['K8'] = ng_qty
-        ws['U8'] = lot_no
-        ws['G9'] = short_defect
-        ws['A11'] = full_desc
+        ws['U8'] = excel_safe(lot_no)
+        ws['G9'] = excel_safe(short_defect)
+        ws['A11'] = excel_safe(full_desc)
         ws['V16'] = repl_qty
 
         photo_anchors = ['A16', 'Z22', 'A37', 'Z50', 'A63', 'Z63']
