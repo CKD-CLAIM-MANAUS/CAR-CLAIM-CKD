@@ -51,14 +51,10 @@ service cloud.firestore {
                     && request.resource.data.history is list;
       allow update: if canWrite()
                     && (isOwner(resource.data.userId) || isAdmin())
-                    // Só campos conhecidos — impede injeção de campos arbitrários.
-                    // Cobre create + campos adicionados em updates + legado (chassisNote).
-                    && request.resource.data.keys().hasOnly([
-                         'partNo','partName','model','orderNo','lotNo','ngQty','defect',
-                         'detected','carNum','incidentType','photos','user','userId',
-                         'updatedAt','status','createdAt','history',
-                         'sentAt','eta','tracking','receivedAt','completedAt',
-                         'carGeneratedAt','chassisNote'])
+                    // NB: sem hasOnly() aqui — documentos legados têm campos fora de
+                    // qualquer whitelist e a trava bloqueava updates reais (mudar status).
+                    // As proteções essenciais (userId/createdAt imutáveis, eta_confirmed
+                    // só-admin) continuam abaixo.
                     && (!('userId' in request.resource.data)
                         || request.resource.data.userId == resource.data.userId)
                     && (!('createdAt' in request.resource.data)
