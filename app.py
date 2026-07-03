@@ -41,7 +41,7 @@ else:
 # Aceita várias origens separadas por vírgula (GitHub Pages + Cloudflare Pages)
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get(
     'ALLOWED_ORIGIN',
-    'https://ckd-claim-manaus.github.io,https://car-claim-ckd.pages.dev'
+    'https://car-claim-ckd.pages.dev'
 ).split(',') if o.strip()]
 CLOUDINARY_BASE = 'https://res.cloudinary.com/dos2jsgzg/'
 TEMPLATE_PATH   = os.path.join(os.path.dirname(__file__), 'template.xlsx')

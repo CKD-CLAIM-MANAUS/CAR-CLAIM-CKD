@@ -13,8 +13,7 @@ import {
 
 // SEGURANÇA: restringir esta API key na Firebase Console →
 // Google Cloud Console → APIs → Browser key → Restrições de aplicação → HTTP referrers
-// Referrers configurados: https://ckd-claim-manaus.github.io/*,
-// https://car-claim-ckd.pages.dev/* e http://localhost:*
+// Referrers configurados: https://car-claim-ckd.pages.dev/* e http://localhost:*
 const firebaseConfig = {
   apiKey: "AIzaSyBkOtlCGjrfSkR2HgVP2OOv4UZpW6txm90",
   authDomain: "car-garantia.firebaseapp.com",
