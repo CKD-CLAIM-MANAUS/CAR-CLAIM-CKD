@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v60';
+const CACHE_NAME = 'car-garantia-v61';
 
 // Assets estáticos — caminhos RELATIVOS ao scope do SW, para funcionar tanto
 // no GitHub Pages (/CAR-CLAIM-CKD/) como no Cloudflare Pages (raiz /).
@@ -48,20 +48,19 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Serviços externos — sempre da rede (nunca cachear)
-  if (
-    url.hostname.includes('firebase') ||
-    url.hostname.includes('firestore') ||
-    url.hostname.includes('cloudinary') ||
-    url.hostname.includes('googleapis') ||
-    url.hostname.includes('gstatic') ||
-    url.hostname.includes('jsdelivr') ||
-    url.hostname.includes('fonts.google') ||
-    url.hostname.includes('onrender.com')
-  ) {
-    event.respondWith(fetch(event.request).catch(() => new Response('')));
-    return;
-  }
+  // ── RAIZ DA CORREÇÃO ──────────────────────────────────────────
+  // Só interceptamos requests do MESMO domínio (app shell + assets locais).
+  // Recursos externos (Firebase, Firestore, Cloudinary, backend Render, CDNs,
+  // fontes) passam DIRETO para a rede, sem passar pelo fetch() do SW.
+  // Motivo: um fetch() dentro do SW é regido pela diretiva `connect-src` da
+  // CSP. Ao interceptar <script>/<img>/fontes de outros domínios, prendíamos
+  // esses recursos ao connect-src (em vez de script-src/img-src/font-src),
+  // o que os bloqueava no pages.dev (onde a CSP vem como header e alcança o SW).
+  // Deixando passar, o navegador os governa pela diretiva correta.
+  if (url.origin !== self.location.origin) return;
+
+  // Só cacheamos GET
+  if (event.request.method !== 'GET') return;
 
   // Ficheiros JS — rede primeiro, cache como fallback offline
   // Garante que o JS mais recente é sempre servido
