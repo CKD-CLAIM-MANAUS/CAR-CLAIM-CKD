@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v59';
+const CACHE_NAME = 'car-garantia-v60';
 
 // Assets estáticos — caminhos RELATIVOS ao scope do SW, para funcionar tanto
 // no GitHub Pages (/CAR-CLAIM-CKD/) como no Cloudflare Pages (raiz /).
