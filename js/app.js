@@ -606,20 +606,23 @@ function renderList() {
     ? `<div class="stat-trend down">↓ ${diff} este mês</div>`
     : `<div class="stat-trend flat">— igual ao mês anterior</div>`;
 
-  document.getElementById('statTotal').textContent   = stats.total;
-  document.getElementById('statPending').textContent = stats.pending;
-  document.getElementById('statDone').textContent    = stats.done;
+  document.getElementById('statTotal').textContent     = stats.total;
+  document.getElementById('statPending').textContent   = stats.pending;
+  const statInTransit = document.getElementById('statInTransit');
+  if (statInTransit) statInTransit.textContent          = stats.inTransit;
+  document.getElementById('statDone').textContent      = stats.done;
 
-  // Empty state KPIs (desktop detail panel) — sempre todos os incidentes
-  const IN_TRANSIT = ['sent', 'awaiting', 'eta_confirmed', 'received'];
+  // Empty state KPIs (desktop detail panel) — sempre TODOS os incidentes,
+  // mesma repartição por status da lateral (via getStats).
+  const allStats = getStats(incidents);
   const emT  = document.getElementById('emptyTotal');
   const emP  = document.getElementById('emptyPending');
   const emTr = document.getElementById('emptyInTransit');
   const emD  = document.getElementById('emptyDone');
-  if (emT)  emT.textContent  = incidents.length;
-  if (emP)  emP.textContent  = incidents.filter(i => (i.status || 'pending') === 'pending').length;
-  if (emTr) emTr.textContent = incidents.filter(i => IN_TRANSIT.includes(i.status)).length;
-  if (emD)  emD.textContent  = incidents.filter(i => i.status === 'done').length;
+  if (emT)  emT.textContent  = allStats.total;
+  if (emP)  emP.textContent  = allStats.pending;
+  if (emTr) emTr.textContent = allStats.inTransit;
+  if (emD)  emD.textContent  = allStats.done;
 
   // Tendência no card total
   const trendEl = document.getElementById('statTrend');
@@ -2954,11 +2957,10 @@ window.exportFullExcel = async (type, model, fromStr, toStr) => {
     to:   { row: headerRowNum + list.length, column: HEADERS.length },
   };
 
-  const totalNG    = list.reduce((s, i) => s + (parseInt(i.ngQty) || 0), 0);
-  const nPending   = list.filter(i => (i.status || 'pending') === 'pending').length;
-  const nDone      = list.filter(i => i.status === 'done').length;
+  const totalNG = list.reduce((s, i) => s + (parseInt(i.ngQty) || 0), 0);
+  const st      = getStats(list); // mesma repartição da lateral/painel
   _xlAddTotalsRow(ws, HEADERS.length,
-    `TOTAIS: ${list.length} incidentes · ${totalNG} peças NG · ${nPending} pendentes · ${nDone} encerrados`);
+    `TOTAIS: ${list.length} incidentes · ${totalNG} peças NG · ${st.pending} pendentes · ${st.inTransit} em trânsito · ${st.done} encerrados`);
 
   const date = new Date().toISOString().slice(0, 10);
   await _xlDownload(wb, `CAR-Garantia-${date}.xlsx`);

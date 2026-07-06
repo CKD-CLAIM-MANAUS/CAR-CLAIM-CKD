@@ -369,9 +369,12 @@ export function filterIncidents(incidents, { filter = 'all', search = '', incide
 }
 
 // ── Stats ─────────────────────────────────────────────────────
+// Repartição por status (mesma definição em toda a app: lateral, painel e Excel)
 export function getStats(incidents) {
-  const total   = incidents.length;
-  const done    = incidents.filter(i => i.status === 'done').length;
-  const pending = total - done;
-  return { total, done, pending };
+  const IN_TRANSIT = ['sent', 'awaiting', 'eta_confirmed', 'received'];
+  const total     = incidents.length;
+  const done      = incidents.filter(i => i.status === 'done').length;
+  const pending   = incidents.filter(i => (i.status || 'pending') === 'pending').length;
+  const inTransit = incidents.filter(i => IN_TRANSIT.includes(i.status)).length;
+  return { total, pending, inTransit, done };
 }

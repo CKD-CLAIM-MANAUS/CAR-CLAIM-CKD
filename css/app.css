@@ -513,7 +513,7 @@ img { display: block; max-width: 100%; }
 /* ── Stats Row ──────────────────────────────────────────────── */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -521,19 +521,20 @@ img { display: block; max-width: 100%; }
 .stat-card {
   background: var(--bg-deep);
   border-radius: var(--radius-lg);
-  padding: 18px 10px 14px;
+  padding: 16px 6px 12px;
   text-align: center;
   border: 1px solid var(--border-md);
 }
 
 .stat-value {
-  font-size: 2rem;
+  font-size: 1.6rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.04em;
 }
 .stat-value.blue   { color: var(--blue-400); }
 .stat-value.amber  { color: var(--amber-500); }
+.stat-value.cyan   { color: #06B6D4; }
 .stat-value.green  { color: var(--green-500); }
 
 .stat-label {
@@ -1278,7 +1279,8 @@ img { display: block; max-width: 100%; }
   .form-grid { grid-template-columns: 1fr; }
   .field-full { grid-column: 1; }
   .stats-row { gap: 6px; }
-  .stat-value { font-size: 24px; }
+  .stat-value { font-size: 20px; }
+  .stat-card { padding: 14px 4px 10px; }
 }
 
 /* ── Desktop Layout → ver css/desktop.css ───────────────────── */
