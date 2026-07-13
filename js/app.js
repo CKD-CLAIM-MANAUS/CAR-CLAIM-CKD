@@ -174,9 +174,25 @@ window.doLogin = async () => {
   const email = document.getElementById('loginEmail').value.trim();
   const pass  = document.getElementById('loginPass').value;
   setAuthLoading('loginBtn', true, 'Entrar');
+
+  // Watchdog anti-travamento: no 1º login após ligar o PC, o Firebase Auth
+  // por vezes fica pendente sem resolver (persistência IndexedDB a assentar).
+  // Se passar de 12s sem resposta, recarrega a página — o reload resolve de
+  // forma fiável — em vez de ficar preso em "Aguarde…" para sempre.
+  let settled = false;
+  const watchdog = setTimeout(() => {
+    if (settled) return;
+    showAuthError('A ligação demorou a responder. A recarregar…');
+    setTimeout(() => window.location.reload(), 1400);
+  }, 12000);
+
   try {
     await login(email, pass);
+    settled = true;
+    clearTimeout(watchdog);
   } catch (e) {
+    settled = true;
+    clearTimeout(watchdog);
     showAuthError(e.message);
     setAuthLoading('loginBtn', false, 'Entrar');
   }

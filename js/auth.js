@@ -65,6 +65,15 @@ function clearSessionTimer() {
 export function initAuth(onLogin, onLogout) {
   fbAuth.onAuthStateChanged(auth, async (user) => {
     if (user) {
+      // Verifica expiração ANTES de qualquer leitura ao Firestore.
+      // Após uma noite com o PC desligado, a sessão de 8h expira; ler o role
+      // do Firestore com essa sessão morta pode travar a frio no arranque.
+      const ts = parseInt(localStorage.getItem(SESSION_KEY) || '0');
+      if (ts > 0 && Date.now() - ts > SESSION_TIMEOUT_MS) {
+        await fbAuth.signOut(auth);
+        return;
+      }
+
       currentUser = user;
       try {
         const snap = await fb.getDoc(fb.doc(db, 'users', user.uid));
@@ -74,13 +83,6 @@ export function initAuth(onLogin, onLogout) {
       } catch {
         isAdmin  = false;
         isViewer = false;
-      }
-
-      // Verifica se a sessão não expirou
-      const ts = parseInt(localStorage.getItem(SESSION_KEY) || '0');
-      if (ts > 0 && Date.now() - ts > SESSION_TIMEOUT_MS) {
-        await fbAuth.signOut(auth);
-        return;
       }
 
       startSessionTimer();
