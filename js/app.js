@@ -2134,13 +2134,18 @@ window.saveForm = async () => {
       incidentType: currentIncidentType,
     };
 
+    // Garante um rascunho fresco ANTES da gravação — se a rede travar ou o
+    // upload falhar, nada do que foi digitado/fotografado se perde.
+    await saveDraft();
+
     await saveIncident(formData, currentPhotos, editingId, currentUser);
     clearDraft();
     showToast(editingId ? '✅ Actualizado!' : '✅ Incidente registado!');
     editingId = null;
     goToList();
   } catch (e) {
-    showToast('Erro ao guardar: ' + e.message);
+    // Falha (ex.: backend a acordar / rede) — o rascunho ficou guardado.
+    showToast('⚠️ ' + e.message + ' Os seus dados ficaram guardados — toque em Guardar para tentar de novo.', 6000);
   }
 
   btn.disabled = false;

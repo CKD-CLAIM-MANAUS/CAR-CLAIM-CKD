@@ -73,6 +73,39 @@ function _compressImageLegacy(file, maxW = 1280) {
 // (unsigned) foi desactivado. Sem assinatura do servidor não há upload.
 const SIGN_URL = 'https://car-claim-manaus.onrender.com/sign-upload';
 
+// fetch com timeout (AbortController) — impede que um upload fique preso para
+// sempre quando o backend Render está a acordar (cold start) ou a rede falha.
+// Sem isto, o "A guardar..." podia ficar congelado indefinidamente.
+async function fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Pede a assinatura ao backend. Tenta 2x: o plano free hiberna e a 1ª chamada
+// pode expirar no cold start; a 2ª já apanha o servidor a acordar.
+async function getUploadSignature(token) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetchWithTimeout(SIGN_URL, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }, 45000);
+      if (!res.ok) throw new Error('Falha ao autorizar o upload da foto');
+      return await res.json();
+    } catch (e) {
+      if (attempt === 2) {
+        throw new Error('O servidor demorou a responder. Tente guardar novamente em alguns segundos.');
+      }
+      // 1ª tentativa falhou (provável cold start) → repete
+    }
+  }
+}
+
 export async function uploadPhoto(file) {
   // Bloqueia uploads sem sessão Firebase activa
   if (!auth.currentUser) {
@@ -80,13 +113,9 @@ export async function uploadPhoto(file) {
   }
 
   // 1. Pede uma assinatura ao servidor (autenticado com token Firebase)
-  const token  = await auth.currentUser.getIdToken();
-  const sigRes = await fetch(SIGN_URL, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-  if (!sigRes.ok) throw new Error('Falha ao autorizar o upload da foto');
-  const { signature, timestamp, apiKey, folder, allowedFormats, cloudName } = await sigRes.json();
+  const token = await auth.currentUser.getIdToken();
+  const { signature, timestamp, apiKey, folder, allowedFormats, cloudName } =
+    await getUploadSignature(token);
 
   // 2. Upload assinado ao Cloudinary
   // allowed_formats tem de ser enviado tal como foi assinado pelo servidor.
@@ -97,9 +126,11 @@ export async function uploadPhoto(file) {
   fd.append('folder', folder);
   if (allowedFormats) fd.append('allowed_formats', allowedFormats);
   fd.append('signature', signature);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-    method: 'POST', body: fd
-  });
+  const res = await fetchWithTimeout(
+    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+    { method: 'POST', body: fd },
+    90000
+  );
   if (!res.ok) throw new Error('Falha no upload da foto');
   const data = await res.json();
   return { url: data.secure_url, publicId: data.public_id };
