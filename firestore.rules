@@ -6,10 +6,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Só quem foi provisionado por um admin (tem doc em users/{uid}) tem acesso.
+    // Isto BLOQUEIA contas auto-registadas via config pública do Firebase:
+    // estar autenticado já não basta — é preciso um perfil criado pelo admin.
+    function hasProfile() {
+      return isAuth()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     // Papel do utilizador (users/{uid}.role); '' se não tiver perfil.
     function getRole() {
-      return (isAuth()
-              && exists(/databases/$(database)/documents/users/$(request.auth.uid)))
+      return hasProfile()
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
         : '';
     }
@@ -18,10 +25,9 @@ service cloud.firestore {
       return getRole() == 'admin';
     }
 
-    // Pode escrever = autenticado e NÃO é viewer (só-leitura).
-    // Utilizadores sem perfil mantêm permissão de escrita (compatibilidade).
+    // Pode escrever = tem perfil (provisionado por admin) e NÃO é viewer (só-leitura).
     function canWrite() {
-      return isAuth() && getRole() != 'viewer';
+      return hasProfile() && getRole() != 'viewer';
     }
 
     function isOwner(userId) {
@@ -38,7 +44,7 @@ service cloud.firestore {
     // Segurança real: userId obrigatoriamente == utilizador autenticado
     // Impede impersonação e garante rastreabilidade
     match /incidents/{incidentId} {
-      allow read:   if isAuth();
+      allow read:   if hasProfile();
       allow create: if canWrite()
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.keys().hasOnly([
@@ -71,7 +77,7 @@ service cloud.firestore {
 
     // ── Numeração CAR ─────────────────────────────────────────
     match /carNumbers/{docId} {
-      allow read:          if isAuth();
+      allow read:          if hasProfile();
       allow create:        if canWrite()
                            && request.resource.data.keys().hasOnly(['year','num','createdAt']);
       allow update, delete: if isAdmin();
@@ -79,19 +85,19 @@ service cloud.firestore {
 
     // ── Base de peças (partsDB) ───────────────────────────────
     match /partsDB/{partId} {
-      allow read:  if isAuth();
+      allow read:  if hasProfile();
       allow write: if isAdmin();
     }
 
     // ── Lotes (lotNo → pedido manual) ─────────────────────────
     match /lotsDB/{lotId} {
-      allow read:  if isAuth();
+      allow read:  if hasProfile();
       allow write: if isAdmin();
     }
 
     // ── Stock ─────────────────────────────────────────────────
     match /stock/{partId} {
-      allow read:  if isAuth();
+      allow read:  if hasProfile();
       allow write: if canWrite()
                    && request.resource.data.keys().hasOnly([
                         'partNo','partName','qty','updatedAt','updatedBy'])
@@ -100,7 +106,7 @@ service cloud.firestore {
 
     // ── Movimentos de stock ───────────────────────────────────
     match /stockMovements/{moveId} {
-      allow read:   if isAuth();
+      allow read:   if hasProfile();
       allow create: if canWrite()
                     && request.resource.data.keys().hasOnly([
                          'partNo','partName','type','qty','qtyBefore','qtyAfter',
