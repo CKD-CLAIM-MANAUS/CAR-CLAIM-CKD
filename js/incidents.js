@@ -358,11 +358,20 @@ export function filterIncidents(incidents, { filter = 'all', search = '', incide
       filter === 'all'
       || filter === st
       || (filter === 'inprogress' && IN_PROGRESS_STATUSES.includes(st));
+    // Busca por Nº CAR — aceita "car072", "CAR 72", "072" ou "72".
+    // O carNum guardado é só o número (ex: "072"); ignora "car", espaços e
+    // zeros à esquerda para casar independentemente de como o utilizador digita.
+    const carN       = String(inc.carNum || '').split('/')[0].trim();
+    const qCarDigits = q.replace(/car/g, '').replace(/[^0-9]/g, '');
+    const matchCar   = !!qCarDigits && !!carN
+      && (carN.includes(qCarDigits) || parseInt(carN, 10) === parseInt(qCarDigits, 10));
+
     const matchSearch = !q
       || (inc.partNo   || '').toLowerCase().includes(q)
       || (inc.partName || '').toLowerCase().includes(q)
       || (inc.model    || '').toLowerCase().includes(q)
-      || (inc.orderNo  || '').toLowerCase().includes(q);
+      || (inc.orderNo  || '').toLowerCase().includes(q)
+      || matchCar;
     const matchType = !incidentType || (inc.incidentType || 'normal') === incidentType;
     return matchFilter && matchSearch && matchType;
   });
