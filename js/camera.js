@@ -13,6 +13,7 @@ function showFileError(msg) {
 }
 
 let cameraStream = null;
+let cameraOpening = false; // trava contra abertura dupla (duplo-toque no botão)
 
 // ── Compress image ────────────────────────────────────────────
 // Caminho rápido: createImageBitmap decodifica FORA da main thread (o decode
@@ -262,6 +263,11 @@ export async function openCamera(onCapture, onError) {
     onError(new Error('Camera API not supported'));
     return;
   }
+  // Limpa qualquer overlay/stream anterior e evita corrida de duplo-toque
+  // (dois overlays com o mesmo id ficavam presos na tela ao fechar).
+  closeCamera();
+  if (cameraOpening) return;
+  cameraOpening = true;
 
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -272,24 +278,30 @@ export async function openCamera(onCapture, onError) {
       cameraStream,
       async (canvas) => {
         closeCamera();
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-        const byteStr = atob(dataUrl.split(',')[1]);
-        const arr = new Uint8Array(byteStr.length);
-        for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
-        const blob = new Blob([arr], { type: 'image/jpeg' });
-        const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        const { dataUrl: compUrl, compFile } = await compressImage(file);
+        try {
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          const byteStr = atob(dataUrl.split(',')[1]);
+          const arr = new Uint8Array(byteStr.length);
+          for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
+          const blob = new Blob([arr], { type: 'image/jpeg' });
+          const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+          const { dataUrl: compUrl, compFile } = await compressImage(file);
 
-        // Mostra preview antes de confirmar
-        showPhotoPreview(
-          compUrl,
-          // Confirmar — upload imediato
-          async () => { await uploadAndAdd(compFile, compUrl, onCapture); },
-          // Tentar outra vez — reabre câmera
-          () => { openCamera(onCapture, onError); },
-          // Cancelar
-          () => {}
-        );
+          // Mostra preview antes de confirmar
+          showPhotoPreview(
+            compUrl,
+            // Confirmar — upload imediato
+            async () => { await uploadAndAdd(compFile, compUrl, onCapture); },
+            // Tentar outra vez — reabre câmera
+            () => { openCamera(onCapture, onError); },
+            // Cancelar
+            () => {}
+          );
+        } catch (err) {
+          // Falha ao processar a captura — a câmera já foi fechada acima.
+          console.warn('Captura falhou:', err);
+          showFileError('❌ Não foi possível processar a foto. Tente de novo.');
+        }
       },
       () => { closeCamera(); }
     );
@@ -299,6 +311,8 @@ export async function openCamera(onCapture, onError) {
   } catch (e) {
     console.warn('getUserMedia failed:', e.message);
     onError(e);
+  } finally {
+    cameraOpening = false;
   }
 }
 
@@ -345,5 +359,16 @@ function createCameraOverlay(stream, onCapture, onClose) {
 
 function closeCamera() {
   if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
-  document.getElementById('cameraOverlay')?.remove();
+  // Remove TODOS os overlays de câmera — defensivo contra duplicados que
+  // ficavam presos na tela (getElementById só removia um). Para também o
+  // stream de cada <video>, garantindo que a câmera/LED desliga mesmo em
+  // overlays que perderam a referência global.
+  document.querySelectorAll('#cameraOverlay').forEach(el => {
+    el.querySelectorAll('video').forEach(v => {
+      const s = v.srcObject;
+      if (s && s.getTracks) s.getTracks().forEach(t => t.stop());
+      v.srcObject = null;
+    });
+    el.remove();
+  });
 }
