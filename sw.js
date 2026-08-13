@@ -1,5 +1,5 @@
 // ── Service Worker — CAR Garantia CFMOTO ─────────────────────
-const CACHE_NAME = 'car-garantia-v65';
+const CACHE_NAME = 'car-garantia-v66';
 
 // Assets estáticos — caminhos RELATIVOS ao scope do SW, para funcionar tanto
 // no GitHub Pages (/CAR-CLAIM-CKD/) como no Cloudflare Pages (raiz /).
@@ -7,12 +7,13 @@ const STATIC_ASSETS = [
   './',
   './index.html',
   './css/app.css',
+  './css/desktop.css',
   './logo.png',
   './manifest.json',
 ];
 
-// Ficheiros JS — nunca pre-cached, sempre rede primeiro
-const JS_PATTERN = /\/js\/.*\.js$/;
+// Extensões tratadas como imagem (cache primeiro).
+const IMG_PATTERN = /\.(png|jpe?g|gif|webp|svg|ico)$/i;
 
 // ── Install ───────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
@@ -48,48 +49,51 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // ── RAIZ DA CORREÇÃO ──────────────────────────────────────────
-  // Só interceptamos requests do MESMO domínio (app shell + assets locais).
-  // Recursos externos (Firebase, Firestore, Cloudinary, backend Render, CDNs,
-  // fontes) passam DIRETO para a rede, sem passar pelo fetch() do SW.
-  // Motivo: um fetch() dentro do SW é regido pela diretiva `connect-src` da
-  // CSP. Ao interceptar <script>/<img>/fontes de outros domínios, prendíamos
-  // esses recursos ao connect-src (em vez de script-src/img-src/font-src),
-  // o que os bloqueava no pages.dev (onde a CSP vem como header e alcança o SW).
-  // Deixando passar, o navegador os governa pela diretiva correta.
+  // ── Recursos externos passam DIRETO para a rede ──────────────
+  // Firebase, Firestore, Cloudinary, backend Render, CDNs e fontes NÃO passam
+  // pelo fetch() do SW — senão ficariam presos ao `connect-src` da CSP (em vez
+  // de script-src/img-src/font-src) e seriam bloqueados no pages.dev.
   if (url.origin !== self.location.origin) return;
 
-  // Só cacheamos GET
+  // Só tratamos GET.
   if (event.request.method !== 'GET') return;
 
-  // Ficheiros JS — rede primeiro, cache como fallback offline
-  // Garante que o JS mais recente é sempre servido
-  if (JS_PATTERN.test(url.pathname)) {
+  // ── Imagens locais: CACHE PRIMEIRO ───────────────────────────
+  // Rápido e seguro — imagens não afetam a lógica do app.
+  if (IMG_PATTERN.test(url.pathname)) {
     event.respondWith(
-      fetch(event.request)
-        .then(response => {
+      caches.match(event.request).then(cached =>
+        cached || fetch(event.request).then(response => {
           if (response && response.status === 200) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
           }
           return response;
         })
-        .catch(() => caches.match(event.request))
+      )
     );
     return;
   }
 
-  // CSS / HTML / imagens — cache first, actualiza em background
+  // ── App shell (HTML + CSS + JS): REDE PRIMEIRO ───────────────
+  // Serve sempre a MESMA versão de HTML, CSS e JS juntos → elimina o
+  // "version skew" (JS novo a correr sobre HTML/CSS antigos em cache) que
+  // causava bugs de carregamento a cada deploy. O cache é só reserva offline.
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const fetchPromise = fetch(event.request).then(response => {
+    fetch(event.request)
+      .then(response => {
         if (response && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => cached);
-      return cached || fetchPromise;
-    })
+      })
+      .catch(() =>
+        caches.match(event.request).then(cached =>
+          cached || (event.request.mode === 'navigate'
+            ? caches.match('./index.html')
+            : undefined)
+        )
+      )
   );
 });
